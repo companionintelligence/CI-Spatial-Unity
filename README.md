@@ -15,7 +15,7 @@ Set Unity Ver 2022.3 LTS
 
 - Set URP
 - Import Packages
-# Ready Player Me 
+#### Ready Player Me 
 - head tends to move every time a new sentence
 - eyes pop a bit; also body pose pops on start
 
