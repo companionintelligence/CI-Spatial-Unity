@@ -27,7 +27,7 @@ The system performs **context-aware analysis** of passthrough visuals by streami
 
 ## 🛠️ Tech Stack
 
-- **Unity 6.0** (URP)
+- **Unity 6.0** (Built-In RP)
 - **XR Interaction Toolkit**
 - **Meta XR SDK**
 - **XREAL NRSDK**
@@ -71,9 +71,6 @@ Set Unity Ver 2022.3 LTS
 
 
 ### todo
-
-- Set URP
-- Import Packages
 #### Ready Player Me 
 - head tends to move every time a new sentence
 - eyes pop a bit; also body pose pops on start
