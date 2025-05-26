@@ -1,5 +1,4 @@
 # CI-Embodied-Companion-Unity
-![647e5c0ed5a1ce939b8a0e61_ready-player-me-3d-avatars-immersed-1](https://github.com/user-attachments/assets/b6e8785e-8dd4-4a3b-837d-1195aaa4a42b)
 
 **CI-Embodied-Companion-Unity** is an immersive avatar-based application designed for Meta Quest 3 and XREAL passthrough devices. It combines real-time camera passthrough with agentic AI analysis via the **Companion Intelligence server**, enabling dynamic, contextual interactions with an embodied virtual companion.
 
