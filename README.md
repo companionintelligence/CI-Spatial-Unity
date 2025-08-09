@@ -47,6 +47,9 @@ Setup: 5 Minutes
 
 4) Assign the `Florence2Controller` field:
    - `Api Configuration`: assign the ScriptableObject you created.
+   - Optional
+     - `Anchor Mode`: BoundingBox2D, SpatialAnchor3D, or Both.
+     - For 3D mode, assign `Spatial Anchor Prefab` (e.g., a world-space canvas with `TMP` label) and an `EnvironmentRaycastManager` in the scene. The controller casts a ray from detected box centers using `PassthroughCameraUtils.ScreenPointToRayInWorld`.
   
 Other field descriptions that are already assigned:
    - `Source Texture` (`RawImage`): the image to analyze, it's by default assigned to a RawImage that is fed by the Passthrough Camera of the Quest 3.
@@ -59,9 +62,6 @@ Other field descriptions that are already assigned:
      - `Bounding Box Prefab`: prefab containing a root `RectTransform` and a `TextMeshProUGUI` child for the label.
      - `Status Text` (`TMP_Text`): request status and errors.
      - `Loading Icon` (`GameObject`): optional spinner shown during requests.
-   - Anchors (optional)
-     - `Anchor Mode`: BoundingBox2D, SpatialAnchor3D, or Both.
-     - For 3D mode, assign `Spatial Anchor Prefab` (e.g., a world-space canvas with `TMP` label) and an `EnvironmentRaycastManager` in the scene. The controller casts a ray from detected box centers using `PassthroughCameraUtils.ScreenPointToRayInWorld`.
 
 5) Run a request
    - In Play Mode, click the `SendRequest()` button shown in the Inspector (NaughtyAttributes adds the button to the component).
