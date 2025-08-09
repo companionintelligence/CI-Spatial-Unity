@@ -1,6 +1,8 @@
 # Unity-MetaXR-AI-Florence
 Unity project integrating Microsoft Florence-2 (Vision-Language Model) via NVIDIA’s AI API, with an end-to-end controller and UI to run image understanding tasks in XR.
 
+![florence-xr-Trim-Trim-ezgif com-optimize](https://github.com/user-attachments/assets/429c9837-574e-4857-8843-1727167f73c3)
+
 🔎 Overview
 - Florence-2 is a multi-task vision-language model by Microsoft that supports captioning, detection, OCR, segmentation, region descriptions, and more using a single, tag-driven prompt format.
 - This project calls Florence-2 through NVIDIA’s hosted endpoint and parses the response to draw 2D bounding boxes or spawn 3D anchors in the scene.
@@ -49,7 +51,6 @@ Unity project integrating Microsoft Florence-2 (Vision-Language Model) via NVIDI
    - `Api Configuration`: assign the ScriptableObject you created.
    - Optional
      - `Anchor Mode`: BoundingBox2D, SpatialAnchor3D, or Both.
-     - For 3D mode, assign `Spatial Anchor Prefab` (e.g., a world-space canvas with `TMP` label) and an `EnvironmentRaycastManager` in the scene. The controller casts a ray from detected box centers using `PassthroughCameraUtils.ScreenPointToRayInWorld`.
   
 Other field descriptions that are already assigned:
    - `Source Texture` (`RawImage`): the image to analyze, it's by default assigned to a RawImage that is fed by the Passthrough Camera of the Quest 3.
@@ -63,9 +64,10 @@ Other field descriptions that are already assigned:
      - `Status Text` (`TMP_Text`): request status and errors.
      - `Loading Icon` (`GameObject`): optional spinner shown during requests.
 
-5) Run a request
-   - In Play Mode, click the `SendRequest()` button shown in the Inspector (NaughtyAttributes adds the button to the component).
+5) Run a request / Build to device
+   - In Play Mode, click the `SendRequest()` button shown in the Inspector (NaughtyAttributes adds the button to the component). In the editor only the Anchor Mode "Bounding Box 2D" will work.
    - Or call it via script if you have a reference: `controller.SendRequest();`
+   - If you want to test the "Spatial Label 3D" anchor mode (the one shown in the video above), you must build the scene to your Quest 3 device.
 
 🛠️ How It Works (Under the Hood)
 1) Image encoding
