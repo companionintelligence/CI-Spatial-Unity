@@ -224,7 +224,6 @@ namespace PresentFutures.XRAI.Florence
             };
             string jsonPayload = JsonConvert.SerializeObject(payload);
 
-            // --- Corrected Coroutine Logic ---
             statusText.text = "Sending request...";
             
             // Start the async network request and get a "Task" handle for it.
@@ -265,8 +264,7 @@ namespace PresentFutures.XRAI.Florence
             }
         }
 
-    // THIS IS THE NEW ASYNC METHOD THAT REPLACES THE UnityWebRequest LOGIC
-    // It uses the standard .NET HttpClient for full control over the request.
+    // Standard .NET HttpClient for full control over the request.
     private async Task<byte[]> SendRequestWithHttpClientAsync(string jsonPayload)
     {
         // Use 'using' to ensure the client is disposed of correctly
@@ -533,6 +531,7 @@ namespace PresentFutures.XRAI.Florence
         }
         #endregion
 
+        //Clear all created anchors
         private void ClearAnchors()
         {
             foreach (var go in _spawnedAnchors)
