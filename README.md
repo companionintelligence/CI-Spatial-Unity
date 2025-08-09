@@ -1,6 +1,8 @@
 # Unity-MetaXR-AI-Florence
 Unity project integrating Microsoft Florence-2 (Vision-Language Model) via NVIDIA’s AI API, with an end-to-end controller and UI to run image understanding tasks in XR.
 
+![florence-xr-Trim-Trim-ezgif com-optimize](https://github.com/user-attachments/assets/429c9837-574e-4857-8843-1727167f73c3)
+
 🔎 Overview
 - Florence-2 is a multi-task vision-language model by Microsoft that supports captioning, detection, OCR, segmentation, region descriptions, and more using a single, tag-driven prompt format.
 - This project calls Florence-2 through NVIDIA’s hosted endpoint and parses the response to draw 2D bounding boxes or spawn 3D anchors in the scene.
