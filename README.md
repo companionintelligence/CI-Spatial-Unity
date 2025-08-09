@@ -86,6 +86,14 @@ Other field descriptions that are already assigned:
    - 2D: Converts Florence coordinates `[x1, y1, x2, y2]` to width/height and spawns the bounding box prefab under `BoundingBoxContainer`, scaled to `Result Image` size.
    - 3D: Projects box center to a world-space ray and uses `EnvironmentRaycastManager.Raycast` to place an anchor prefab at the hit point, labeled with the detection class.
 
+⚠️ Limitations
+- Minimize head/device movement from the moment you capture and send the frame until the response returns. This ensures the depth/passthrough frame alignment remains valid when projecting detections back into the scene.
+- Because requests are network-bound, latency can cause pose drift relative to the original capture. If you move, the raycast from the detected 2D box center may no longer intersect the same real-world surface.
+- Tips:
+  - Prefer testing while stationary, or on a tripod/stand when possible.
+  - Capture and cache the head/camera pose at send-time and consider reprojecting using that pose when placing anchors (future improvement path).
+  - Use the 2D Bounding Box mode in-Editor; reserve 3D Spatial labels for on-device tests where pose is more stable during a single request.
+
 🧩 Extending
 - Segmentation: Use `overlay.png` (if returned) or the `Entities` segmentation data to render masks or outlines.
 - OCR: Display `Message.Content`/entities in the UI, draw text regions.
