@@ -145,7 +145,7 @@ namespace PresentFutures.XRAI.Florence
         [Tooltip("UI GameObject (e.g. spinner) to show while waiting for results")]
         public GameObject loadingIcon;
 
-        public enum FlorenceAnchorMode { BoundingBox2D, SpatialAnchor3D, Both }
+        public enum FlorenceAnchorMode { BoundingBox2D, SpatialLabel3D, Both }
 
         [Header("Anchor Mode")]
         [Tooltip("Choose how to visualize detections: 2D bounding boxes or 3D spatial anchors")] 
@@ -506,7 +506,7 @@ namespace PresentFutures.XRAI.Florence
                     
                     _spawnedBoxes.Add(boxGO);
                 }
-                if ((anchorMode == FlorenceAnchorMode.SpatialAnchor3D || anchorMode == FlorenceAnchorMode.Both) && spatialAnchorPrefab != null && environmentRaycastManager != null)
+                if ((anchorMode == FlorenceAnchorMode.SpatialLabel3D || anchorMode == FlorenceAnchorMode.Both) && spatialAnchorPrefab != null && environmentRaycastManager != null)
                 {
                     int centerX = Mathf.RoundToInt(x + w * 0.5f);
                     int centerY = Mathf.RoundToInt(y + h * 0.5f);
