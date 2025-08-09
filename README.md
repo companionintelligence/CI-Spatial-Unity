@@ -64,9 +64,10 @@ Other field descriptions that are already assigned:
      - `Status Text` (`TMP_Text`): request status and errors.
      - `Loading Icon` (`GameObject`): optional spinner shown during requests.
 
-5) Run a request
-   - In Play Mode, click the `SendRequest()` button shown in the Inspector (NaughtyAttributes adds the button to the component).
+5) Run a request / Build to device
+   - In Play Mode, click the `SendRequest()` button shown in the Inspector (NaughtyAttributes adds the button to the component). In the editor only the Anchor Mode "Bounding Box 2D" will work.
    - Or call it via script if you have a reference: `controller.SendRequest();`
+   - If you want to test the "Spatial Label 3D" anchor mode (the one shown in the video above), you must build the scene to your Quest 3 device.
 
 🛠️ How It Works (Under the Hood)
 1) Image encoding
