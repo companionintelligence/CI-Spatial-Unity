@@ -51,7 +51,6 @@ Unity project integrating Microsoft Florence-2 (Vision-Language Model) via NVIDI
    - `Api Configuration`: assign the ScriptableObject you created.
    - Optional
      - `Anchor Mode`: BoundingBox2D, SpatialAnchor3D, or Both.
-     - For 3D mode, assign `Spatial Anchor Prefab` (e.g., a world-space canvas with `TMP` label) and an `EnvironmentRaycastManager` in the scene. The controller casts a ray from detected box centers using `PassthroughCameraUtils.ScreenPointToRayInWorld`.
   
 Other field descriptions that are already assigned:
    - `Source Texture` (`RawImage`): the image to analyze, it's by default assigned to a RawImage that is fed by the Passthrough Camera of the Quest 3.
