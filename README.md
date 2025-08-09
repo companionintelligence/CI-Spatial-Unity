@@ -45,8 +45,10 @@ Setup: 5 Minutes
 3) Open the sample scene
    - `Assets/XR-AI-Florence2/Scenes/XR-AI-Florence2.unity`.
 
-4) Assign the `Florence2Controller` fields
+4) Assign the `Florence2Controller` field:
    - `Api Configuration`: assign the ScriptableObject you created.
+  
+Other field descriptions that are already assigned:
    - `Source Texture` (`RawImage`): the image to analyze, it's by default assigned to a RawImage that is fed by the Passthrough Camera of the Quest 3.
    - `Task`: choose a task from the dropdown. For now, the only task that is fully implemented is Object Recognition.
    - `Region Of Interest`: used by region-based tasks. Coordinates are normalized (0–1) as a Rect (x, y, width, height).
