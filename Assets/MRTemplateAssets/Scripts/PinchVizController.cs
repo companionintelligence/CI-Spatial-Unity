@@ -1,23 +1,33 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
+/// <summary>
+/// Controls visual feedback for pinch gestures by adjusting blend shape weights based on input values.
+/// </summary>
 public class PinchVizController : MonoBehaviour
 {
     [SerializeField]
+    [Tooltip("The skinned mesh renderer to control for pinch visualization.")]
     SkinnedMeshRenderer m_Pointer;
 
     XRRayInteractor m_Interactor;
 
-    // Start is called before the first frame update
     void Start()
     {
-        m_Interactor = this.GetComponent<XRRayInteractor>();
+        m_Interactor = GetComponent<XRRayInteractor>();
+        if (m_Interactor == null)
+        {
+            Debug.LogWarning($"PinchVizController: No XRRayInteractor found on {name}", this);
+            enabled = false;
+        }
     }
 
-    // Update is called once per frame
     void Update()
     {
-        var inputValue = Mathf.Max(m_Interactor.selectInput.ReadValue(), m_Interactor.uiPressInput.ReadValue());
-        m_Pointer.SetBlendShapeWeight(0, inputValue * 100f);
+        if (m_Interactor != null && m_Pointer != null)
+        {
+            var inputValue = Mathf.Max(m_Interactor.selectInput.ReadValue(), m_Interactor.uiPressInput.ReadValue());
+            m_Pointer.SetBlendShapeWeight(0, inputValue * 100f);
+        }
     }
 }

@@ -3,36 +3,55 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.Serialization;
 
+/// <summary>
+/// Controls the fade animation of plane materials including dot radius and alpha values.
+/// </summary>
 public class FadePlaneMaterial : MonoBehaviour
 {
-    // attached game object for fading
-    public GameObject Plane;
+    [SerializeField]
+    [Tooltip("The plane GameObject whose material will be faded.")]
+    GameObject m_Plane;
 
-    // fade speed length
-    public float fadeSpeed = 1f;
+    [SerializeField]
+    [Tooltip("Duration of the dot fade effect in seconds.")]
+    float m_FadeSpeed = 1f;
 
-    // fade alpha speed length
-    public float fadeAlphaSpeed = 0.5f;
+    [SerializeField]
+    [Tooltip("Duration of the alpha fade effect in seconds.")]
+    float m_FadeAlphaSpeed = 0.5f;
 
-    // view radius
-    public float viewRadius = 2.5f;
+    [SerializeField]
+    [Tooltip("Maximum view radius for the dot effect.")]
+    float m_ViewRadius = 2.5f;
 
-    // alpha
-    public float alpha = 0.5f;
+    [SerializeField]
+    [Tooltip("Target alpha value when visible.")]
+    float m_Alpha = 0.5f;
 
     Coroutine m_FadeDotsCoroutine;
     Coroutine m_FadeAlphaCoroutine;
+    Renderer m_CachedRenderer;
     static readonly int k_DotViewRadius = Shader.PropertyToID("_DotViewRadius");
     static readonly int k_Alpha = Shader.PropertyToID("_Alpha");
 
     void Awake()
     {
-        Renderer rend = Plane.transform.GetComponent<Renderer>();
-        rend.material.SetFloat(k_DotViewRadius, 0f);
-        rend.material.SetFloat(k_Alpha, 0f);
+        if (m_Plane != null)
+        {
+            m_CachedRenderer = m_Plane.GetComponent<Renderer>();
+            if (m_CachedRenderer != null)
+            {
+                m_CachedRenderer.material.SetFloat(k_DotViewRadius, 0f);
+                m_CachedRenderer.material.SetFloat(k_Alpha, 0f);
+            }
+        }
         FadePlane(true);
     }
 
+    /// <summary>
+    /// Initiates a fade effect on the plane material.
+    /// </summary>
+    /// <param name="visible">True to fade in, false to fade out.</param>
     public void FadePlane(bool visible)
     {
         if (m_FadeDotsCoroutine != null)
@@ -45,64 +64,79 @@ public class FadePlaneMaterial : MonoBehaviour
         m_FadeDotsCoroutine = StartCoroutine(FadeDots(visible));
     }
 
-    //Fade Coroutine
-    public IEnumerator FadeDots(bool visible)
+    /// <summary>
+    /// Coroutine that fades the dot view radius.
+    /// </summary>
+    IEnumerator FadeDots(bool visible)
     {
-        yield return new WaitForSeconds(fadeAlphaSpeed);
+        yield return new WaitForSeconds(m_FadeAlphaSpeed);
 
-        Renderer rend = Plane.transform.GetComponent<Renderer>();
-        float viewRadiusValue = rend.material.GetFloat(k_DotViewRadius);
+        if (m_CachedRenderer == null)
+        {
+            Debug.LogWarning($"FadePlaneMaterial: No renderer found on {name}", this);
+            yield break;
+        }
+
+        float viewRadiusValue = m_CachedRenderer.material.GetFloat(k_DotViewRadius);
 
         if (!visible)
         {
-            //while loop to deincrement Alpha value until object is invisible
-            while (rend.material.GetFloat(k_DotViewRadius) > 0f)
+            // Fade out dots
+            while (m_CachedRenderer.material.GetFloat(k_DotViewRadius) > 0f)
             {
-                viewRadiusValue -= Time.deltaTime / fadeSpeed;
-                rend.material.SetFloat(k_DotViewRadius, viewRadiusValue);
+                viewRadiusValue -= Time.deltaTime / m_FadeSpeed;
+                m_CachedRenderer.material.SetFloat(k_DotViewRadius, viewRadiusValue);
                 yield return null;
             }
-            rend.material.SetFloat(k_DotViewRadius, 0f);
+            m_CachedRenderer.material.SetFloat(k_DotViewRadius, 0f);
         }
-        else if (visible)
+        else
         {
-            //while loop to increment object Alpha value until object is opaque
-            while (rend.material.GetFloat(k_DotViewRadius) < viewRadius)
+            // Fade in dots
+            while (m_CachedRenderer.material.GetFloat(k_DotViewRadius) < m_ViewRadius)
             {
-                viewRadiusValue += Time.deltaTime / fadeSpeed;
-                rend.material.SetFloat(k_DotViewRadius, viewRadiusValue);
+                viewRadiusValue += Time.deltaTime / m_FadeSpeed;
+                m_CachedRenderer.material.SetFloat(k_DotViewRadius, viewRadiusValue);
                 yield return null;
             }
-            rend.material.SetFloat(k_DotViewRadius, viewRadius);
+            m_CachedRenderer.material.SetFloat(k_DotViewRadius, m_ViewRadius);
         }
     }
 
-    public IEnumerator FadeAlpha(bool visible)
+    /// <summary>
+    /// Coroutine that fades the alpha value.
+    /// </summary>
+    IEnumerator FadeAlpha(bool visible)
     {
-        Renderer rend = Plane.transform.GetComponent<Renderer>();
-        float alphaValue = rend.material.GetFloat(k_Alpha);
+        if (m_CachedRenderer == null)
+        {
+            Debug.LogWarning($"FadePlaneMaterial: No renderer found on {name}", this);
+            yield break;
+        }
+
+        float alphaValue = m_CachedRenderer.material.GetFloat(k_Alpha);
 
         if (!visible)
         {
-            //while loop to deincrement Alpha value until object is invisible
-            while (rend.material.GetFloat(k_Alpha) > 0f)
+            // Fade out alpha
+            while (m_CachedRenderer.material.GetFloat(k_Alpha) > 0f)
             {
-                alphaValue -= Time.deltaTime / fadeAlphaSpeed;
-                rend.material.SetFloat(k_DotViewRadius, alphaValue);
+                alphaValue -= Time.deltaTime / m_FadeAlphaSpeed;
+                m_CachedRenderer.material.SetFloat(k_Alpha, alphaValue);
                 yield return null;
             }
-            rend.material.SetFloat(k_Alpha, 0f);
+            m_CachedRenderer.material.SetFloat(k_Alpha, 0f);
         }
-        else if (visible)
+        else
         {
-            //while loop to increment object Alpha value until object is opaque
-            while (rend.material.GetFloat(k_Alpha) < alpha)
+            // Fade in alpha
+            while (m_CachedRenderer.material.GetFloat(k_Alpha) < m_Alpha)
             {
-                alphaValue += Time.deltaTime / fadeAlphaSpeed;
-                rend.material.SetFloat(k_Alpha, alphaValue);
+                alphaValue += Time.deltaTime / m_FadeAlphaSpeed;
+                m_CachedRenderer.material.SetFloat(k_Alpha, alphaValue);
                 yield return null;
             }
-            rend.material.SetFloat(k_Alpha, alpha);
+            m_CachedRenderer.material.SetFloat(k_Alpha, m_Alpha);
         }
     }
 }

@@ -1,16 +1,34 @@
 using System.Collections;
 using UnityEngine;
 
+/// <summary>
+/// Fades a material's alpha value over time for smooth visibility transitions.
+/// </summary>
 public class FadeMaterial : MonoBehaviour
 {
-    // attached game object for fading
-    public GameObject Environment;
+    [SerializeField]
+    [Tooltip("The GameObject whose material will be faded.")]
+    GameObject m_Environment;
 
-    // fade speed length
-    public float fadeSpeed;
+    [SerializeField]
+    [Tooltip("Duration of the fade effect in seconds.")]
+    float m_FadeSpeed = 1f;
 
     Coroutine m_FadeCoroutine;
+    Renderer m_CachedRenderer;
 
+    void Awake()
+    {
+        if (m_Environment != null)
+        {
+            m_CachedRenderer = m_Environment.GetComponent<Renderer>();
+        }
+    }
+
+    /// <summary>
+    /// Fades the skybox material to visible or invisible.
+    /// </summary>
+    /// <param name="visible">True to fade to invisible, false to fade to visible.</param>
     public void FadeSkybox(bool visible)
     {
         if (m_FadeCoroutine != null)
@@ -19,33 +37,40 @@ public class FadeMaterial : MonoBehaviour
         m_FadeCoroutine = StartCoroutine(Fade(visible));
     }
 
-    //Fade Coroutine
-    public IEnumerator Fade(bool visible)
+    /// <summary>
+    /// Coroutine that performs the fade animation.
+    /// </summary>
+    IEnumerator Fade(bool visible)
     {
-        Renderer rend = Environment.transform.GetComponent<Renderer>();
-        float alphaValue = rend.material.GetFloat("_Alpha");
+        if (m_CachedRenderer == null)
+        {
+            Debug.LogWarning($"FadeMaterial: No renderer found on {name}", this);
+            yield break;
+        }
+
+        float alphaValue = m_CachedRenderer.material.GetFloat("_Alpha");
 
         if (visible)
         {
-            //while loop to deincrement Alpha value until object is invisible
-            while (rend.material.GetFloat("_Alpha") > 0f)
+            // Fade to invisible
+            while (m_CachedRenderer.material.GetFloat("_Alpha") > 0f)
             {
-                alphaValue -= Time.deltaTime / fadeSpeed;
-                rend.material.SetFloat("_Alpha", alphaValue);
+                alphaValue -= Time.deltaTime / m_FadeSpeed;
+                m_CachedRenderer.material.SetFloat("_Alpha", alphaValue);
                 yield return null;
             }
-            rend.material.SetFloat("_Alpha", 0f);
+            m_CachedRenderer.material.SetFloat("_Alpha", 0f);
         }
-        else if (!visible)
+        else
         {
-            //while loop to increment object Alpha value until object is opaque
-            while (rend.material.GetFloat("_Alpha") < 1f)
+            // Fade to visible
+            while (m_CachedRenderer.material.GetFloat("_Alpha") < 1f)
             {
-                alphaValue += Time.deltaTime / fadeSpeed;
-                rend.material.SetFloat("_Alpha", alphaValue);
+                alphaValue += Time.deltaTime / m_FadeSpeed;
+                m_CachedRenderer.material.SetFloat("_Alpha", alphaValue);
                 yield return null;
             }
-            rend.material.SetFloat("_Alpha", 1f);
+            m_CachedRenderer.material.SetFloat("_Alpha", 1f);
         }
     }
 }
