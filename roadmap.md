@@ -899,3 +899,664 @@ A complete house mapping session produces:
 | **MRUK** | Meta Room Understanding Kit — Quest 3 spatial understanding for raycasting |
 | **ICameraProvider** | Unity interface abstracting platform-specific camera access |
 | **Passthrough Camera API** | Quest 3 API providing access to headset front cameras [16][17] |
+
+
+
+
+# ALT VERSION
+
+# Formal Software Development Plan for Local Quest 3 House Mapping With On‑Prem Vision Models
+
+## Executive summary
+
+You want to evolve the prototype concept demonstrated by `Unity-MetaXR-AI-ZeroShot` (Quest camera frame → zero-shot vision → 2D boxes → 3D anchors) into a **fully local**, privacy-preserving system that runs **entirely on your home network**: Unity clients on **Quest / iOS / Android**, backed by a **Linux CV server with an RTX 4080** that hosts **GroundingDINO**, **Grounded‑SAM** (GroundingDINO + Segment Anything), and **Florence‑2**. The key architectural shift is to **replace NVIDIA’s cloud “asset upload + polling” flow** with a low-latency **LAN inference API** designed for **timestamped pose correctness** (to avoid drift) and **session graph storage** (to make “mapping” durable and editable across devices). The project will succeed if it produces a measurable, repeatable scanning workflow: a Quest user can scan a room, see stable 3D semantic anchors (e.g., “door,” “couch”), export room geometry + a semantic object graph, and then review/edit it from a mobile app—without any cloud dependency.
+
+Primary source anchors you should use while implementing:
+- The baseline Unity project you referenced (cloud flow + UI/anchoring patterns): https://github.com/lucas-martinic/Unity-MetaXR-AI-ZeroShot/
+- Meta Quest Passthrough Camera API samples: https://github.com/oculus-samples/Unity-PassthroughCameraApiSamples
+- MRUK PassthroughCameraAccess API reference (timestamped pose + intrinsics): https://developers.meta.com/horizon/reference/mruk/v81/class_meta_x_r_passthrough_camera_access/
+- Unity AR Foundation docs (shared mobile AR abstraction): https://docs.unity3d.com/Packages/com.unity.xr.arfoundation@latest/
+- GroundingDINO repo (license/implementation): https://github.com/IDEA-Research/GroundingDINO
+- Grounded‑SAM paper (design intent: text-to-mask via detection+segmentation): https://arxiv.org/abs/2401.14159
+- Segment Anything (SAM) repo (license/weights): https://github.com/facebookresearch/segment-anything
+- Florence‑2 model card/license (Hugging Face): https://huggingface.co/microsoft/Florence-2-large (see LICENSE on the repo page)
+- Triton Inference Server docs (HTTP/gRPC, backends, model repo): https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html
+- NVIDIA Container Toolkit (GPU in Docker): https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/
+
+## Project goals and success criteria
+
+### Project goals
+Build a **local-first semantic mapping system** that:
+- Captures Quest 3 passthrough frames + spatial context (intrinsics + timestamped pose + depth/mesh) and runs local GPU vision to detect/segment objects from text prompts.
+- Anchors results as stable 3D entities in a room coordinate frame and persists them as a session graph.
+- Shares the map across platforms via a single local API so **iOS/Android** apps can browse/edit the same map.
+- Provides a clear path from a fast PyTorch MVP to optimized inference (ONNX/TensorRT/Triton).
+
+### Success criteria (measurable)
+Define “done” as hitting these thresholds in a representative home environment:
+
+**Functional**
+- Quest scan session can: (1) capture frames, (2) run detection, (3) place 3D anchors, (4) persist session, (5) re-load session later on Quest and on mobile.
+- Server supports 3 task families: open-vocab detection (GroundingDINO), text-conditioned segmentation (Grounded‑SAM), multi-task vision-language (Florence‑2).
+
+**Quality**
+- Anchor stability: median 3D reprojection drift < 10 cm when the user turns head after capture (achieved by using pose *at capture timestamp* vs “current pose”).
+- Detection responsiveness: median end-to-end latency (capture→server→response) < 400 ms on LAN at 1 FPS sampling (MVP); < 200 ms after optimization on selected models/inputs.
+- Availability: server can recover automatically (systemd) and resumes serving within 60 seconds after reboot.
+
+**Privacy/compliance**
+- All processing stays on LAN; no remote endpoints.
+- Quest app gates headset camera usage behind explicit user action and visible UI indicators; permission requests are explained in-app.
+
+### Explicit assumptions
+Because you stated “no specific constraint,” this plan assumes:
+- Team size: 1–3 engineers (you as owner + optional support).
+- Home network: standard Wi‑Fi 6/E and gigabit Ethernet to server.
+- Storage: at least 1 TB available on the server for sessions (frames + exports).
+- You can accept “developer mode” distributions during development; store submission is later.
+
+## Detailed architecture and data flows
+
+### Component architecture
+Core idea: **Quest does sensing + spatial understanding**, server does **inference + persistence**, mobile does **review/edit + optional AR view**.
+
+```mermaid
+flowchart LR
+  subgraph Clients
+    Q[Quest 3 Unity App\nScanner + Anchoring]
+    M[iOS/Android Unity App\nViewer/Editor (+ optional AR overlay)]
+  end
+
+  subgraph Server[Linux CV Server (RTX 4080)]
+    GW[API Gateway\nHTTP/gRPC + Auth + Rate limits]
+    INF[Inference Service\nGroundingDINO / Grounded-SAM / Florence-2]
+    STORE[Session Store\nDB + Object Storage]
+    IDX[Optional: Vector Index\nfor retrieval/dedup]
+  end
+
+  Q -- Frames+metadata --> GW
+  M -- Query/edit --> GW
+  GW --> INF
+  GW --> STORE
+  INF --> GW
+  STORE --> GW
+```
+
+### End-to-end sequence: capture → inference → anchoring
+Your biggest technical risk is **pose drift** caused by latency. The mitigation is to treat every frame as a packet: `(rgb, intrinsics, pose_at_timestamp, timestamp)`.
+
+```mermaid
+sequenceDiagram
+  participant Quest as Quest Unity
+  participant Server as Local API
+  participant Model as Inference (GPU)
+  participant Store as Session Store
+
+  Quest->>Quest: Capture RGB frame
+  Quest->>Quest: Read intrinsics + timestamp
+  Quest->>Quest: Get camera pose at timestamp
+  Quest->>Server: POST /v1/sessions/{id}/frames (jpeg + metadata)
+  Server->>Model: Run model (detect/segment/caption)
+  Model-->>Server: Results (boxes/masks/text)
+  Server-->>Quest: JSON result + frame_id
+  Quest->>Quest: 2D->3D reprojection using captured pose/intrinsics
+  Quest->>Quest: Raycast/depth sample vs room mesh
+  Quest->>Server: POST /v1/sessions/{id}/objects (3D anchors)
+  Server->>Store: Persist session graph
+  Store-->>Server: OK
+  Server-->>Quest: OK
+```
+
+### Data flow principles
+- **Capture-once, compute-many**: store a small set of keyframes for replayable testing and for re-running improved models.
+- **Server returns pixel-space outputs** (boxes/masks aligned to the shipped image) to keep clients simple.
+- **Clients own world anchoring** because they have the spatial map, depth, and XR coordinate frames.
+
+image_group{"layout":"carousel","aspect_ratio":"16:9","query":["Meta Quest Passthrough Camera API Unity sample","MRUK scene room mesh Quest developer documentation image","NVIDIA Triton Inference Server architecture diagram","Grounded SAM example segmentation output"],"num_per_query":1}
+
+## API design
+
+### Design goals
+- Low-latency LAN friendly
+- Supports batching and asynchronous jobs when needed
+- Stable schemas across Unity platforms
+- Explicit error model, rate limits, and versioning
+- Optional “compatibility mode” to emulate the cloud response shape used by the existing repo
+
+### Authentication and transport
+**MVP recommendation**
+- HTTP/1.1 + JSON for simplicity, upgrade later.
+- TLS on LAN (recommended, not strictly required for first internal prototype).
+- Auth: pre-shared API token per device (Quest/mobile). Store devices in server config.
+
+**Hardening trajectory**
+- mTLS or device-bound tokens if you later want stronger LAN security.
+- Use a local CA that your phone trusts (or a dev-only self-signed cert with explicit client trust handling).
+
+### Error handling standard
+Use a consistent JSON error envelope:
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "prompt must be non-empty",
+    "details": { "field": "prompt" },
+    "request_id": "01HZW..."
+  }
+}
+```
+
+Include:
+- `request_id` for logs
+- `retry_after_ms` for throttling
+- HTTP status aligned with semantics (400/401/403/404/409/422/429/500/503)
+
+### Rate limits
+Rate limiting protects GPU memory and prevents clients from saturating LAN.
+
+Baseline:
+- Per-device: 2 requests/sec sustained, burst 5.
+- Per-session: 1 in-flight inference request by default (configurable).
+- Server: queue depth cap (e.g., 32), reject with `429` or `503` when exceeded.
+
+### API endpoints table (requested)
+This table uses concise “schema sketches.” The detailed JSON Schema files should live in your repo (`/contracts/openapi.yaml` + `/contracts/schemas/*.json`).
+
+| Area | Method | Endpoint | Request schema (sketch) | Response schema (sketch) | Common errors |
+|---|---:|---|---|---|---|
+| Health | GET | `/v1/health` | — | `{status, version, gpu:{name, vram_mb}, models:[...]}` | 503 |
+| Sessions | POST | `/v1/sessions` | `{device_id, client_version, notes?}` | `{session_id, created_at}` | 400, 401 |
+| Sessions | GET | `/v1/sessions/{id}` | — | `{session_id, state, stats, created_at}` | 404 |
+| Frames upload | POST | `/v1/sessions/{id}/frames` | `multipart`: `jpeg` + `meta_json` | `{frame_id, width, height, received_at}` | 400, 413, 415, 429 |
+| Detect (sync) | POST | `/v1/detect` | `{image:{b64_jpeg}, prompt, threshold?, model_version?, return_logits?}` | `{detections:[{label, score, bbox_xywh_px}]}` | 400, 422, 429, 503 |
+| Grounded‑SAM (sync) | POST | `/v1/segment` | `{image:{b64_jpeg}, prompt, dino_threshold?, sam_variant?, mask_format:"rle|png", max_masks?}` | `{segments:[{label, score, bbox_xywh_px, mask}]}` | 400, 422, 429 |
+| Florence‑2 (sync) | POST | `/v1/vision_language` | `{image:{b64_jpeg}, task:"caption|ocr|od|...", prompt?, region?}` | `{text?, detections?, regions?, ocr?}` | 400, 422 |
+| Async job | POST | `/v1/jobs` | `{task, payload}` | `{job_id, status:"queued"}` | 400, 429 |
+| Job status | GET | `/v1/jobs/{id}` | — | `{job_id, status, result?, error?}` | 404 |
+| Persist 3D objects | POST | `/v1/sessions/{id}/objects` | `{frame_id, objects:[{label, pose_world, extent?, confidence, source:"dino|sam|florence"}]}` | `{ok:true, stored:n}` | 400, 409 |
+| Map export | GET | `/v1/sessions/{id}/export` | — | `{download_urls:{json, glb?}, summary}` | 404 |
+| NVCF emulation (optional) | POST | `/v1/nvcf/grounding-dino` | Match existing repo payload style | Match existing `choices/message/content` shape | 400/422 |
+
+### Why include an “NVCF emulation” endpoint
+Your reference repo is structured around a cloud flow that uses “asset upload + polling + ZIP.” If you want to minimize Unity changes in the first week, you can:
+- implement a local endpoint that returns the **same JSON shape** as `GroundingDinoResponse` expects, and
+- bypass the entire asset/polling mechanism with a direct response.
+
+You’ll still want to refactor to a clean API long-term, but an emulation endpoint can reduce initial integration work.
+
+## Model selection, versions, licenses, and performance plan
+
+### Model choices and why
+
+**GroundingDINO (open-vocabulary detection)**
+- Use as the default “prompt → boxes/labels” engine.
+- You will pick a specific backbone/variant (e.g., smaller backbone for speed vs larger for accuracy) based on measured needs.
+- Source: official repo. https://github.com/IDEA-Research/GroundingDINO
+
+**Grounded‑SAM (text-conditioned segmentation)**
+- Use to turn detection into **pixel masks**, improving 3D anchoring (centroid-of-mask in depth) and enabling mesh/point cloud extraction per object.
+- Source: paper that defines the combined approach. https://arxiv.org/abs/2401.14159  
+- Implementation can be assembled from GroundingDINO + Segment Anything official repo: https://github.com/facebookresearch/segment-anything
+
+**Florence‑2 (multi-task VLM)**
+- Use if you need captioning, OCR, region description, open-vocab detection alternatives, etc.
+- Source: official model card (Hugging Face). https://huggingface.co/microsoft/Florence-2-large
+
+### License notes (must verify per exact repo commit/model)
+You should treat these as **checkpoints**: confirm `LICENSE` files in the exact repos and model weights you ship.
+
+- GroundingDINO: verify license in repo `LICENSE`. (Often Apache-2.0, but confirm in your pinned commit tag.) https://github.com/IDEA-Research/GroundingDINO
+- Segment Anything: verify license and model weights terms. https://github.com/facebookresearch/segment-anything
+- Florence‑2: verify MIT license via the Hugging Face model repository license file. https://huggingface.co/microsoft/Florence-2-large
+
+### Expected RTX 4080 VRAM and latency (estimates + how to make them rigorous)
+You asked for expected VRAM/latency “on RTX 4080.” Official repositories rarely publish consistent “4080 wall-clock” numbers across variants; therefore you should treat initial numbers as **engineering estimates**, then replace them with measured telemetry in Sprint 1–2.
+
+The table below provides **planning estimates** that are deliberately conservative for a single-stream inference server running at 720p–1080p images (common passthrough resolutions), FP16 enabled, no batching. Your actual results can be significantly better with TensorRT.
+
+#### Model resource/latency estimate table (requested)
+
+| Model task | Likely GPU working set (VRAM) | Est. single-frame latency on RTX 4080 (PyTorch FP16) | Notes & knobs |
+|---|---:|---:|---|
+| GroundingDINO detect | ~2–6 GB | ~60–200 ms | Variant/backbone dominates; prompt length impacts encoder; image size drives compute. Pin an input size. |
+| SAM (mask decode) as part of Grounded‑SAM | ~3–10 GB (depends on ViT variant) | ~40–180 ms | ViT‑B/L/H differ greatly; mask output format matters. |
+| Grounded‑SAM end-to-end | ~6–16 GB | ~120–350 ms | Combined pipeline: DINO + SAM + postprocess; can be pipelined. |
+| Florence‑2 large | ~8–18 GB | ~150–600 ms | Task-dependent; captioning/ocr/od differ; optimize with model-specific settings. |
+
+**How to make these numbers real**
+- Build a benchmark harness that replays a fixed set of captured frames through each server endpoint and logs:
+  - `decode_ms`, `preprocess_ms`, `model_ms`, `post_ms`, `serialize_ms`, total.
+- Log peak VRAM via `nvidia-smi` sampling or NVML integration at request boundaries.
+- Publish a “performance profile” doc and use it to choose variants and optimization milestones.
+
+### Optimization path: PyTorch → ONNX → TensorRT → Triton
+Your plan should explicitly treat optimization as a staged deliverable:
+
+**Stage A (MVP): PyTorch**
+- Fast iteration, easiest correctness debugging.
+- One Python service loads models, returns JSON.
+
+**Stage B: Export to ONNX**
+- Export stable subgraphs (image encoder, transformer blocks) where feasible.
+- Validate numerics vs PyTorch on your replay dataset.
+
+**Stage C: TensorRT**
+- Convert ONNX → TensorRT FP16 engines.
+- Validate throughput/latency gain, watch for dynamic shapes.
+
+**Stage D: Triton Inference Server**
+- Serve TensorRT engines and/or ONNX models through Triton for robust scheduling and standard protocols.
+- Triton provides HTTP/gRPC endpoints and model repository management. https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html
+
+## Deployment plan: containers, Triton, systemd, monitoring, backups
+
+### Server infrastructure spec table (requested)
+Assuming a typical single RTX 4080 server.
+
+| Component | Minimum | Recommended | Rationale |
+|---|---:|---:|---|
+| GPU | RTX 4080 16GB | RTX 4080 16GB | Your stated hardware. |
+| CPU | 8 cores | 16 cores | JPEG decode, postprocess, DB, concurrency. |
+| RAM | 32 GB | 64 GB | Caching, multiple models, DB buffers. |
+| Storage | 500 GB SSD | 1–2 TB NVMe SSD | Store sessions, keyframes, exports. |
+| OS | Ubuntu 22.04+ | Ubuntu 24.04+ | Better kernel + driver support. |
+| Network | 1 GbE | 2.5 GbE + strong Wi‑Fi | Reduce upload time + response jitter. |
+
+### Container runtime and GPU access
+Use NVIDIA Container Toolkit so Docker containers can access the GPU. Official docs: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/
+
+### Deployment topology
+Two practical deployment topologies:
+
+**Topology A: Simple (MVP)**
+- `cv-api` container (FastAPI/uvicorn or similar) loads all models and serves all endpoints.
+- `db` container (Postgres) or local file-based store for session metadata.
+- `object-store` optional (MinIO) or filesystem folder for frame blobs.
+
+**Topology B: Triton-backed**
+- `triton` container serves optimized model backends.
+- `cv-api` container becomes a thin gateway: auth, input validation, orchestration, session persistence.
+- Additional worker for async jobs.
+
+### Docker/Triton config snippets table (requested)
+To keep the table readable, snippets are referenced by ID and then provided in full below.
+
+| Snippet ID | File | Purpose | Notes |
+|---|---|---|---|
+| S1 | `docker-compose.yml` | Bring up gateway + store + optional Triton | Use NVIDIA runtime for GPU containers. |
+| S2 | `systemd/cv-stack.service` | Auto-start on boot and restart on failure | Use `docker compose up`. |
+| S3 | `triton/models/groundingdino/config.pbtxt` | Triton model config skeleton | Adjust inputs/outputs after export. |
+| S4 | `nginx/conf.d/cv.conf` | TLS reverse proxy + rate limits | Optional but recommended. |
+
+#### Snippet S1: docker-compose.yml (MVP + Triton optional)
+```yaml
+services:
+  cv-api:
+    image: yourorg/cv-api:0.1
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      - CV_API_TOKEN=change_me
+      - STORE_PATH=/data
+      - TRITON_URL=http://127.0.0.1:8001
+    volumes:
+      - /srv/cv/data:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+
+  triton:
+    image: nvcr.io/nvidia/tritonserver:24.XX-py3
+    restart: unless-stopped
+    network_mode: "host"
+    command: ["tritonserver", "--model-repository=/models"]
+    volumes:
+      - /srv/cv/triton/models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+```
+
+#### Snippet S2: systemd unit
+```ini
+[Unit]
+Description=Local CV Mapping Stack
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/srv/cv
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Snippet S3: Triton config.pbtxt skeleton
+```txt
+name: "groundingdino"
+platform: "tensorrt_plan"
+max_batch_size: 1
+
+input [
+  { name: "images" data_type: TYPE_FP16 dims: [3, 800, 800] }
+]
+
+output [
+  { name: "boxes" data_type: TYPE_FP32 dims: [N, 4] },
+  { name: "scores" data_type: TYPE_FP32 dims: [N] },
+  { name: "labels" data_type: TYPE_INT32 dims: [N] }
+]
+```
+
+#### Snippet S4: Reverse proxy rate limit (optional)
+```nginx
+limit_req_zone $binary_remote_addr zone=perip:10m rate=2r/s;
+
+server {
+  listen 443 ssl;
+  server_name cv.local;
+
+  location / {
+    limit_req zone=perip burst=5 nodelay;
+    proxy_pass http://127.0.0.1:8080;
+  }
+}
+```
+
+### Monitoring and backups
+**Monitoring (MVP)**
+- Structured logs with `request_id`.
+- GPU health sampling: `nvidia-smi` via cron or a small NVML exporter.
+- App metrics: request counts, latency histograms, queue depth, VRAM peaks.
+
+**Backups**
+- Session store snapshots nightly to an external disk/NAS.
+- Keep a retention policy: raw frames can be pruned; keep derived “map” artifacts longer.
+
+## Data pipeline: capture packets, reprojection math, coordinate frames, session graph schema
+
+### Frame capture packet
+A “frame packet” is the atomic unit you send to the server and later replay for regression tests.
+
+Minimum fields:
+- `jpeg_bytes` (or `b64_jpeg`)
+- `width`, `height`
+- `timestamp_ns` (camera timestamp)
+- `intrinsics`:
+  - focal length `(fx, fy)`
+  - principal point `(cx, cy)`
+  - optional distortion parameters if exposed (platform-dependent)
+- `pose_cam_in_world` (at timestamp): position + orientation (quaternion)
+- `device_id`, `session_id`, `frame_id`
+
+Quest specifics: MRUK `PassthroughCameraAccess` is designed to provide intrinsics and a timestamped camera pose. https://developers.meta.com/horizon/reference/mruk/v81/class_meta_x_r_passthrough_camera_access/  
+Sample project for setup/permissions: https://github.com/oculus-samples/Unity-PassthroughCameraApiSamples
+
+Mobile specifics:
+- AR Foundation provides camera frame events and intrinsics access through `ARCameraManager`. https://docs.unity3d.com/Packages/com.unity.xr.arfoundation@latest/
+
+### Depth/mesh and 2D→3D reprojection
+Your 3D anchoring requires translating 2D detections/masks into 3D points.
+
+**Coordinate frames**
+Define and document these frames explicitly:
+- `W`: session/world frame (Quest spatial origin for the session)
+- `C_t`: camera frame at capture timestamp `t`
+- `I`: image pixel frame (u,v)
+
+Store transforms:
+- `T_WC(t)` (camera pose in world) at capture timestamp
+- intrinsics matrix `K`
+
+**Ray from pixel**
+Given pixel `(u,v)`:
+- Normalize: `x = (u - cx) / fx`, `y = (v - cy) / fy`
+- Ray in camera frame: `r_c = normalize([x, y, 1])`
+- Ray in world: `r_w = R_WC * r_c`, origin `o_w = p_WC`
+
+**Depth intersection strategies**
+- **Depth API**: sample depth at pixel (best if available and temporally aligned).
+- **Raycast**: cast ray into scene mesh/planes; use MRUK EnvironmentRaycastManager when available for depth-based raycasting (Quest). (Your earlier plan already included gating this for performance.)
+
+**Mask-based anchoring (Grounded‑SAM)**
+Instead of using box center:
+- Compute mask centroid in image space (or multiple sample points).
+- Reject thin/noisy masks via area thresholds.
+- Backproject several points and fit a stable 3D centroid (robust to depth noise).
+
+### Session graph storage schema (actionable)
+Use a server-side session graph that supports:
+- multiple frames per session
+- multiple derived objects per frame
+- object identity over time (tracking/merging)
+- mesh + room structure attachments
+
+A minimal relational schema (or equivalent JSON document store):
+- `sessions(session_id, device_id, created_at, notes, coordinate_frame_info)`
+- `frames(frame_id, session_id, timestamp_ns, intrinsics_json, pose_json, image_path)`
+- `inference_results(result_id, frame_id, model, model_version, prompt, json_path)`
+- `objects(object_id, session_id, label, confidence, pose_world_json, extent_json, source, created_at)`
+- `object_observations(object_id, frame_id, bbox_json, mask_path?, score)`
+
+MVP can store JSON files on disk + a small SQLite/Postgres index; you can harden later.
+
+## Unity client design: shared core + platform adapters + build targets
+
+### Shared Unity core (reused across Quest/iOS/Android)
+Create an assembly definition structure:
+- `Core/Domain` (session graph types, serialization)
+- `Core/Networking` (API client, auth headers, retry/backoff)
+- `Core/Viz` (2D overlays, 3D label prefab logic)
+- `Core/Mapping` (object merge/dedup, anchor persistence abstraction)
+
+### Platform adapters
+
+**Quest adapter**
+- Capture: MRUK `PassthroughCameraAccess` frame acquisition, intrinsics, timestamp, and pose-at-timestamp.
+- Spatial: MRUK/Scene data APIs (room mesh), depth/raycast integration.
+- Permissions: headset camera permissions and spatial/scene permissions must be requested and handled gracefully.
+- Sample baseline for passthrough camera: https://github.com/oculus-samples/Unity-PassthroughCameraApiSamples
+
+**Mobile adapter**
+- AR Foundation for iOS/Android shared camera & tracking surfaces.
+- Capture rate throttling (CPU image acquisition is expensive; only sample on-demand / low FPS).
+- Local network permission on iOS: must include `NSLocalNetworkUsageDescription` in Info.plist to access LAN services.
+
+### Build targets and conditional compilation
+You can keep one Unity project and compile platform-specific code via:
+- Assembly definition constraints (preferred)
+- `#if` symbols (secondary)
+
+Suggested compile symbols:
+- `PLATFORM_META_QUEST` (Android + Quest build)
+- `PLATFORM_IOS`
+- `PLATFORM_ANDROID_MOBILE`
+- `USE_TRITON` (server side, but you may toggle client behavior)
+- `USE_NVCF_EMULATION` (if you implement the compatibility endpoint)
+
+### Required permissions checklist (high level)
+- Quest: headset camera permission (documented in Meta passthrough camera materials) + spatial/scene data permission (for room mesh/depth usage).
+- iOS: `NSLocalNetworkUsageDescription` for LAN discovery/requests; camera permission if capturing.
+- Android: camera permission if capturing; network permissions; handle TLS dev certificates carefully.
+
+## Integration steps to replace NVIDIA cloud flow in the repo
+
+Your reference repo’s core coupling is the cloud workflow:
+- obtain upload URL and asset ID
+- upload asset bytes
+- invoke model with asset headers
+- poll status
+- parse returned JSON/ZIP
+
+You want to replace that with a local backend with a stable contract.
+
+### Concrete integration roadmap
+
+**Step one: introduce an inference backend interface**
+- Create `IInferenceBackend` with methods:
+  - `DetectAsync(FramePacket, prompt, options)`
+  - `SegmentAsync(FramePacket, prompt, options)`
+  - `VisionLanguageAsync(FramePacket, task, prompt, options)`
+
+**Step two: extend ApiConfig**
+- Add:
+  - `serverBaseUrl`
+  - `apiToken`
+  - `timeoutMs`
+  - `useHttps`
+  - `compatMode` (optional)
+
+**Step three: implement LocalServerBackend**
+- Use `UnityWebRequest` to call your local endpoints.
+- Handle 401/403/429/503 with explicit UX (toast + retry with exponential backoff).
+
+**Step four: keep a cloud backend only for parity testing**
+- Keep the existing code path (NVIDIA cloud) behind a compile flag until local is validated.
+
+**Step five: adapt parsing/visualization**
+- Preserve existing `BoundingBox` prefab + overlay rendering logic.
+- Add mask rendering path:
+  - decode RLE/PNG mask
+  - draw mask overlay for debugging
+  - compute centroid and anchor.
+
+**Step six: incorporate timestamped pose anchoring**
+- Replace any “use current camera pose” logic with “use pose at capture timestamp” to eliminate drift.
+
+## Testing plan
+
+### Test pyramid
+
+**Unit tests**
+- Serialization/deserialization of API schemas.
+- 2D→3D math functions (ray generation, centroid calculation).
+- Mask postprocessing (area thresholds, contour extraction, centroid).
+
+**Integration tests**
+- Replay harness:
+  - stored frame packets (RGB + intrinsics + pose)
+  - deterministic inference runs
+  - verify response schema stability and numeric sanity.
+
+**Latency and drift tests**
+- Fix a known target (e.g., door frame).
+- Measure:
+  - server RTT
+  - anchor placement repeatability
+  - drift if user rotates head post-capture, comparing:
+    - “pose at capture timestamp” vs “pose at response time.”
+
+**Model accuracy tests**
+- Build a small labeled internal dataset of your home objects (10–50 scenes).
+- Define detection KPIs:
+  - IoU on boxes
+  - mask IoU (if you create ground truth)
+  - false positives per scene.
+
+**Privacy compliance tests**
+- Verify:
+  - no calls to external endpoints
+  - camera frames are only captured after user action
+  - visible indicator when camera is active
+  - logs avoid storing raw images unless explicitly enabled.
+
+## Rollout, maintenance, and security
+
+### CI/CD
+- Server:
+  - build Docker images on merge to main
+  - tag releases with semantic versions
+- Unity:
+  - build pipeline for Quest APK and mobile builds
+  - run unit tests (edit mode) per PR
+
+### Model updates
+- Maintain a “model registry” config:
+  - pinned versions/hashes
+  - conversion artifacts (onnx, trt engines)
+  - compatibility constraints with Triton configs
+- Re-run benchmark harness prior to accepting updates.
+
+### TLS, certs, and local network discovery (mDNS/Bonjour)
+For a smooth UX, clients should discover the server by name (e.g., `cv.local`) rather than hardcoding IPs.
+
+Plan:
+- Server advertises a `_cvmap._tcp` service via mDNS/DNS‑SD.
+- iOS uses Bonjour discovery; Android can use NSD; Unity can implement discovery via a small native plugin or a managed library.
+
+Also ensure iOS local network privacy strings are set so discovery doesn’t silently fail.
+
+## UX considerations for privacy and reliability
+
+Key UX states:
+- “Camera permission required” (Quest and mobile)
+- “Local server not found” (mDNS discovery failed)
+- “Server found, auth failed” (token mismatch)
+- “Server busy” (429): show retry countdown
+- “Inference running” indicator (spinner + frame timestamp)
+- “Anchoring confidence low” (mask too small / no depth hit): request re-scan
+
+Privacy affordances:
+- explicit “Start Scan” button
+- visible capture indicator
+- “Delete session” control (server + clients)
+- “Store frames” toggle (default off; store only derived results)
+
+## Deliverables, milestones, resource estimates, and risk register
+
+### Minimal viable product definition
+**MVP** is a Quest-first system that:
+- Captures frames + metadata (intrinsics + pose at timestamp)
+- Sends to local server `/v1/detect` (GroundingDINO)
+- Renders 2D boxes and places stable 3D anchors using timestamped pose and raycast/depth
+- Persists session objects on server
+- Mobile app can load and view session object list + 3D scene preview (non-AR viewer is acceptable)
+
+### First sprint checklist (recommended)
+- Stand up `cv-api` container with `/v1/health` and `/v1/detect`.
+- Implement `IInferenceBackend` + `LocalServerBackend` in Unity.
+- Quest frame packet capture with timestamp + pose-at-timestamp.
+- Anchor placement with drift-resistant reprojection.
+- Session creation + saving anchors to server.
+- Build a replayable dataset of 50–200 frames from your home for testing.
+
+### Milestone timeline table (requested)
+Assume you are the project owner and primary developer; add additional owners if you assign teammates.
+
+| Milestone | Duration (person-days) | Owner | Deliverables |
+|---|---:|---|---|
+| M0: Contracts + repo setup | 2–4 | You | OpenAPI/JSON schemas; project structure; logging conventions |
+| M1: Local server MVP (GroundingDINO detect) | 5–10 | You | `/v1/detect`, auth, rate limits, basic persistence |
+| M2: Quest integration + stable anchoring | 7–14 | You | Timestamped pose anchoring, 2D overlays, 3D labels saved to session |
+| M3: Mobile viewer (non-AR + optional AR) | 5–10 | You | Session browser, object list, map summary |
+| M4: Grounded‑SAM segmentation support | 7–14 | You | `/v1/segment`, mask overlays, centroid anchoring improvements |
+| M5: Florence‑2 endpoints | 7–14 | You | `/v1/vision_language` tasks (caption/OCR etc), UI integration |
+| M6: Optimization phase (ONNX/TensorRT/Triton) | 10–25 | You | Triton-backed serving, benchmark report, perf targets |
+| M7: Hardening (TLS, mDNS discovery, backups) | 5–15 | You | Cert strategy, service discovery, backups/monitoring |
+
+### Risk register with mitigations
+
+| Risk | Impact | Likelihood | Mitigation |
+|---|---|---:|---|
+| Pose drift causes mis-anchoring | High | High | Use pose-at-capture timestamp; store full frame packet; reprojection tests; prefer mask centroid with depth sampling |
+| Model latency too high for “live” feel | Medium–High | Medium | Throttle capture rate; async jobs; optimize (FP16, TensorRT); lower input resolution; smaller variants |
+| VRAM exhaustion when loading multiple models | High | Medium | Load models on-demand; use separate worker processes; quantize; Triton scheduling; enforce request concurrency limits |
+| Quest permissions/policies block camera usage in some environments | High | Medium | Develop with correct permission flows; provide non-camera fallback modes; document user setup steps |
+| LAN discovery unreliable (mDNS quirks) | Medium | Medium | Provide manual IP entry fallback; cache last-known server; add diagnostics UI |
+| Security issues from self-signed certs or tokens | Medium | Medium | Use local CA; rotate tokens; restrict server to LAN; keep images off by default |
+| Schema churn breaks clients | Medium | Medium | Version API (`/v1`), contract tests, strict backward-compat policy |
+| Grounded‑SAM complexity slows delivery | Medium | Medium | Ship detection-only MVP first; add segmentation as separate milestone |
+
+w
+# ALT VERSION 2
+
