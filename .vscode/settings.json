@@ -6,5 +6,6 @@
         "d:\\UnityProjects\\Unity-MetaXR-AI-Florence\\meta.xr.mrutilitykit.csproj",
         "d:\\UnityProjects\\Unity-MetaXR-AI-Florence\\meta.xr.mrutilitykit.editor.csproj",
         "d:\\UnityProjects\\Unity-MetaXR-AI-Florence\\meta.xr.mrutilitykit.tests.csproj"
-    ]
+    ],
+    "dotnet.preferCSharpExtension": true
 }
