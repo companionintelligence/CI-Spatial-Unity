@@ -1,6 +1,7 @@
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
+from PIL import Image
 
 from app.model_manager import ModelManager
 from app.schemas.detect import DetectRequest, DetectResponse
@@ -8,8 +9,25 @@ from app.utils.image_utils import decode_base64_image
 
 try:
     from groundingdino.util.inference import predict
+    from groundingdino.datasets import transforms as T
 except Exception:  # pragma: no cover
     predict = None
+    T = None
+
+
+def _prepare_grounding_dino_input(image: Image.Image) -> Tuple[np.ndarray, "torch.Tensor"]:
+    if T is None:
+        raise RuntimeError("GroundingDINO transforms are not available.")
+    transform = T.Compose(
+        [
+            T.RandomResize([800], max_size=1333),
+            T.ToTensor(),
+            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ]
+    )
+    image_np = np.asarray(image)
+    image_tensor, _ = transform(image, None)
+    return image_np, image_tensor
 
 
 def run_grounding_dino(request: DetectRequest) -> DetectResponse:
@@ -20,13 +38,13 @@ def run_grounding_dino(request: DetectRequest) -> DetectResponse:
     mm.load_grounding_dino()
 
     image = decode_base64_image(request.image, max_side=request.max_side)
-    image_np = np.array(image)
+    image_np, image_tensor = _prepare_grounding_dino_input(image)
     height, width = image_np.shape[:2]
 
     model = mm.gdino_model
     boxes, scores, labels = predict(
         model=model,
-        image=image_np,
+        image=image_tensor,
         caption=request.prompt,
         box_threshold=request.box_threshold,
         text_threshold=request.text_threshold,

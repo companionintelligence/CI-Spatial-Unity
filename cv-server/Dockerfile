@@ -16,6 +16,9 @@ WORKDIR /app
 
 RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
+RUN pip3 install packaging
+RUN pip3 install --no-build-isolation flash-attn
+
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
