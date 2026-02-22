@@ -158,16 +158,15 @@ namespace HouseMapper.Mapping
                     continue;
                 }
 
-                float x1 = bbox[0];
-                float y1 = bbox[1];
-                float x2 = bbox[2];
-                float y2 = bbox[3];
+                if (!BoundingBoxUtils.TryNormalize(bbox, _frameTexture.width, _frameTexture.height, out Rect normalized))
+                {
+                    continue;
+                }
 
-                float cx = (x1 + x2) * 0.5f;
-                float cy = (y1 + y2) * 0.5f;
+                float u = normalized.x + normalized.width * 0.5f;
+                float v = 1.0f - (normalized.y + normalized.height * 0.5f);
 
-                float u = _frameTexture.width > 0 ? cx / _frameTexture.width : 0.5f;
-                float v = _frameTexture.height > 0 ? 1.0f - (cy / _frameTexture.height) : 0.5f;
+                Rect pixelRect = BoundingBoxUtils.NormalizedToPixels(normalized, _frameTexture.width, _frameTexture.height);
 
                 if (!raycaster.TryRaycastViewport(new Vector2(u, v), out Vector3 hitPoint, out Vector3 hitNormal))
                 {
@@ -181,13 +180,8 @@ namespace HouseMapper.Mapping
                     score = score,
                     position = hitPoint,
                     normal = hitNormal,
-                    bboxPixels = new SerializableRect(x1, y1, x2 - x1, y2 - y1),
-                    bboxNormalized = new SerializableRect(
-                        _frameTexture.width > 0 ? x1 / _frameTexture.width : 0f,
-                        _frameTexture.height > 0 ? y1 / _frameTexture.height : 0f,
-                        _frameTexture.width > 0 ? (x2 - x1) / _frameTexture.width : 0f,
-                        _frameTexture.height > 0 ? (y2 - y1) / _frameTexture.height : 0f
-                    ),
+                    bboxPixels = new SerializableRect(pixelRect.x, pixelRect.y, pixelRect.width, pixelRect.height),
+                    bboxNormalized = new SerializableRect(normalized.x, normalized.y, normalized.width, normalized.height),
                     sourcePrompt = detectionPrompt,
                     timestamp = Time.timeAsDouble
                 };

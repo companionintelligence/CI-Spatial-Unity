@@ -6,6 +6,7 @@ using HouseMapper.Core;
 using NaughtyAttributes;
 using Newtonsoft.Json.Linq;
 using PassthroughCameraSamples;
+using PresentFutures.XRAI;
 using UnityEngine;
 using UnityEngine.UI;
 using Meta.XR;
@@ -28,12 +29,6 @@ namespace PresentFutures.XRAI.Florence
         RegionToDescription,
         OCR,
         OCRWithRegion
-    }
-
-    public class DetectionResult
-    {
-        public Rect BoundingBox;
-        public string Label;
     }
 
     public class Florence2Controller : MonoBehaviour
@@ -76,7 +71,7 @@ namespace PresentFutures.XRAI.Florence
         [Tooltip("Reference to the EnvironmentRaycastManager in the scene")]
         public EnvironmentRaycastManager environmentRaycastManager;
 
-        private readonly List<DetectionResult> _detectionResults = new List<DetectionResult>();
+        private readonly List<DetectionBox> _detectionResults = new List<DetectionBox>();
         private readonly List<GameObject> _spawnedBoxes = new List<GameObject>();
         private readonly List<GameObject> _spawnedAnchors = new List<GameObject>();
         private CVServerClient _client;
@@ -192,9 +187,9 @@ namespace PresentFutures.XRAI.Florence
             if (loadingIcon != null) loadingIcon.SetActive(false);
         }
 
-        private bool TryExtractDetections(JToken results, out List<DetectionResult> detections)
+        private bool TryExtractDetections(JToken results, out List<DetectionBox> detections)
         {
-            detections = new List<DetectionResult>();
+            detections = new List<DetectionBox>();
             if (results == null)
             {
                 return false;
@@ -209,8 +204,7 @@ namespace PresentFutures.XRAI.Florence
                 return false;
             }
 
-            int width = resultImage != null && resultImage.texture != null ? resultImage.texture.width : 0;
-            int height = resultImage != null && resultImage.texture != null ? resultImage.texture.height : 0;
+            GetImageSize(out int width, out int height);
             int count = Mathf.Min(labelsToken.Count, bboxesToken.Count);
 
             for (int i = 0; i < count; i++)
@@ -225,26 +219,14 @@ namespace PresentFutures.XRAI.Florence
                 float x2 = bbox[2].Value<float>();
                 float y2 = bbox[3].Value<float>();
 
-                bool normalized = x2 <= 1f && y2 <= 1f && width > 0 && height > 0;
-                if (normalized)
+                if (!BoundingBoxUtils.TryNormalize(new[] { x1, y1, x2, y2 }, width, height, out Rect rect))
                 {
-                    x1 *= width;
-                    x2 *= width;
-                    y1 *= height;
-                    y2 *= height;
+                    continue;
                 }
 
-                float w = x2 - x1;
-                float h = y2 - y1;
-                if (w < 0f || h < 0f)
+                detections.Add(new DetectionBox
                 {
-                    w = x2;
-                    h = y2;
-                }
-
-                detections.Add(new DetectionResult
-                {
-                    BoundingBox = new Rect(x1, y1, w, h),
+                    BoundingBox = rect,
                     Label = labelsToken[i]?.ToString() ?? "object"
                 });
             }
@@ -305,7 +287,7 @@ namespace PresentFutures.XRAI.Florence
             ClearAnchors();
         }
 
-        private IEnumerator SpawnDetectionVisuals(List<DetectionResult> results)
+        private IEnumerator SpawnDetectionVisuals(List<DetectionBox> results)
         {
             if (boundingBoxContainer == null)
             {
@@ -313,11 +295,19 @@ namespace PresentFutures.XRAI.Florence
                 yield break;
             }
 
+            if (resultImage == null || resultImage.texture == null)
+            {
+                Debug.LogWarning("No resultImage texture assigned – cannot render bounding boxes.");
+                yield break;
+            }
+
             ClearBoundingBoxes();
 
             RectTransform imgRect = resultImage.rectTransform;
-            float scaleX = imgRect.rect.width / resultImage.texture.width;
-            float scaleY = imgRect.rect.height / resultImage.texture.height;
+            int imageWidth = resultImage.texture.width;
+            int imageHeight = resultImage.texture.height;
+            float scaleX = imgRect.rect.width / imageWidth;
+            float scaleY = imgRect.rect.height / imageHeight;
 
             foreach (var det in results)
             {
@@ -326,10 +316,15 @@ namespace PresentFutures.XRAI.Florence
                     Debug.LogError("boundingBoxPrefab not assigned");
                     yield break;
                 }
-                float x = det.BoundingBox.x * scaleX;
-                float y = det.BoundingBox.y * scaleY;
-                float w = det.BoundingBox.width * scaleX;
-                float h = det.BoundingBox.height * scaleY;
+                float x = det.BoundingBox.x * imageWidth;
+                float y = det.BoundingBox.y * imageHeight;
+                float w = det.BoundingBox.width * imageWidth;
+                float h = det.BoundingBox.height * imageHeight;
+
+                float uiX = x * scaleX;
+                float uiY = y * scaleY;
+                float uiW = w * scaleX;
+                float uiH = h * scaleY;
 
                 if (anchorMode == FlorenceAnchorMode.BoundingBox2D || anchorMode == FlorenceAnchorMode.Both)
                 {
@@ -339,8 +334,8 @@ namespace PresentFutures.XRAI.Florence
                     rt.anchorMin = new Vector2(0, 1);
                     rt.anchorMax = new Vector2(0, 1);
                     rt.pivot = new Vector2(0, 1);
-                    rt.anchoredPosition = new Vector2(x, -y);
-                    rt.sizeDelta = new Vector2(w, h);
+                    rt.anchoredPosition = new Vector2(uiX, -uiY);
+                    rt.sizeDelta = new Vector2(uiW, uiH);
 
                     var txt = boxGO.GetComponentInChildren<TMPro.TextMeshProUGUI>();
                     if (txt) txt.text = det.Label;
@@ -351,7 +346,7 @@ namespace PresentFutures.XRAI.Florence
                 {
                     int centerX = Mathf.RoundToInt(x + w * 0.5f);
                     int centerY = Mathf.RoundToInt(y + h * 0.5f);
-                    int invertedCenterY = resultImage.texture.height - centerY;
+                    int invertedCenterY = imageHeight - centerY;
                     var cameraScreenPoint = new Vector2Int(centerX, invertedCenterY);
 
                     var ray = PassthroughCameraUtils.ScreenPointToRayInWorld(PassthroughCameraEye.Left, cameraScreenPoint);
@@ -379,6 +374,25 @@ namespace PresentFutures.XRAI.Florence
                 if (go) Destroy(go);
             }
             _spawnedAnchors.Clear();
+        }
+
+        private void GetImageSize(out int width, out int height)
+        {
+            width = 0;
+            height = 0;
+
+            if (sourceTexture != null && sourceTexture.texture != null)
+            {
+                width = sourceTexture.texture.width;
+                height = sourceTexture.texture.height;
+                return;
+            }
+
+            if (resultImage != null && resultImage.texture != null)
+            {
+                width = resultImage.texture.width;
+                height = resultImage.texture.height;
+            }
         }
     }
 }

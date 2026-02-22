@@ -21,8 +21,6 @@ namespace HouseMapper.Rendering
                 return;
             }
 
-            float imgWidth = sourceTexture.width;
-            float imgHeight = sourceTexture.height;
             Rect containerRect = container.rect;
 
             for (int i = 0; i < result.bboxes.Count; i++)
@@ -33,10 +31,15 @@ namespace HouseMapper.Rendering
                     continue;
                 }
 
-                float x1 = bbox[0] / imgWidth * containerRect.width;
-                float y1 = bbox[1] / imgHeight * containerRect.height;
-                float x2 = bbox[2] / imgWidth * containerRect.width;
-                float y2 = bbox[3] / imgHeight * containerRect.height;
+                if (!BoundingBoxUtils.TryNormalize(bbox, sourceTexture.width, sourceTexture.height, out Rect normalized))
+                {
+                    continue;
+                }
+
+                float x1 = normalized.x * containerRect.width;
+                float y1 = normalized.y * containerRect.height;
+                float x2 = (normalized.x + normalized.width) * containerRect.width;
+                float y2 = (normalized.y + normalized.height) * containerRect.height;
 
                 var boxObj = Instantiate(bboxPrefab, container);
                 var rect = boxObj.GetComponent<RectTransform>();

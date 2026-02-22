@@ -5,18 +5,13 @@ using System.Threading.Tasks;
 using HouseMapper.Core;
 using NaughtyAttributes;
 using PassthroughCameraSamples;
+using PresentFutures.XRAI;
 using UnityEngine;
 using UnityEngine.UI;
 using Meta.XR;
 
 namespace PresentFutures.XRAI.GroundingDino
 {
-    public class DetectionResult
-    {
-        public Rect BoundingBox;
-        public string Label;
-    }
-
     public class GroundingDinoController : MonoBehaviour
     {
         [Header("Server")]
@@ -58,7 +53,7 @@ namespace PresentFutures.XRAI.GroundingDino
         [Tooltip("Reference to the EnvironmentRaycastManager in the scene")]
         public EnvironmentRaycastManager environmentRaycastManager;
 
-        private readonly List<DetectionResult> _detectionResults = new List<DetectionResult>();
+        private readonly List<DetectionBox> _detectionResults = new List<DetectionBox>();
         private readonly List<GameObject> _spawnedBoxes = new List<GameObject>();
         private readonly List<GameObject> _spawnedAnchors = new List<GameObject>();
         private CVServerClient _client;
@@ -155,8 +150,7 @@ namespace PresentFutures.XRAI.GroundingDino
             }
 
             int count = Mathf.Min(detection.bboxes.Count, detection.labels.Count);
-            int width = resultImage != null && resultImage.texture != null ? resultImage.texture.width : 0;
-            int height = resultImage != null && resultImage.texture != null ? resultImage.texture.height : 0;
+            GetImageSize(out int width, out int height);
 
             for (int i = 0; i < count; i++)
             {
@@ -166,13 +160,12 @@ namespace PresentFutures.XRAI.GroundingDino
                     continue;
                 }
 
-                var rect = ToRect(detection.bboxes[i], width, height);
-                if (rect.width <= 0f || rect.height <= 0f)
+                if (!BoundingBoxUtils.TryNormalize(detection.bboxes[i], width, height, out Rect rect))
                 {
                     continue;
                 }
 
-                _detectionResults.Add(new DetectionResult
+                _detectionResults.Add(new DetectionBox
                 {
                     BoundingBox = rect,
                     Label = $"{detection.labels[i]} ({score:F2})"
@@ -180,36 +173,23 @@ namespace PresentFutures.XRAI.GroundingDino
             }
         }
 
-        private static Rect ToRect(float[] bbox, int imageWidth, int imageHeight)
+        private void GetImageSize(out int width, out int height)
         {
-            if (bbox == null || bbox.Length < 4)
+            width = 0;
+            height = 0;
+
+            if (sourceTexture != null && sourceTexture.texture != null)
             {
-                return Rect.zero;
+                width = sourceTexture.texture.width;
+                height = sourceTexture.texture.height;
+                return;
             }
 
-            float x1 = bbox[0];
-            float y1 = bbox[1];
-            float x2 = bbox[2];
-            float y2 = bbox[3];
-
-            bool normalized = x2 <= 1f && y2 <= 1f && imageWidth > 0 && imageHeight > 0;
-            if (normalized)
+            if (resultImage != null && resultImage.texture != null)
             {
-                x1 *= imageWidth;
-                x2 *= imageWidth;
-                y1 *= imageHeight;
-                y2 *= imageHeight;
+                width = resultImage.texture.width;
+                height = resultImage.texture.height;
             }
-
-            float width = x2 - x1;
-            float height = y2 - y1;
-            if (width < 0f || height < 0f)
-            {
-                width = x2;
-                height = y2;
-            }
-
-            return new Rect(x1, y1, width, height);
         }
 
         public static Texture2D ConvertToTexture2D(Texture texture)
@@ -265,7 +245,7 @@ namespace PresentFutures.XRAI.GroundingDino
             ClearAnchors();
         }
 
-        public IEnumerator SpawnDetectionVisuals(List<DetectionResult> results)
+        public IEnumerator SpawnDetectionVisuals(List<DetectionBox> results)
         {
             if (boundingBoxContainer == null)
             {
@@ -273,11 +253,19 @@ namespace PresentFutures.XRAI.GroundingDino
                 yield break;
             }
 
+            if (resultImage == null || resultImage.texture == null)
+            {
+                Debug.LogWarning("No resultImage texture assigned – cannot render bounding boxes.");
+                yield break;
+            }
+
             ClearBoundingBoxes();
 
             RectTransform imgRect = resultImage.rectTransform;
-            float scaleX = imgRect.rect.width / resultImage.texture.width;
-            float scaleY = imgRect.rect.height / resultImage.texture.height;
+            int imageWidth = resultImage.texture.width;
+            int imageHeight = resultImage.texture.height;
+            float scaleX = imgRect.rect.width / imageWidth;
+            float scaleY = imgRect.rect.height / imageHeight;
 
             foreach (var det in results)
             {
@@ -286,10 +274,15 @@ namespace PresentFutures.XRAI.GroundingDino
                     Debug.LogError("boundingBoxPrefab not assigned");
                     yield break;
                 }
-                float x = det.BoundingBox.x * scaleX;
-                float y = det.BoundingBox.y * scaleY;
-                float w = det.BoundingBox.width * scaleX;
-                float h = det.BoundingBox.height * scaleY;
+                float x = det.BoundingBox.x * imageWidth;
+                float y = det.BoundingBox.y * imageHeight;
+                float w = det.BoundingBox.width * imageWidth;
+                float h = det.BoundingBox.height * imageHeight;
+
+                float uiX = x * scaleX;
+                float uiY = y * scaleY;
+                float uiW = w * scaleX;
+                float uiH = h * scaleY;
 
                 if (anchorMode == AnchorMode.BoundingBox2D || anchorMode == AnchorMode.Both)
                 {
@@ -299,8 +292,8 @@ namespace PresentFutures.XRAI.GroundingDino
                     rt.anchorMin = new Vector2(0, 1);
                     rt.anchorMax = new Vector2(0, 1);
                     rt.pivot = new Vector2(0, 1);
-                    rt.anchoredPosition = new Vector2(x, -y);
-                    rt.sizeDelta = new Vector2(w, h);
+                    rt.anchoredPosition = new Vector2(uiX, -uiY);
+                    rt.sizeDelta = new Vector2(uiW, uiH);
 
                     var txt = boxGO.GetComponentInChildren<TMPro.TextMeshProUGUI>();
                     if (txt) txt.text = det.Label;
@@ -311,7 +304,7 @@ namespace PresentFutures.XRAI.GroundingDino
                 {
                     int centerX = Mathf.RoundToInt(x + w * 0.5f);
                     int centerY = Mathf.RoundToInt(y + h * 0.5f);
-                    int invertedCenterY = resultImage.texture.height - centerY;
+                    int invertedCenterY = imageHeight - centerY;
                     var cameraScreenPoint = new Vector2Int(centerX, invertedCenterY);
 
                     var ray = PassthroughCameraUtils.ScreenPointToRayInWorld(PassthroughCameraEye.Left, cameraScreenPoint);

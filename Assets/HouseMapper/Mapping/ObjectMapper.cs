@@ -28,9 +28,6 @@ namespace HouseMapper.Mapping
                 return positions;
             }
 
-            float imgWidth = sourceTexture.width;
-            float imgHeight = sourceTexture.height;
-
             for (int i = 0; i < result.bboxes.Count; i++)
             {
                 var bbox = result.bboxes[i];
@@ -39,10 +36,13 @@ namespace HouseMapper.Mapping
                     continue;
                 }
 
-                float cx = (bbox[0] + bbox[2]) * 0.5f;
-                float cy = (bbox[1] + bbox[3]) * 0.5f;
-                float u = cx / imgWidth;
-                float v = 1.0f - (cy / imgHeight);
+                if (!BoundingBoxUtils.TryNormalize(bbox, sourceTexture.width, sourceTexture.height, out Rect normalized))
+                {
+                    continue;
+                }
+
+                float u = normalized.x + normalized.width * 0.5f;
+                float v = 1.0f - (normalized.y + normalized.height * 0.5f);
 
                 Vector3 hitPoint = GetWorldPoint(u, v);
 
