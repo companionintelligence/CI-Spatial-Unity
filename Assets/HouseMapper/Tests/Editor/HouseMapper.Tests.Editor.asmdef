@@ -1,0 +1,22 @@
+{
+  "name": "HouseMapper.Tests.Editor",
+  "rootNamespace": "HouseMapper.Tests.Editor",
+  "references": [
+    "HouseMapper"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "testAssemblies": true,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

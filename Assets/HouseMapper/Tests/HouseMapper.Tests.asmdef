@@ -1,0 +1,20 @@
+{
+  "name": "HouseMapper.Tests",
+  "rootNamespace": "HouseMapper.Tests",
+  "references": [
+    "HouseMapper"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "testAssemblies": true,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
