@@ -4,10 +4,13 @@ Quest 3 local world/space mapper that combines Meta scene understanding with a l
 ![florence-xr-Trim-Trim-ezgif com-optimize](https://github.com/user-attachments/assets/429c9837-574e-4857-8843-1727167f73c3)
 
 ## Overview
-- Runs entirely on your local network: Quest 3 capture + CV server in Docker.
-- Captures Quest camera frames, runs detection/segmentation/captioning, and raycasts pins into world space.
-- Captures Meta scene anchors (semantic labels, planes, volumes) from Space Setup.
-- Exports a glTF with combined extras and uploads it back to the server when the user taps Export Sync.
+
+Two independent capture systems feed a **unified spatial pin store**:
+
+- **Meta Scene Understanding** (Pipeline A) — on-device OVRAnchor queries for semantic labels, planes, volumes. No network needed. See [Meta Scene API docs](https://developers.meta.com/horizon/documentation/unity/unity-scene-overview/).
+- **CV Server Pipeline** (Pipeline B) — passthrough camera frames → Florence2 → GroundingDINO → SAM2 via a local Docker server. Raycasts detections into world space.
+
+Both pipelines write `SpatialPin` objects (tagged `CvServer` or `MetaScene`) to the shared `SpatialPinManager`. The glTF export merges data from both sources.
 
 ## Key Paths
 - Scene: `Assets/XR-AI-ZeroShot/Scenes/XR-AI-ZeroShot.unity`
@@ -15,19 +18,27 @@ Quest 3 local world/space mapper that combines Meta scene understanding with a l
 - CV server: `cv-server/`
 
 ## Architecture
-```
+
+```text
 Quest 3 App
-  - Camera capture
-  - CV server requests
-  - Pin raycasts + labels
-  - Meta scene anchors
-  - glTF export + sync
+  ├─ Pipeline A: Meta Scene Understanding (on-device)
+  │    OVRAnchor → OVRRoomLayout → OVRSemanticLabels
+  │    → MetaSceneSnapshot → SpatialPin (MetaScene)
+  │
+  ├─ Pipeline B: CV Server (network)
+  │    Camera JPEG → Florence2 caption + OD
+  │    → GroundingDINO detect → SAM2 segment
+  │    → Raycast → SpatialPin (CvServer)
+  │
+  ├─ SpatialPinManager (unified pin store)
+  │
+  └─ glTF export + sync → /v1/gltf
 
 Local CV Server (Docker)
-  - /v1/detect (Grounding DINO)
-  - /v1/segment (Grounded SAM 2)
-  - /v1/florence (Florence-2)
-  - /v1/gltf (upload)
+  - /v1/detect   (GroundingDINO)
+  - /v1/segment  (Grounded SAM 2)
+  - /v1/florence  (Florence-2)
+  - /v1/gltf     (upload)
 ```
 
 ## Quick Start
@@ -46,13 +57,15 @@ Local CV Server (Docker)
 
 5) Build to Quest 3
    - Run Space Setup and grant `com.oculus.permission.USE_SCENE`.
-   - Press the capture button to pin objects.
+   - Press the capture button — triggers `CaptureAll()` which runs both Meta Scene + CV Server.
    - Press Export Sync to generate and upload the glTF.
 
 ## glTF Export + Sync
+
 - Exports `.gltf` + `.bin` and injects extras for:
-  - CV mapping (pins, floorplan, bounds)
-  - Meta scene anchors (labels, planes, volumes)
+  - Unified pins from both CV Server and Meta Scene (tagged by `source`)
+  - CV-derived floorplan and bounds
+  - Full Meta scene anchor data (labels, planes, volumes)
 - Uploads to the local server at `POST /v1/gltf`.
 
 ## Documentation

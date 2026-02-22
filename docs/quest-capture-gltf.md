@@ -335,3 +335,9 @@ The `pins` array contains entries from **both** systems.  Use the `source` field
 - The floor mesh is optional and is created just for export.
 - Pins are spawned in world space and included in the exported scene.
 - Use `SpatialMapExporter.ExportAndSync()` to upload the glTF to the server via `GltfSyncClient`.
+- Both capture systems write `SpatialPin` objects with `PinSource.CvServer` or `PinSource.MetaScene`.
+- `SpatialPinManager.ClearPins(PinSource)` can selectively clear one system's pins.
+- Meta Scene pins have `score = 1.0` (ground-truth) and carry `planeSize`/`volumeSize`/`anchorUuid`.
+- CV Server pins have `bboxPixels`/`bboxNormalized` and are raycasted via `ViewportRaycaster`.
+- `SemanticLabelMapper` normalises both CV and Meta labels to the same Meta vocabulary.
+- The Meta Scene API reference: <https://developers.meta.com/horizon/documentation/unity/unity-scene-overview/>
