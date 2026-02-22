@@ -1,106 +1,26 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
-using System.Text;
+using System.Threading.Tasks;
+using HouseMapper.Core;
 using NaughtyAttributes;
+using PassthroughCameraSamples;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.Networking;
-using Newtonsoft.Json;
-using System.Net.Http;
-using System.Threading.Tasks;
 using Meta.XR;
-using PassthroughCameraSamples;
 
 namespace PresentFutures.XRAI.GroundingDino
 {
-    /// <summary>
-    /// A helper class to store the final, processed detection results for drawing.
-    /// </summary>
     public class DetectionResult
     {
         public Rect BoundingBox;
         public string Label;
     }
 
-    #region JSON Data Models
-    // These classes represent the structure of the JSON response from the API.
-
-    [System.Serializable]
-    public class GroundingDinoResponse
-    {
-        [JsonProperty("id")]
-        public string Id { get; set; }
-
-        [JsonProperty("choices")]
-        public List<Choice> Choices { get; set; }
-    }
-
-    [Serializable]
-    public class Choice
-    {
-        [JsonProperty("index")]
-        public int Index { get; set; }
-
-        [JsonProperty("message")]
-        public Message Message { get; set; }
-    }
-
-    [Serializable]
-    public class GroundingDinoBoundingBoxGroup
-    {
-        [JsonProperty("phrase")] public string Phrase { get; set; }
-        [JsonProperty("bboxes")] public List<List<float>> Bboxes { get; set; }
-        [JsonProperty("confidence")] public List<float> Confidence { get; set; }
-    }
-
-    [Serializable]
-    public class GroundingDinoContent
-    {
-        [JsonProperty("frameNo")] public int FrameNo { get; set; }
-        [JsonProperty("frameWidth")] public int FrameWidth { get; set; }
-        [JsonProperty("frameHeight")] public int FrameHeight { get; set; }
-        [JsonProperty("message")] public string Message { get; set; }
-        [JsonProperty("boundingBoxes")] public List<GroundingDinoBoundingBoxGroup> BoundingBoxes { get; set; }
-    }
-
-    [Serializable]
-    public class Message
-    {
-        [JsonProperty("role")]
-        public string Role { get; set; }
-
-        // For Grounding DINO responses, content is a structured object, not a string
-        [JsonProperty("content")]
-        public GroundingDinoContent Content { get; set; }
-    }
-
-
-    // Removed Usage model for simplicity (not used)
-    #endregion
-
-    #region JSON Data Models for Asset Upload
-    [System.Serializable]
-    public class AssetUploadResponse
-    {
-        [JsonProperty("assetId")]
-        public string AssetId { get; set; }
-
-        [JsonProperty("uploadUrl")]
-        public string UploadUrl { get; set; }
-    }
-    #endregion
-
     public class GroundingDinoController : MonoBehaviour
     {
-        [Header("NVIDIA API Settings")]
-        [Tooltip("Your NVIDIA API Key")]
-        [SerializeField] private ApiConfig apiConfiguration;
-        private const string InvokeUrl = "https://ai.api.nvidia.com/v1/cv/nvidia/nv-grounding-dino";
-        private const string AssetUrl = "https://api.nvcf.nvidia.com/v2/nvcf/assets";
-        private const string PollingUrlBase = "https://api.nvcf.nvidia.com/v2/nvcf/pexec/status/";
+        [Header("Server")]
+        [SerializeField] private ServerConfig serverConfig;
 
         [Header("Input")]
         [Tooltip("The image you want to process")]
@@ -109,7 +29,7 @@ namespace PresentFutures.XRAI.GroundingDino
         [Header("Task Selection")]
         [Tooltip("A natural language prompt describing what to detect. E.g., 'a cat, a dog, and a car'")]
         public string textPrompt;
-        
+
         [Tooltip("Confidence threshold for detections (0.0 to 1.0)")]
         [Range(0f, 1f)]
         public float threshold = 0.3f;
@@ -129,7 +49,7 @@ namespace PresentFutures.XRAI.GroundingDino
         public enum AnchorMode { BoundingBox2D, SpatialLabel3D, Both }
 
         [Header("Anchor Mode")]
-        [Tooltip("Choose how to visualize detections: 2D bounding boxes or 3D spatial anchors")] 
+        [Tooltip("Choose how to visualize detections: 2D bounding boxes or 3D spatial anchors")]
         public AnchorMode anchorMode = AnchorMode.BoundingBox2D;
 
         [Header("Spatial Placement")]
@@ -137,371 +57,161 @@ namespace PresentFutures.XRAI.GroundingDino
         public GameObject spatialAnchorPrefab;
         [Tooltip("Reference to the EnvironmentRaycastManager in the scene")]
         public EnvironmentRaycastManager environmentRaycastManager;
-        
-        private List<DetectionResult> _detectionResults = new List<DetectionResult>();
+
+        private readonly List<DetectionResult> _detectionResults = new List<DetectionResult>();
         private readonly List<GameObject> _spawnedBoxes = new List<GameObject>();
         private readonly List<GameObject> _spawnedAnchors = new List<GameObject>();
-        private const string AssetDescription = "Image for GroundingDino";
-        [Range(1, 120)] public int pollingMaxRetries = 20;
-        [Range(0.1f, 10f)] public float pollingIntervalSeconds = 1f;
+        private CVServerClient _client;
+
+        private void Awake()
+        {
+            if (serverConfig == null)
+            {
+                serverConfig = ScriptableObject.CreateInstance<ServerConfig>();
+            }
+            _client = new CVServerClient(serverConfig);
+        }
 
         [Button]
         public void SendRequest()
         {
+            if (!gameObject.activeInHierarchy)
+            {
+                gameObject.SetActive(true);
+            }
+
+            if (!enabled)
+            {
+                enabled = true;
+            }
+
+            if (sourceTexture == null)
+            {
+                Debug.LogError("GroundingDinoController is missing a source texture.");
+                if (statusText != null) statusText.text = "Error: Missing source image.";
+                if (loadingIcon != null) loadingIcon.SetActive(false);
+                return;
+            }
+
             if (resultText != null) resultText.text = "";
             if (statusText != null) statusText.text = "Processing...";
             if (loadingIcon != null) loadingIcon.SetActive(true);
-            
+
             _detectionResults.Clear();
-            
             StartCoroutine(SendApiRequest());
-        } 
-        
+        }
+
         private IEnumerator SendApiRequest()
         {
-            if (string.IsNullOrEmpty(apiConfiguration.apiKey) || sourceTexture == null)
+            byte[] imageBytes = EncodeTextureToJPG(sourceTexture.texture);
+            if (imageBytes == null || imageBytes.Length == 0)
             {
-                statusText.text = "Error: API Key or Source Image is missing!";
+                if (statusText != null) statusText.text = "Error: Failed to capture image.";
                 if (loadingIcon != null) loadingIcon.SetActive(false);
                 yield break;
             }
 
-            byte[] imageBytes = EncodeTextureToJPG(sourceTexture.texture);
-            
-            // This task will run the entire async process: asset upload, invocation, and polling
-            Task<byte[]> fullRequestTask = PerformFullRequestLifecycle(imageBytes);
-
-            // Wait in the coroutine until the async Task is completed.
-            while (!fullRequestTask.IsCompleted)
+            Task<HouseMapper.Core.DetectionResult> detectTask = _client.DetectAsync(imageBytes, textPrompt);
+            while (!detectTask.IsCompleted)
             {
                 yield return null;
             }
 
-            // Now that the task is complete, we can check for errors and get the result.
-            if (fullRequestTask.IsFaulted)
+            if (detectTask.IsFaulted)
             {
-                // If an exception occurred in the async task.
-                Debug.LogError($"An error occurred during the web request: {fullRequestTask.Exception}");
-                statusText.text = "Error: Request failed.";
+                Debug.LogError($"GroundingDinoController request failed: {detectTask.Exception}");
+                if (statusText != null) statusText.text = "Error: Request failed.";
                 if (loadingIcon != null) loadingIcon.SetActive(false);
+                yield break;
             }
-            else
+
+            var detection = detectTask.Result;
+            if (detection == null)
             {
-                // If the task completed successfully.
-                byte[] zipData = fullRequestTask.Result;
-                if (zipData != null && zipData.Length > 0)
-                {
-                    statusText.text = "Success! Processing response...";
-                    ProcessZipResponse(zipData);
-                }
-                else
-                {
-                    // This case handles HTTP errors where the task completes but the result is null.
-                    statusText.text = "Error: Received an error response from the server.";
-                    Debug.LogError("Request completed but returned null or empty data. Check console for specific HTTP error.");
-                }
+                if (statusText != null) statusText.text = "Error: Empty response.";
                 if (loadingIcon != null) loadingIcon.SetActive(false);
-            }
-        }
-
-    private async Task<byte[]> PerformFullRequestLifecycle(byte[] imageBytes)
-    {
-        // 1. Get Asset Upload URL
-        statusText.text = "Requesting asset upload URL...";
-        AssetUploadResponse assetInfo = await GetAssetUploadUrl();
-        if (assetInfo == null) return null;
-
-        // 2. Upload Image to Asset URL
-        statusText.text = "Uploading image...";
-        bool uploadSuccess = await UploadAsset(assetInfo.UploadUrl, imageBytes, AssetDescription);
-        if (!uploadSuccess) return null;
-
-        // 3. Invoke the model with the Asset ID
-        statusText.text = "Invoking model...";
-        var payload = new
-        {
-            model = "Grounding-Dino",
-            messages = new[]
-            {
-                new
-                {
-                    role = "user",
-                    content = new object[]
-                    {
-                        new { type = "text", text = textPrompt },
-                        new { type = "media_url", media_url = new { url = $"data:image/jpeg;asset_id,{assetInfo.AssetId}" } }
-                    }
-                }
-            },
-            threshold = this.threshold
-        };
-        string jsonPayload = JsonConvert.SerializeObject(payload);
-        
-        HttpResponseMessage initialResponse = await InvokeModel(jsonPayload, assetInfo.AssetId);
-        if (initialResponse == null) return null;
-
-        // 4. Handle response: Poll if 202, otherwise process directly
-        if (initialResponse.StatusCode == System.Net.HttpStatusCode.Accepted)
-        {
-            if (!initialResponse.Headers.TryGetValues("NVCF-REQID", out var values))
-            {
-                Debug.LogError("Server returned 202 Accepted but did not provide an NVCF-REQID header for polling.");
-                return null;
-            }
-            string requestId = new List<string>(values)[0];
-            statusText.text = "Waiting for result...";
-            return await PollForResult(requestId);
-        }
-        else if (initialResponse.IsSuccessStatusCode)
-        {
-            return await initialResponse.Content.ReadAsByteArrayAsync();
-        }
-        else
-        {
-            string errorContent = await initialResponse.Content.ReadAsStringAsync();
-            Debug.LogError($"Error during model invocation: {initialResponse.StatusCode}\n{errorContent}");
-            return null;
-        }
-    }
-
-    private async Task<AssetUploadResponse> GetAssetUploadUrl()
-    {
-        using (var client = new HttpClient())
-        {
-            var requestMessage = new HttpRequestMessage(HttpMethod.Post, AssetUrl);
-            requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiConfiguration.apiKey);
-            requestMessage.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-
-            var payload = new { contentType = "image/jpeg", description = AssetDescription };
-            requestMessage.Content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-
-            var response = await client.SendAsync(requestMessage);
-
-            if (response.IsSuccessStatusCode)
-            {
-                string json = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<AssetUploadResponse>(json);
-            }
-            else
-            {
-                string errorContent = await response.Content.ReadAsStringAsync();
-                Debug.LogError($"Error getting asset upload URL: {response.StatusCode}\n{errorContent}");
-                return null;
-            }
-        }
-    }
-
-    private async Task<bool> UploadAsset(string uploadUrl, byte[] data, string description)
-    {
-        // Use UnityWebRequest with manual configuration for the PUT request to S3.
-        // The pre-signed URL contains authentication, and we must match the exact headers
-        // that were used to generate the signature.
-        using (var uwr = new UnityWebRequest(uploadUrl, "PUT"))
-        {
-            uwr.uploadHandler = new UploadHandlerRaw(data);
-            uwr.downloadHandler = new DownloadHandlerBuffer();
-            
-            // These headers must match what the server expects for the signature
-            uwr.SetRequestHeader("Content-Type", "image/jpeg");
-            uwr.SetRequestHeader("x-amz-meta-nvcf-asset-description", description);
-
-            var asyncOp = uwr.SendWebRequest();
-
-            while (!asyncOp.isDone)
-            {
-                await Task.Yield();
+                yield break;
             }
 
-            if (uwr.result == UnityWebRequest.Result.Success)
+            if (resultText != null)
             {
-                Debug.Log("Asset uploaded successfully!");
-                return true;
+                resultText.text = $"Detections: {detection.labels.Count}";
             }
-            else
-            {
-                string errorDetails = uwr.downloadHandler != null ? uwr.downloadHandler.text : "No response body";
-                Debug.LogError($"Error uploading asset: {uwr.responseCode}\n{uwr.error}\n{errorDetails}");
-                return false;
-            }
-        }
-    }
 
-    private async Task<HttpResponseMessage> InvokeModel(string jsonPayload, string assetId)
-    {
-        using (var client = new HttpClient())
-        {
-            var requestMessage = new HttpRequestMessage(HttpMethod.Post, InvokeUrl);
-            requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiConfiguration.apiKey);
-            requestMessage.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/zip"));
-            requestMessage.Headers.Add("NVCF-INPUT-ASSET-REFERENCES", assetId);
-            requestMessage.Headers.Add("NVCF-FUNCTION-ASSET-IDS", assetId);
+            PopulateDetections(detection);
+            StartCoroutine(SpawnDetectionVisuals(_detectionResults));
 
-            requestMessage.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-
-            // Use SendAsync to get the full HttpResponseMessage back
-            return await client.SendAsync(requestMessage);
-        }
-    }
-
-    private async Task<byte[]> PollForResult(string requestId)
-    {
-        string pollingUrl = PollingUrlBase + requestId;
-        using (var client = new HttpClient())
-        {
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiConfiguration.apiKey);
-            client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/zip"));
-
-            int maxRetries = pollingMaxRetries;
-            for (int i = 0; i < maxRetries; i++)
-            {
-                int delayMs = Mathf.RoundToInt(pollingIntervalSeconds * 1000f);
-                await Task.Delay(delayMs);
-                statusText.text = $"Polling for result... (Attempt {i + 1}/{maxRetries})";
-                
-                var response = await client.GetAsync(pollingUrl);
-
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
-                {
-                    // Result is ready
-                    return await response.Content.ReadAsByteArrayAsync();
-                }
-                else if (response.StatusCode == System.Net.HttpStatusCode.Accepted)
-                {
-                    // Still processing, continue polling
-                    continue;
-                }
-                else
-                {
-                    // An error occurred during polling
-                    string errorContent = await response.Content.ReadAsStringAsync();
-                    Debug.LogError($"Error polling for result: {response.StatusCode}\n{errorContent}");
-                    return null;
-                }
-            }
-        }
-        Debug.LogError("Polling timed out. The result was not ready in time.");
-        return null;
-    }
-
-    private void ProcessZipResponse(byte[] zipData)
-    {
-        try
-        {
-            Debug.Log($"<color=orange>ProcessZipResponse called with {zipData.Length} bytes of data.</color>");
-
-            using (var memoryStream = new MemoryStream(zipData))
-            using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Read))
-            {
-                Debug.Log($"<color=yellow>Archive contains {archive.Entries.Count} file(s).</color>");
-
-                foreach (ZipArchiveEntry entry in archive.Entries)
-                {
-                    Debug.Log($"<color=cyan>Found file in zip with full name: '{entry.FullName}'</color>");
-                    
-                    if (entry.FullName.EndsWith(".response"))
-                    {
-                        Debug.Log($"<color=green>Found a .response file! Processing as JSON...</color>");
-
-                        using (var reader = new StreamReader(entry.Open()))
-                        {
-                            string jsonContent = reader.ReadToEnd();
-                            Debug.Log($"<color=cyan>--- RECEIVED JSON ---</color>\n{jsonContent}");
-
-                            GroundingDinoResponse response = JsonConvert.DeserializeObject<GroundingDinoResponse>(jsonContent);
-
-                            if (response == null)
-                            {
-                                Debug.LogError("JSON Deserialization failed. The response object is null.");
-                                if (statusText != null) statusText.text = "Error: Failed to parse JSON.";
-                                return;
-                            }
-
-                            if (resultText != null)
-                            {
-                                // Compose summary from Grounding DINO content only
-                                var msg = response.Choices?[0]?.Message;
-                                if (msg?.Content != null)
-                                {
-                                    int totalBoxes = 0;
-                                    if (msg.Content.BoundingBoxes != null)
-                                    {
-                                        foreach (var group in msg.Content.BoundingBoxes)
-                                            totalBoxes += group.Bboxes != null ? group.Bboxes.Count : 0;
-                                    }
-                                    resultText.text = $"Grounding DINO Response\nObjects: {totalBoxes}\nLabels: {msg.Content.Message}";
-                                }
-                                else
-                                {
-                                    resultText.text = "No objects found in response.";
-                                }
-                            }
-
-                            var content = response.Choices?[0]?.Message?.Content;
-                            if (content?.BoundingBoxes != null && content.BoundingBoxes.Count > 0)
-                            {
-                                DisplayGroundingDinoResults(content);
-                            }
-                            else
-                            {
-                                Debug.LogWarning("No bounding boxes found in Grounding DINO content.");
-                            }
-                        }
-                    }
-                    // Ignoring any additional files (e.g., overlay images) for simplicity
-                }
-            }
             if (statusText != null) statusText.text = "Done!";
+            if (loadingIcon != null) loadingIcon.SetActive(false);
         }
-        catch (Exception e)
-        {
-            if (statusText != null) statusText.text = "Error: Failed to read response.";
-            Debug.LogError($"Failed to process ZIP response: {e.Message}\n{e.StackTrace}");
-        }
-    }
 
-        // Removed Florence-style Entities fallback for simplicity
-        
-        private void DisplayGroundingDinoResults(GroundingDinoContent content)
+        private void PopulateDetections(HouseMapper.Core.DetectionResult detection)
         {
             _detectionResults.Clear();
-            if (content.BoundingBoxes == null)
+
+            if (detection.bboxes == null || detection.labels == null)
             {
-                Debug.LogWarning("GroundingDinoResults: content.BoundingBoxes is null");
                 return;
             }
 
-            int added = 0;
-            foreach (var group in content.BoundingBoxes)
+            int count = Mathf.Min(detection.bboxes.Count, detection.labels.Count);
+            int width = resultImage != null && resultImage.texture != null ? resultImage.texture.width : 0;
+            int height = resultImage != null && resultImage.texture != null ? resultImage.texture.height : 0;
+
+            for (int i = 0; i < count; i++)
             {
-                if (group.Bboxes == null) continue;
-                for (int i = 0; i < group.Bboxes.Count; i++)
+                float score = i < detection.scores.Count ? detection.scores[i] : 0f;
+                if (score < threshold)
                 {
-                    var bbox = group.Bboxes[i];
-                    if (bbox.Count < 4) continue;
-                    float conf = (group.Confidence != null && group.Confidence.Count > i) ? group.Confidence[i] : 1f;
-                    if (conf < threshold) continue; // apply threshold filter
-
-                    float x = bbox[0];
-                    float y = bbox[1];
-                    float width = bbox[2];
-                    float height = bbox[3];
-
-                    _detectionResults.Add(new DetectionResult
-                    {
-                        BoundingBox = new Rect(x, y, width, height),
-                        Label = $"{group.Phrase} ({conf:F2})"
-                    });
-                    added++;
-                    Debug.Log($"Detected '{group.Phrase}' conf={conf:F2} box: [x:{x}, y:{y}, w:{width}, h:{height}]");
+                    continue;
                 }
+
+                var rect = ToRect(detection.bboxes[i], width, height);
+                if (rect.width <= 0f || rect.height <= 0f)
+                {
+                    continue;
+                }
+
+                _detectionResults.Add(new DetectionResult
+                {
+                    BoundingBox = rect,
+                    Label = $"{detection.labels[i]} ({score:F2})"
+                });
+            }
+        }
+
+        private static Rect ToRect(float[] bbox, int imageWidth, int imageHeight)
+        {
+            if (bbox == null || bbox.Length < 4)
+            {
+                return Rect.zero;
             }
 
-            Debug.Log($"<color=green>GroundingDINO: Added {added} filtered boxes.</color>");
-            StartCoroutine(SpawnDetectionVisuals(_detectionResults));
+            float x1 = bbox[0];
+            float y1 = bbox[1];
+            float x2 = bbox[2];
+            float y2 = bbox[3];
+
+            bool normalized = x2 <= 1f && y2 <= 1f && imageWidth > 0 && imageHeight > 0;
+            if (normalized)
+            {
+                x1 *= imageWidth;
+                x2 *= imageWidth;
+                y1 *= imageHeight;
+                y2 *= imageHeight;
+            }
+
+            float width = x2 - x1;
+            float height = y2 - y1;
+            if (width < 0f || height < 0f)
+            {
+                width = x2;
+                height = y2;
+            }
+
+            return new Rect(x1, y1, width, height);
         }
-        
-        // Removed overlay decode/display for simplicity
-        
+
         public static Texture2D ConvertToTexture2D(Texture texture)
         {
             if (texture == null)
@@ -580,7 +290,7 @@ namespace PresentFutures.XRAI.GroundingDino
                 float y = det.BoundingBox.y * scaleY;
                 float w = det.BoundingBox.width * scaleX;
                 float h = det.BoundingBox.height * scaleY;
-                
+
                 if (anchorMode == AnchorMode.BoundingBox2D || anchorMode == AnchorMode.Both)
                 {
                     GameObject boxGO = Instantiate(boundingBoxPrefab, boundingBoxContainer);
@@ -589,12 +299,12 @@ namespace PresentFutures.XRAI.GroundingDino
                     rt.anchorMin = new Vector2(0, 1);
                     rt.anchorMax = new Vector2(0, 1);
                     rt.pivot = new Vector2(0, 1);
-                    rt.anchoredPosition = new Vector2(x, -y); // y inverted
+                    rt.anchoredPosition = new Vector2(x, -y);
                     rt.sizeDelta = new Vector2(w, h);
 
                     var txt = boxGO.GetComponentInChildren<TMPro.TextMeshProUGUI>();
                     if (txt) txt.text = det.Label;
-                    
+
                     _spawnedBoxes.Add(boxGO);
                 }
                 if ((anchorMode == AnchorMode.SpatialLabel3D || anchorMode == AnchorMode.Both) && spatialAnchorPrefab != null && environmentRaycastManager != null)
@@ -603,7 +313,7 @@ namespace PresentFutures.XRAI.GroundingDino
                     int centerY = Mathf.RoundToInt(y + h * 0.5f);
                     int invertedCenterY = resultImage.texture.height - centerY;
                     var cameraScreenPoint = new Vector2Int(centerX, invertedCenterY);
-                    
+
                     var ray = PassthroughCameraUtils.ScreenPointToRayInWorld(PassthroughCameraEye.Left, cameraScreenPoint);
 
                     if (environmentRaycastManager.Raycast(ray, out EnvironmentRaycastHit hitInfo))

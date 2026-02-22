@@ -9057,7 +9057,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 81658987dfcbf6d4abc1653b7fa2ea93, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  apiConfiguration: {fileID: 11400000, guid: a2c09e6ea8c313c47bb3a941dd9bc60f, type: 2}
+  serverConfig: {fileID: 0}
   sourceTexture: {fileID: 1371373118}
   task: 3
   textPrompt: 
@@ -11300,7 +11300,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e430288aa0b0d34ea9b2d9e3d779d08, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  apiConfiguration: {fileID: 11400000, guid: a2c09e6ea8c313c47bb3a941dd9bc60f, type: 2}
+  serverConfig: {fileID: 0}
   sourceTexture: {fileID: 1371373118}
   textPrompt: bike
   threshold: 0.4
@@ -11313,8 +11313,6 @@ MonoBehaviour:
   anchorMode: 0
   spatialAnchorPrefab: {fileID: 7011814298867290955, guid: 6b375e879b1134b4d8f73e698cb23513, type: 3}
   environmentRaycastManager: {fileID: 1309603985}
-  pollingMaxRetries: 20
-  pollingIntervalSeconds: 1
 --- !u!4 &1988061442
 Transform:
   m_ObjectHideFlags: 0
