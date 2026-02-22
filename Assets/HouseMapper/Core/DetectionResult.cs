@@ -1,17 +1,13 @@
+using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
 
 namespace HouseMapper.Core
 {
+    [Serializable]
     public class DetectionResult
     {
-        [JsonProperty("bboxes")]
-        public List<List<float>> Bboxes;
-
-        [JsonProperty("labels")]
-        public List<string> Labels;
-
-        [JsonProperty("scores")]
-        public List<float> Scores;
+        public List<float[]> bboxes = new List<float[]>();
+        public List<string> labels = new List<string>();
+        public List<float> scores = new List<float>();
     }
 }
