@@ -8,9 +8,10 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - CV_SERVER_DEVICE=cuda
+      - CV_SERVER_LOAD_ALL=false
       - GDINO_CONFIG_PATH=/app/configs/GroundingDINO_SwinT_OGC.py
       - GDINO_WEIGHTS_PATH=/app/checkpoints/groundingdino_swint_ogc.pth
-      - SAM2_CONFIG_PATH=/app/configs/sam2.1_hiera_t.yaml
+      - SAM2_CONFIG_PATH=configs/sam2.1/sam2.1_hiera_t
       - SAM2_WEIGHTS_PATH=/app/checkpoints/sam2.1_hiera_tiny.pt
       - FLORENCE_MODEL_ID=microsoft/Florence-2-large
     deploy:

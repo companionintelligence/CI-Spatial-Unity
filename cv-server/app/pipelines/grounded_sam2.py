@@ -22,6 +22,7 @@ def run_grounded_sam2(request: SegmentRequest) -> SegmentResponse:
     height, width = image_np.shape[:2]
 
     mm = ModelManager.get_instance()
+    mm.load_grounding_dino()
     boxes, scores, labels = predict(
         model=mm.gdino_model,
         image=image_np,
@@ -35,8 +36,7 @@ def run_grounded_sam2(request: SegmentRequest) -> SegmentResponse:
     abs_boxes = _to_absolute_boxes(boxes, width, height)
 
     if request.return_masks:
-        if mm.sam2_predictor is None:
-            raise RuntimeError("SAM2 predictor is not loaded.")
+        mm.load_sam2()
         mm.sam2_predictor.set_image(image_np)
 
     for idx, box in enumerate(abs_boxes):

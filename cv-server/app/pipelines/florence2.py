@@ -10,6 +10,7 @@ from app.utils.image_utils import decode_base64_image
 
 def run_florence2(request: FlorenceRequest) -> FlorenceResponse:
     mm = ModelManager.get_instance()
+    mm.load_florence2()
     if mm.florence_model is None or mm.florence_processor is None:
         raise RuntimeError("Florence-2 model is not loaded.")
 

@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.config import settings
 from app.routers.detect import router as detect_router
 from app.routers.health import router as health_router
 from app.routers.segment import router as segment_router
@@ -19,9 +20,10 @@ app.include_router(stream_router, prefix="/v1")
 @app.on_event("startup")
 def startup() -> None:
     mm = ModelManager.get_instance()
-    mm.load_grounding_dino()
-    mm.load_sam2()
-    mm.load_florence2()
+    if settings.load_all_models:
+        mm.load_grounding_dino()
+        mm.load_sam2()
+        mm.load_florence2()
 
 
 @app.on_event("shutdown")

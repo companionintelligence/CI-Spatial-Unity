@@ -16,18 +16,21 @@ def run_grounding_dino(request: DetectRequest) -> DetectResponse:
     if predict is None:
         raise RuntimeError("GroundingDINO inference is not available.")
 
+    mm = ModelManager.get_instance()
+    mm.load_grounding_dino()
+
     image = decode_base64_image(request.image, max_side=request.max_side)
     image_np = np.array(image)
     height, width = image_np.shape[:2]
 
-    model = ModelManager.get_instance().gdino_model
+    model = mm.gdino_model
     boxes, scores, labels = predict(
         model=model,
         image=image_np,
         caption=request.prompt,
         box_threshold=request.box_threshold,
         text_threshold=request.text_threshold,
-        device=str(ModelManager.get_instance().device),
+        device=str(mm.device),
     )
 
     bboxes = _to_absolute_boxes(boxes, width, height)
