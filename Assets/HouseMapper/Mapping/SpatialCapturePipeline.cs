@@ -96,6 +96,28 @@ namespace HouseMapper.Mapping
         public bool IsBusy => _isBusy;
 
         // ═══════════════════════════════════════════════════════════════
+        //  Runtime toggle properties (driven by ControllerMenuUI)
+        // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>Enable / disable the Florence2 caption step at runtime.</summary>
+        public bool RunFlorence { get => runFlorence; set => runFlorence = value; }
+
+        /// <summary>Enable / disable the GroundingDINO detection step at runtime.</summary>
+        public bool RunGroundingDino { get => runGroundingDino; set => runGroundingDino = value; }
+
+        /// <summary>Enable / disable the SAM2 segmentation step at runtime.</summary>
+        public bool RunSam2 { get => runSam2; set => runSam2 = value; }
+
+        /// <summary>Enable / disable Meta Scene Understanding capture at runtime.</summary>
+        public bool RunMetaSceneCapture { get => runMetaSceneCapture; set => runMetaSceneCapture = value; }
+
+        /// <summary>Enable / disable 2-D bounding-box rendering at runtime.</summary>
+        public bool RenderBoxes { get => renderBoxes; set => renderBoxes = value; }
+
+        /// <summary>Enable / disable mask overlay rendering at runtime.</summary>
+        public bool RenderMasks { get => renderMasks; set => renderMasks = value; }
+
+        // ═══════════════════════════════════════════════════════════════
         //  Lifecycle
         // ═══════════════════════════════════════════════════════════════
 
