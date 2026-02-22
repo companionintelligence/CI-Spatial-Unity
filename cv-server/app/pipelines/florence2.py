@@ -23,7 +23,30 @@ def run_florence2(request: FlorenceRequest) -> FlorenceResponse:
 
     with torch.no_grad():
         generated_ids = mm.florence_model.generate(**inputs, max_new_tokens=512)
-    generated_text = mm.florence_processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    generated_text = mm.florence_processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
 
-    results: Dict[str, Any] = {"raw_text": generated_text}
-    return FlorenceResponse(task=request.task, results=results, text=generated_text)
+    # Post-process the generated text through Florence's built-in decoder
+    # which converts location tokens (<loc_NNN>) into actual bounding boxes,
+    # polygon points, etc.
+    parsed = mm.florence_processor.post_process_generation(
+        generated_text,
+        task=request.task,
+        image_size=(image.width, image.height),
+    )
+
+    # parsed is keyed by the task prompt, e.g. {"<OD>": {"labels": [...], "bboxes": [...]}}
+    task_result = parsed.get(request.task, {})
+
+    # Normalise bboxes from pixel coords to 0-1 so the Unity client is format-agnostic
+    if "bboxes" in task_result:
+        w, h = image.width, image.height
+        normalised = []
+        for box in task_result["bboxes"]:
+            if len(box) >= 4:
+                normalised.append([box[0] / w, box[1] / h, box[2] / w, box[3] / h])
+        task_result["bboxes"] = normalised
+
+    # Also include the raw decoded text for caption-only tasks
+    plain_text = mm.florence_processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    results: Dict[str, Any] = {**task_result, "raw_text": plain_text}
+    return FlorenceResponse(task=request.task, results=results, text=plain_text)

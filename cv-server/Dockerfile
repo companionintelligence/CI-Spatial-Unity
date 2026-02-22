@@ -50,6 +50,9 @@ COPY app/ /app/app/
 COPY configs/ /app/configs/
 COPY checkpoints/ /app/checkpoints/
 
-EXPOSE 8000
+EXPOSE 8000 443
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+CMD ["/app/entrypoint.sh"]

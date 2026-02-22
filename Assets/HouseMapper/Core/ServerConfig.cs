@@ -7,7 +7,7 @@ namespace HouseMapper.Core
     public class ServerConfig : ScriptableObject
     {
         public const string PlayerPrefsBaseUrlKey = "HouseMapper.ServerBaseUrl";
-        public string baseUrl = "http://liam-razer.capybara-ulmer.ts.net:8000";
+        public string baseUrl = "https://liam-razer.capybara-ulmer.ts.net";
         public float boxThreshold = 0.35f;
         public float textThreshold = 0.25f;
 

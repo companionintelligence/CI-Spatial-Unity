@@ -8,5 +8,6 @@ namespace HouseMapper.Core
     {
         public string task;
         public JToken results;
+        public string text;
     }
 }

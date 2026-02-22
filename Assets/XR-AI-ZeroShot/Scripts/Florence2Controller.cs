@@ -173,7 +173,10 @@ namespace PresentFutures.XRAI.Florence
 
             if (resultText != null)
             {
-                resultText.text = result.results != null ? result.results.ToString() : "No results.";
+                // Prefer the plain-text field for captions; fall back to full results JSON
+                resultText.text = !string.IsNullOrEmpty(result.text)
+                    ? result.text
+                    : (result.results != null ? result.results.ToString() : "No results.");
             }
 
             if (TryExtractDetections(result.results, out var detections))

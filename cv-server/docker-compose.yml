@@ -1,9 +1,9 @@
-version: "3.9"
 services:
   cv-server:
     build: .
     ports:
       - "8000:8000"
+      - "443:443"
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
@@ -14,6 +14,8 @@ services:
       - SAM2_CONFIG_PATH=configs/sam2.1/sam2.1_hiera_t
       - SAM2_WEIGHTS_PATH=/app/checkpoints/sam2.1_hiera_tiny.pt
       - FLORENCE_MODEL_ID=microsoft/Florence-2-large
+      - SSL_CERTFILE=/app/certs/liam-razer.capybara-ulmer.ts.net.crt
+      - SSL_KEYFILE=/app/certs/liam-razer.capybara-ulmer.ts.net.key
     deploy:
       resources:
         reservations:
@@ -22,6 +24,7 @@ services:
     volumes:
       - ./configs:/app/configs:ro
       - ./checkpoints:/app/checkpoints:ro
+      - ./certs:/app/certs:ro
       - huggingface_cache:/root/.cache/huggingface
     restart: unless-stopped
 

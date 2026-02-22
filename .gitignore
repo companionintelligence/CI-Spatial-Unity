@@ -5,6 +5,7 @@
 .utmp/
 /cv-server/checkpoints/
 /cv-server/configs/
+/cv-server/certs/
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
