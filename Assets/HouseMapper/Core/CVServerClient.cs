@@ -55,7 +55,13 @@ namespace HouseMapper.Core
 
         private async Task<T> PostAsync<T>(string endpoint, object payload)
         {
-            var url = _config.baseUrl.TrimEnd('/') + endpoint;
+            var baseUrl = _config != null ? _config.ResolveBaseUrl() : null;
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                throw new Exception("CV server base URL is not set.");
+            }
+
+            var url = baseUrl.TrimEnd('/') + endpoint;
             var json = JsonConvert.SerializeObject(payload);
             using var request = new UnityWebRequest(url, "POST");
             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));

@@ -12,6 +12,20 @@ namespace HouseMapper.UI
         [SerializeField] private TMP_InputField boxThresholdField;
         [SerializeField] private TMP_InputField textThresholdField;
 
+        private void Start()
+        {
+            if (config == null || urlField == null)
+            {
+                return;
+            }
+
+            var resolvedUrl = config.ResolveBaseUrl();
+            if (!string.IsNullOrWhiteSpace(resolvedUrl))
+            {
+                urlField.text = resolvedUrl;
+            }
+        }
+
         public void Apply()
         {
             if (config == null)
@@ -22,6 +36,8 @@ namespace HouseMapper.UI
             if (urlField != null)
             {
                 config.baseUrl = urlField.text;
+                PlayerPrefs.SetString(ServerConfig.PlayerPrefsBaseUrlKey, config.baseUrl);
+                PlayerPrefs.Save();
             }
 
             if (boxThresholdField != null && float.TryParse(boxThresholdField.text, NumberStyles.Float, CultureInfo.InvariantCulture, out float boxValue))

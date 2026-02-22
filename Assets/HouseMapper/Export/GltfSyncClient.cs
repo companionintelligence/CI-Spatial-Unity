@@ -16,9 +16,10 @@ namespace HouseMapper.Export
 
         public async Task<bool> UploadAsync(string gltfPath, string binPath, JObject extras)
         {
-            if (serverConfig == null || string.IsNullOrWhiteSpace(serverConfig.baseUrl))
+            var baseUrl = serverConfig != null ? serverConfig.ResolveBaseUrl() : null;
+            if (string.IsNullOrWhiteSpace(baseUrl))
             {
-                Debug.LogError("GltfSyncClient: serverConfig.baseUrl is not set.");
+                Debug.LogError("GltfSyncClient: server base URL is not set.");
                 return false;
             }
 
@@ -28,7 +29,7 @@ namespace HouseMapper.Export
                 return false;
             }
 
-            var url = serverConfig.baseUrl.TrimEnd('/') + endpointPath;
+            var url = baseUrl.TrimEnd('/') + endpointPath;
             var form = new List<IMultipartFormSection>
             {
                 new MultipartFormFileSection(
