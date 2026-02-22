@@ -40,3 +40,18 @@ curl http://localhost:8000/v1/health
 ## Optional Request Fields
 
 All image endpoints accept `max_side` to let the client request server-side resizing.
+
+## Testing
+
+```bash
+pytest
+```
+
+The smoke tests skip automatically if model weights are not present.
+
+## Load Testing
+
+```bash
+pip install -r load/requirements.txt
+locust -f load/locustfile.py --host http://localhost:8000 --image-b64 <BASE64_JPEG>
+```

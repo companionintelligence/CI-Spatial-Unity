@@ -31,6 +31,7 @@ def test_segment_endpoint_smoke() -> None:
         "grounding_model": "grounding_dino",
         "return_masks": False,
         "mask_format": "rle",
+        "max_side": 64,
     }
     response = client.post("/v1/segment", json=payload)
     assert response.status_code == 200
