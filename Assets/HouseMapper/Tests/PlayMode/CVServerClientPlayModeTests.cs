@@ -15,13 +15,18 @@ namespace HouseMapper.Tests.PlayMode
         [UnityTest]
         public IEnumerator DetectEndpoint_ReturnsResponse()
         {
+            var config = ScriptableObject.CreateInstance<ServerConfig>();
             var serverUrl = Environment.GetEnvironmentVariable(ServerUrlEnv);
-            if (string.IsNullOrEmpty(serverUrl))
+            if (string.IsNullOrWhiteSpace(serverUrl))
             {
-                Assert.Ignore($"Set {ServerUrlEnv} to enable this test.");
+                serverUrl = config.ResolveBaseUrl();
             }
 
-            var config = ScriptableObject.CreateInstance<ServerConfig>();
+            if (string.IsNullOrWhiteSpace(serverUrl))
+            {
+                Assert.Ignore($"Set {ServerUrlEnv} or assign ServerConfig.baseUrl to enable this test.");
+            }
+
             config.baseUrl = serverUrl;
 
             var client = new CVServerClient(config);
