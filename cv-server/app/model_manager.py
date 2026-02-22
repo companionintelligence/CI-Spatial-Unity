@@ -6,10 +6,12 @@ import torch
 
 from app.config import settings
 
+_gdino_import_error = None
 try:
     from groundingdino.util.inference import load_model
-except Exception:  # pragma: no cover - optional import until deps are installed
+except Exception as exc:  # pragma: no cover - optional import until deps are installed
     load_model = None
+    _gdino_import_error = exc
 
 try:
     from sam2.build_sam2 import build_sam2
@@ -45,7 +47,8 @@ class ModelManager:
         if self.gdino_model is not None:
             return
         if load_model is None:
-            raise RuntimeError("GroundingDINO dependencies are not available.")
+            detail = f"{type(_gdino_import_error).__name__}: {_gdino_import_error}" if _gdino_import_error else "Unknown import error"
+            raise RuntimeError(f"GroundingDINO dependencies are not available. {detail}")
         self.gdino_model = load_model(
             settings.gdino_config_path,
             settings.gdino_weights_path,

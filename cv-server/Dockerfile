@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED=1
 ENV CUDA_HOME=/usr/local/cuda
 
 RUN apt-get update && apt-get install -y \
-    python3.10 python3-pip git build-essential libgl1 \
+    python3.10 python3-pip git build-essential libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
