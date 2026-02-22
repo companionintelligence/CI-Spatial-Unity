@@ -16,7 +16,10 @@ def run_florence2(request: FlorenceRequest) -> FlorenceResponse:
 
     image = decode_base64_image(request.image, max_side=request.max_side)
     inputs = mm.florence_processor(text=request.task + request.text_input, images=image, return_tensors="pt")
-    inputs = {k: v.to(mm.device) for k, v in inputs.items()}
+    inputs = {
+        k: (v.to(mm.device, dtype=torch.float16) if k == "pixel_values" else v.to(mm.device))
+        for k, v in inputs.items()
+    }
 
     with torch.no_grad():
         generated_ids = mm.florence_model.generate(**inputs, max_new_tokens=512)
