@@ -17,7 +17,7 @@ def run_grounded_sam2(request: SegmentRequest) -> SegmentResponse:
     if predict is None:
         raise RuntimeError("GroundingDINO inference is not available.")
 
-    image = decode_base64_image(request.image)
+    image = decode_base64_image(request.image, max_side=request.max_side)
     image_np = np.array(image)
     height, width = image_np.shape[:2]
 

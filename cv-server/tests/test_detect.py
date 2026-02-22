@@ -35,3 +35,31 @@ def test_detect_endpoint_smoke() -> None:
     assert "bboxes" in body
     assert "labels" in body
     assert "scores" in body
+
+
+@pytest.mark.skipif(
+    not Path(settings.gdino_weights_path).exists(),
+    reason="GroundingDINO weights not found",
+)
+def test_detect_batch_endpoint_smoke() -> None:
+    client = TestClient(app)
+    payload = [
+        {
+            "image": _build_test_image_b64(),
+            "prompt": "chair . table .",
+            "box_threshold": 0.35,
+            "text_threshold": 0.25,
+            "max_side": 64,
+        },
+        {
+            "image": _build_test_image_b64(),
+            "prompt": "lamp .",
+            "box_threshold": 0.35,
+            "text_threshold": 0.25,
+        },
+    ]
+    response = client.post("/v1/detect/batch", json=payload)
+    assert response.status_code == 200
+    body = response.json()
+    assert isinstance(body, list)
+    assert len(body) == 2

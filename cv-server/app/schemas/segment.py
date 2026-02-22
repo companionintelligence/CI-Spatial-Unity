@@ -23,6 +23,9 @@ class SegmentRequest(BaseModel):
     grounding_model: str = Field("grounding_dino")
     return_masks: bool = Field(True)
     mask_format: str = Field("rle")
+    max_side: Optional[int] = Field(
+        None, description="Optional max image side for server-side resize"
+    )
 
 
 class SegmentResponse(BaseModel):

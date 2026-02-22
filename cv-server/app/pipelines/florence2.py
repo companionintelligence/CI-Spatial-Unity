@@ -13,7 +13,7 @@ def run_florence2(request: FlorenceRequest) -> FlorenceResponse:
     if mm.florence_model is None or mm.florence_processor is None:
         raise RuntimeError("Florence-2 model is not loaded.")
 
-    image = decode_base64_image(request.image)
+    image = decode_base64_image(request.image, max_side=request.max_side)
     inputs = mm.florence_processor(text=request.task + request.text_input, images=image, return_tensors="pt")
     inputs = {k: v.to(mm.device) for k, v in inputs.items()}
 

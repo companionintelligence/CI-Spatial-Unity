@@ -31,6 +31,12 @@ curl http://localhost:8000/v1/health
 ## Endpoints
 
 - `POST /v1/detect`
+- `POST /v1/detect/batch`
 - `POST /v1/segment`
 - `POST /v1/florence`
 - `GET /v1/health`
+- `WS /v1/stream`
+
+## Optional Request Fields
+
+All image endpoints accept `max_side` to let the client request server-side resizing.

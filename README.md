@@ -44,6 +44,9 @@ Unity project integrating Zero-Shot Object Detection models like Grounding DINO 
 - Content-Type: `application/json`
 - Accept: `application/json` for Grounding DINO, `application/zip` for Florence-2.
 
+## 🖥️ Local CV Server (Optional)
+For local processing with Grounding DINO, SAM 2, and Florence-2, see [cv-server/README.md](cv-server/README.md).
+
 ## ⚡ Setup: 5 Minutes
 1) Get an NVIDIA API Key
    - Obtain a key from NVIDIA’s AI API portal and ensure you have access to the model you want to use. https://build.nvidia.com/

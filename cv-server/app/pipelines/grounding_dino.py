@@ -3,7 +3,7 @@ from typing import List
 import numpy as np
 
 from app.model_manager import ModelManager
-from app.schemas.detect import DetectResponse
+from app.schemas.detect import DetectRequest, DetectResponse
 from app.utils.image_utils import decode_base64_image
 
 try:
@@ -12,16 +12,11 @@ except Exception:  # pragma: no cover
     predict = None
 
 
-def run_grounding_dino(
-    image_b64: str,
-    prompt: str,
-    box_threshold: float,
-    text_threshold: float,
-) -> DetectResponse:
+def run_grounding_dino(request: DetectRequest) -> DetectResponse:
     if predict is None:
         raise RuntimeError("GroundingDINO inference is not available.")
 
-    image = decode_base64_image(image_b64)
+    image = decode_base64_image(request.image, max_side=request.max_side)
     image_np = np.array(image)
     height, width = image_np.shape[:2]
 
@@ -29,9 +24,9 @@ def run_grounding_dino(
     boxes, scores, labels = predict(
         model=model,
         image=image_np,
-        caption=prompt,
-        box_threshold=box_threshold,
-        text_threshold=text_threshold,
+        caption=request.prompt,
+        box_threshold=request.box_threshold,
+        text_threshold=request.text_threshold,
         device=str(ModelManager.get_instance().device),
     )
 
