@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using HouseMapper.Mapping;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
-using UnityGLTF;
 
 namespace HouseMapper.Export
 {
@@ -64,8 +63,20 @@ namespace HouseMapper.Export
 
             var floorObject = CreateFloorMesh(root);
 
-            var exporter = new GLTFSceneExporter(new[] { root });
-            exporter.SaveGLTFandBin(outputDir, fileName);
+            if (!TryExportGltf(root, outputDir, fileName))
+            {
+                Debug.LogError("UnityGLTF is not available. Install the UnityGLTF package to export.");
+                if (floorObject != null)
+                {
+                    Destroy(floorObject);
+                }
+                return new ExportResult
+                {
+                    gltfPath = string.Empty,
+                    binPath = string.Empty,
+                    extras = returnExtras ? BuildExtras(root, metaSnapshot) : null
+                };
+            }
 
             var gltfPath = Path.Combine(outputDir, fileName + ".gltf");
             var binPath = Path.Combine(outputDir, fileName + ".bin");
@@ -130,6 +141,7 @@ namespace HouseMapper.Export
 
             var boundary = boundaryProvider != null ? boundaryProvider.GetBoundaryWorldPoints() : new List<Vector3>();
             var pins = pinManager != null ? pinManager.Pins : new List<SpatialPin>();
+            var floorPolygon = FloorplanBuilder.BuildFloorPolygon(boundary, pins, floorY);
             var bounds = FloorplanBuilder.ComputeBounds(boundary, pins);
 
             var cvMapping = new JObject
@@ -239,6 +251,31 @@ namespace HouseMapper.Export
                 array.Add(ToArray(values[i]));
             }
             return array;
+        }
+
+        private bool TryExportGltf(Transform root, string outputDir, string exportName)
+        {
+            var exporterType = Type.GetType("UnityGLTF.GLTFSceneExporter, UnityGLTF");
+            if (exporterType == null)
+            {
+                return false;
+            }
+
+            var ctor = exporterType.GetConstructor(new[] { typeof(Transform[]) });
+            if (ctor == null)
+            {
+                return false;
+            }
+
+            var exporter = ctor.Invoke(new object[] { new[] { root } });
+            var saveMethod = exporterType.GetMethod("SaveGLTFandBin", new[] { typeof(string), typeof(string) });
+            if (saveMethod == null)
+            {
+                return false;
+            }
+
+            saveMethod.Invoke(exporter, new object[] { outputDir, exportName });
+            return true;
         }
     }
 }

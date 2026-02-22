@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;
-using UnityEngine.XR.Management;
 
 namespace HouseMapper.Mapping
 {
@@ -13,7 +12,7 @@ namespace HouseMapper.Mapping
         {
             var points = new List<Vector3>();
             var subsystems = new List<XRInputSubsystem>();
-            SubsystemManager.GetInstances(subsystems);
+            SubsystemManager.GetSubsystems(subsystems);
 
             for (int i = 0; i < subsystems.Count; i++)
             {

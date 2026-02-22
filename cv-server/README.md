@@ -27,6 +27,7 @@ curl http://localhost:8000/v1/health
 - `FLORENCE_MODEL_ID`
 - `BOX_THRESHOLD`
 - `TEXT_THRESHOLD`
+- `GLTF_UPLOAD_DIR` (default: `uploads/gltf`)
 
 ## Endpoints
 
@@ -34,8 +35,17 @@ curl http://localhost:8000/v1/health
 - `POST /v1/detect/batch`
 - `POST /v1/segment`
 - `POST /v1/florence`
+- `POST /v1/gltf`
 - `GET /v1/health`
 - `WS /v1/stream`
+
+### glTF Upload
+
+`POST /v1/gltf` accepts multipart form data:
+
+- `gltf` (file)
+- `bin` (file, optional)
+- `extras` (field, optional)
 
 ## Optional Request Fields
 

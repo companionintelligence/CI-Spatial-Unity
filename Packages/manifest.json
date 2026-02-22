@@ -2,8 +2,8 @@
   "dependencies": {
     "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main",
     "com.github-glitchenzo.nugetforunity": "https://github.com/GlitchEnzo/NuGetForUnity.git?path=/src/NuGetForUnity",
+    "org.khronos.unitygltf": "https://github.com/KhronosGroup/UnityGLTF.git#release/2.18.8",
     "com.meta.xr.sdk.all": "85.0.0",
-    "com.khronos.unitygltf": "https://github.com/KhronosGroup/UnityGLTF.git#v2.14.0",
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.ai.navigation": "2.0.11",
     "com.unity.ide.rider": "3.0.39",

@@ -92,6 +92,14 @@ COUCH, TABLE, BED, LAMP, PLANT, SCREEN, STORAGE, GLOBAL_MESH, OTHER
 `MetaSceneCollector` queries the scene model and stores anchors with labels, transforms, plane bounds, volume bounds, and optional boundary points.
 This requires the `com.oculus.permission.USE_SCENE` permission to be granted on device.
 
+## Design Alignment
+
+The mapping pipeline is aligned with Meta scene understanding guidance:
+
+- Prefer placement on classified planes (floor, wall, table) for stable anchors.
+- Use semantic labels to drive content rules (only place on FLOOR, only attach to WALL_FACE, etc.).
+- Favor occlusion and surface alignment to make pins and overlays feel grounded.
+
 ## glTF Export
 
 `SpatialMapExporter.Export()` writes a `.gltf` + `.bin` under:

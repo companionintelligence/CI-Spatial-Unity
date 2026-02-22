@@ -1,6 +1,18 @@
 # Formal Software Development Plan
 ## Cross-Platform House Mapping System with Grounding DINO, Grounded-SAM 2 &amp; Florence-2
 
+## Current Plan (Feb 22, 2026)
+
+This repo is now focused on a Quest 3 local world/space mapper with glTF export and sync.
+
+1) Run the local CV server in Docker (Grounding DINO, SAM 2, Florence-2).
+2) Capture Quest frames and detect/segment/caption via the local server.
+3) Capture Meta scene anchors and semantic labels from Space Setup.
+4) Raycast detections into world space and track pins.
+5) Export glTF with combined extras and upload back to the CV server.
+
+The rest of this document is historical context from earlier iterations.
+
 **Version:** 2.0  
 **Date:** February 21, 2026  
 **Author:** AI Architecture Assistant  
