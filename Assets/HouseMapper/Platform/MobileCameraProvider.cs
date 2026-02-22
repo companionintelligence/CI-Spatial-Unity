@@ -48,17 +48,17 @@ namespace HouseMapper.Platform
 
             using (image)
             {
-                var format = TextureFormat.RGB24;
+                TextureFormat textureFormat = TextureFormat.RGB24;
                 if (_frame == null || _frame.width != image.width || _frame.height != image.height)
                 {
-                    _frame = new Texture2D(image.width, image.height, format, false);
+                    _frame = new Texture2D(image.width, image.height, textureFormat, false);
                 }
 
                 var conversionParams = new XRCpuImage.ConversionParams
                 {
                     inputRect = new RectInt(0, 0, image.width, image.height),
                     outputDimensions = new Vector2Int(image.width, image.height),
-                    outputFormat = XRCpuImage.Format.RGB24,
+                    outputFormat = TextureFormat.RGB24,
                     transformation = XRCpuImage.Transformation.MirrorY
                 };
 

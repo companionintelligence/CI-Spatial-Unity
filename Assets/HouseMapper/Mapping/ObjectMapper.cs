@@ -3,7 +3,6 @@ using HouseMapper.Core;
 using UnityEngine;
 
 #if UNITY_IOS || UNITY_ANDROID
-using System.Collections.Generic;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 #endif
