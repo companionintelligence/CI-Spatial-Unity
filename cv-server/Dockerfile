@@ -1,11 +1,11 @@
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV CUDA_HOME=/usr/local/cuda
 
 RUN apt-get update && apt-get install -y \
-    python3.10 python3-pip git build-essential libgl1 libglib2.0-0 \
+    python3.10 python3-pip git build-essential ninja-build cmake libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
