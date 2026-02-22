@@ -13,12 +13,14 @@ except Exception as exc:  # pragma: no cover - optional import until deps are in
     load_model = None
     _gdino_import_error = exc
 
+_sam2_import_error = None
 try:
-    from sam2.build_sam2 import build_sam2
+    from sam2.build_sam import build_sam2
     from sam2.sam2_image_predictor import SAM2ImagePredictor
-except Exception:  # pragma: no cover
+except Exception as exc:  # pragma: no cover
     build_sam2 = None
     SAM2ImagePredictor = None
+    _sam2_import_error = exc
 
 try:
     from transformers import AutoModelForCausalLM, AutoProcessor
@@ -59,7 +61,8 @@ class ModelManager:
         if self.sam2_predictor is not None:
             return
         if build_sam2 is None or SAM2ImagePredictor is None:
-            raise RuntimeError("SAM2 dependencies are not available.")
+            detail = f"{type(_sam2_import_error).__name__}: {_sam2_import_error}" if _sam2_import_error else "Unknown import error"
+            raise RuntimeError(f"SAM2 dependencies are not available. {detail}")
         sam2_model = build_sam2(
             settings.sam2_config_path,
             settings.sam2_weights_path,

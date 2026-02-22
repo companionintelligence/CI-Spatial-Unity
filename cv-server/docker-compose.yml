@@ -19,6 +19,8 @@ services:
           devices:
             - capabilities: [gpu]
     volumes:
+      - ./configs:/app/configs:ro
+      - ./checkpoints:/app/checkpoints:ro
       - huggingface_cache:/root/.cache/huggingface
     restart: unless-stopped
 
