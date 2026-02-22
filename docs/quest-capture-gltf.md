@@ -1,22 +1,148 @@
 # Quest 3 Capture Pipeline and glTF Export
 
-This document describes the Quest 3 capture pipeline, Meta scene understanding capture, pinning workflow, boundary/floorplan tracking, and glTF export with embedded extras.
+This document describes the two spatial capture systems, how they feed a unified pin store, and the glTF export format.
 
-## Overview
+## Architecture: Two Capture Systems, One Pin Store
 
-The pipeline captures a camera frame on Quest, runs detection/segmentation/captioning against the CV server, raycasts detections into world space, spawns pins, optionally captures Meta scene anchors (semantic labels, planes, volumes), and exports a glTF with spatial metadata embedded in `extras`.
+The project has **two independent capture pipelines** that both write to the same `SpatialPinManager`.  Every `SpatialPin` carries a `PinSource` enum (`CvServer` or `MetaScene`) so downstream code can filter or merge them.
 
-Key components added in `Assets/HouseMapper`:
+```
+┌──────────────────────────────────────────────────────┐
+│                    SpatialCapturePipeline             │
+│  (orchestrates both pipelines, calls CaptureAll)     │
+├────────────────────────┬─────────────────────────────┤
+│  Pipeline A            │  Pipeline B                 │
+│  Meta Scene (on-device)│  CV Server (network)        │
+│                        │                             │
+│  OVRAnchor query       │  Camera JPEG capture        │
+│  OVRRoomLayout         │   → Florence2 caption       │
+│  OVRSemanticLabels     │   → Florence2 OD            │
+│  OVRBounded2D / 3D    │   → GroundingDINO detect    │
+│  OVRTriangleMesh       │   → SAM2 segment            │
+│       │                │         │                   │
+│       ▼                │         ▼                   │
+│  MetaSceneSnapshot     │  DetectionResult /          │
+│       │                │  SegmentationResult          │
+│       ▼                │         │                   │
+│  ConvertSnapshotToPins │  AddCvPinsFromDetections    │
+│       │                │         │                   │
+│       └────────┬───────┘─────────┘                   │
+│                ▼                                     │
+│        SpatialPinManager                             │
+│        (unified List<SpatialPin>)                    │
+│                │                                     │
+│                ▼                                     │
+│        SpatialMapExporter                            │
+│        → glTF with merged extras                     │
+│        → GltfSyncClient upload                       │
+└──────────────────────────────────────────────────────┘
+```
 
-- `SpatialCapturePipeline` - captures frames and runs CV server requests.
-- `ViewportRaycaster` - converts image-space detections into world-space hits.
-- `SpatialPinManager` - tracks and spawns pins.
-- `SemanticLabelMapper` - normalizes CV labels to Meta semantic labels.
-- `BoundaryProvider` - reads XR boundary points.
-- `FloorplanBuilder` - builds floor polygon and mesh.
-- `MetaSceneCollector` - captures Meta scene anchors (labels, planes, volumes).
-- `SpatialMapExporter` - exports glTF and writes extras.
-- `GltfSyncClient` - uploads glTF back to the server.
+### Pipeline A — Meta Scene Understanding (on-device)
+
+Runs entirely on the Quest headset using the [Meta Scene API](https://developers.meta.com/horizon/documentation/unity/unity-scene-overview/).  No network required.
+
+| Step | What happens |
+|------|-------------|
+| 1 | `MetaSceneCollector.CaptureSnapshotAsync()` queries `OVRAnchor.FetchAnchorsAsync` for rooms with `OVRRoomLayout` |
+| 2 | For each room, fetches child anchors via `OVRAnchorContainer` |
+| 3 | Per anchor reads: `OVRLocatable` (world pose), `OVRSemanticLabels` (classification), `OVRBounded2D` (plane), `OVRBounded3D` (volume), `OVRTriangleMesh` (mesh counts) |
+| 4 | Stores everything in a `MetaSceneSnapshot` (list of `MetaSceneAnchorSnapshot`) |
+| 5 | `ConvertSnapshotToPins()` converts each anchor to a `SpatialPin` with `source = PinSource.MetaScene` |
+| 6 | Pins added to `SpatialPinManager` |
+
+**Prerequisites:**
+- User must run **Space Setup** on the Quest headset
+- Permission `com.oculus.permission.USE_SCENE` must be granted
+- `MetaSceneCollector.trackingSpace` must reference the XR tracking space `Transform`
+
+**Data captured per anchor:** UUID, semantic labels, world position + rotation, plane bounds + boundary polygon, volume bounds, mesh vertex/triangle counts.
+
+### Pipeline B — CV Server (network)
+
+Captures a camera frame on Quest and sends it to a local Docker CV server for AI inference. Detected objects are raycasted into world space.
+
+| Step | What happens |
+|------|-------------|
+| 1 | `ICameraProvider.GetCurrentFrameJpeg()` captures a passthrough camera frame |
+| 2 | Florence2 caption (`<MORE_DETAILED_CAPTION>`) → `LastCaption` |
+| 3 | Florence2 OD (`<OD>`) → extract unique labels |
+| 4 | GroundingDINO detect (prompt from Florence labels or fallback) → `DetectionResult` with normalised bboxes |
+| 5 | For each detection: `ViewportRaycaster.TryRaycastViewport()` → world hit point |
+| 6 | `SemanticLabelMapper.MapToMetaLabel()` normalises CV labels to Meta vocabulary |
+| 7 | Each detection → `SpatialPin` with `source = PinSource.CvServer` → `SpatialPinManager.AddPin()` |
+| 8 | SAM2 segment → `SegmentationResult` → optional mask overlay via `MaskRenderer` |
+
+**Prerequisites:**
+- CV server running (Docker) at the URL in `ServerConfig`
+- A camera provider implementing `ICameraProvider` (e.g. `QuestCameraProvider`)
+- `ViewportRaycaster` for 2D→3D raycasting
+
+### Triggering Capture
+
+`SpatialCapturePipeline` provides three public methods:
+
+| Method | What it does |
+|--------|-------------|
+| `CaptureAll()` | Runs **both** pipelines: Meta Scene first, then CV Server |
+| `CaptureAndPin()` | Runs only the **CV Server** pipeline |
+| `CaptureMetaScene()` | Runs only the **Meta Scene** pipeline |
+
+Wire these to input using `TouchControllerEvent` or UI buttons.
+
+## SpatialPin — Unified Data Type
+
+Both systems produce `SpatialPin` objects with these fields:
+
+```csharp
+public class SpatialPin
+{
+    // Identity
+    string   label;            // raw detection label or Meta class
+    string   semanticLabel;    // normalised to Meta vocabulary
+    float    score;            // confidence (1.0 for Meta ground-truth)
+    PinSource source;          // CvServer or MetaScene
+
+    // Spatial
+    Vector3    position;       // world-space
+    Vector3    normal;         // surface normal
+    Quaternion rotation;       // anchor rotation (MetaScene)
+
+    // 2D (CV-only)
+    SerializableRect bboxPixels;
+    SerializableRect bboxNormalized;
+
+    // Geometry (MetaScene-only)
+    Vector3 planeSize;
+    Vector3 volumeSize;
+    string  anchorUuid;
+
+    // Metadata
+    string sourcePrompt;
+    double timestamp;
+}
+```
+
+`SpatialPinManager` provides filtered views: `.Pins` (all), `.CvPins`, `.MetaScenePins`.
+
+## Key Components
+
+Components in `Assets/HouseMapper/`:
+
+| Component | Role |
+|-----------|------|
+| `SpatialCapturePipeline` | Orchestrator — runs CV pipeline (Florence2→GDino→SAM2) and/or Meta Scene capture |
+| `MetaSceneCollector` | Queries OVRAnchor/OVRRoomLayout, converts to `SpatialPin`s |
+| `ViewportRaycaster` | Converts image-space UV → world-space hit via Physics or ARRaycast |
+| `SpatialPinManager` | Stores + spawns pins from both systems |
+| `SpatialPin` | Unified data type with `PinSource` enum |
+| `SemanticLabelMapper` | Normalises CV labels to Meta vocabulary |
+| `BoundaryProvider` | Reads XR guardian boundary points |
+| `FloorplanBuilder` | Builds floor polygon + mesh from pins/boundary |
+| `SpatialMapExporter` | Exports glTF with unified extras from both systems |
+| `GltfSyncClient` | Uploads exported glTF to the CV server |
+| `CVServerClient` | HTTP client for `/v1/detect`, `/v1/segment`, `/v1/florence` |
+| `ICameraProvider` | Camera abstraction (Quest / Desktop / Mobile implementations) |
 
 ## Scene Wiring
 
@@ -25,60 +151,61 @@ Key components added in `Assets/HouseMapper`:
    - `SpatialCapturePipeline`
    - `ViewportRaycaster`
    - `SpatialPinManager`
-  - `MetaSceneCollector`
+   - `MetaSceneCollector`
    - `BoundaryProvider`
    - `SpatialMapExporter`
-  - `GltfSyncClient`
+   - `GltfSyncClient`
 3. Set references:
    - `SpatialCapturePipeline`
-     - `Server Config` -> `Assets/HouseMapper/Data/ServerConfig` (or create one)
-     - `Camera Provider Source` -> your `QuestCameraProvider`
-     - `Raycaster` -> the `ViewportRaycaster` on the same GameObject
-     - `Pin Manager` -> the `SpatialPinManager` on the same GameObject
+     - `Server Config` → your `ServerConfig` ScriptableObject
+     - `Camera Provider Source` → your `QuestCameraProvider`
+     - `Raycaster` → the `ViewportRaycaster` on the same GameObject
+     - `Pin Manager` → the `SpatialPinManager` on the same GameObject
+     - `Meta Scene Collector` → the `MetaSceneCollector` on the same GameObject
    - `ViewportRaycaster`
-     - `Target Camera` -> main XR camera
+     - `Target Camera` → main XR camera
    - `SpatialPinManager`
-     - `Pin Prefab` -> any world-space label prefab (TextMeshPro supported)
+     - `Pin Prefab` → any world-space label prefab (TextMeshPro supported)
+   - `MetaSceneCollector`
+     - `Tracking Space` → XR tracking origin Transform
    - `SpatialMapExporter`
-     - `Export Root` -> root object to export (pins + optional floor mesh)
-     - `Pin Manager` -> the `SpatialPinManager`
-     - `Boundary Provider` -> the `BoundaryProvider`
-     - `Meta Scene Collector` -> the `MetaSceneCollector`
-     - `Sync Client` -> the `GltfSyncClient`
+     - `Export Root` → root object to export
+     - `Pin Manager` → the `SpatialPinManager`
+     - `Boundary Provider` → the `BoundaryProvider`
+     - `Meta Scene Collector` → the `MetaSceneCollector`
+     - `Sync Client` → the `GltfSyncClient`
    - `GltfSyncClient`
-     - `Server Config` -> `Assets/HouseMapper/Data/ServerConfig`
+     - `Server Config` → same `ServerConfig` ScriptableObject
 
-4. Trigger capture and export from input:
-   - Use `TouchControllerEvent` to call `SpatialCapturePipeline.CaptureAndPin()` on button press.
-  - Add a UI button to call `SpatialMapExporter.ExportAndSync()` when ready.
+4. Trigger capture from input:
+   - Use `TouchControllerEvent` to call `SpatialCapturePipeline.CaptureAll()` for both systems,
+     `CaptureAndPin()` for CV-only, or `CaptureMetaScene()` for Meta-only.
+   - Add a UI button to call `SpatialMapExporter.ExportAndSync()` when ready.
 
 ## Prompts and Categories
 
-The default detection prompt is:
+The CV pipeline uses a multi-stage prompt strategy:
 
-```
-couch, bed, screen, table, lamp, plant, storage, door frame, window frame, wall, floor, ceiling, other
-```
+1. **Florence2 caption** (`<MORE_DETAILED_CAPTION>`) — free-form scene description
+2. **Florence2 OD** (`<OD>`) — extracts object labels
+3. **GroundingDINO prompt** — built automatically from Florence2 labels (e.g. `"couch . table . lamp ."`) with a configurable fallback: `"furniture . object ."`
+4. **SAM2 prompt** — built from GroundingDINO labels filtered by score, or Florence labels, or the fallback
 
-Update `SpatialCapturePipeline.detectionPrompt` to match your taxonomy. Segmentation uses:
-
-```
-wall. floor. ceiling.
-```
+Each prompt stage feeds the next.  Update `florenceCaptionTask`, `florenceDetectionTask`, and `groundingDinoFallbackPrompt` in the Inspector to customise.
 
 ## CV Server
 
-`ServerConfig` should point to the CV server container:
+`ServerConfig` should point to the CV server (HTTPS preferred for Quest builds):
 
 ```
-http://<server-ip>:8000
+https://<server-hostname>
 ```
 
-`SpatialCapturePipeline` uses:
+`SpatialCapturePipeline` (Pipeline B) uses:
 
-- `DetectAsync` for object detection
-- `SegmentAsync` for wall/floor/ceiling masks
-- `FlorenceAsync` for captions
+- `FlorenceAsync` for captions and object detection
+- `DetectAsync` for GroundingDINO bounding-box detection
+- `SegmentAsync` for SAM2 mask segmentation
 
 ## Meta Scene Understanding
 
@@ -125,7 +252,7 @@ The payload includes:
 
 Set `GLTF_UPLOAD_DIR` in the server container to control where uploads land (default: `uploads/gltf`).
 
-It also injects a JSON blob into the root `extras` with both CV and Meta scene data:
+It also injects a JSON blob into the root `extras` with unified pin data from both systems:
 
 ```json
 {
@@ -143,14 +270,34 @@ It also injects a JSON blob into the root `extras` with both CV and Meta scene d
       {
         "label": "couch",
         "semantic_label": "COUCH",
-        "source": "cv_server",
         "score": 0.83,
+        "source": "CvServer",
         "position": [0.5, 0.4, 1.2],
         "normal": [0, 1, 0],
+        "rotation": [0, 0, 0, 1],
         "bbox_pixels": [128, 96, 256, 192],
         "bbox_normalized": [0.2, 0.15, 0.4, 0.3],
-        "prompt": "couch, bed, screen, table, lamp, plant, storage, door frame, window frame, wall, floor, ceiling, other",
+        "plane_size": [0, 0, 0],
+        "volume_size": [0, 0, 0],
+        "anchor_uuid": "",
+        "prompt": "couch . table . lamp .",
         "timestamp": 123.45
+      },
+      {
+        "label": "COUCH",
+        "semantic_label": "COUCH",
+        "score": 1.0,
+        "source": "MetaScene",
+        "position": [0.2, 0.0, 1.1],
+        "normal": [0, 1, 0],
+        "rotation": [0.0, 0.0, 0.0, 1.0],
+        "bbox_pixels": [0, 0, 0, 0],
+        "bbox_normalized": [0, 0, 0, 0],
+        "plane_size": [1.6, 0.6, 0.0],
+        "volume_size": [1.6, 0.6, 0.8],
+        "anchor_uuid": "550e8400-e29b-41d4-a716-446655440000",
+        "prompt": "meta_scene_understanding",
+        "timestamp": 120.0
       }
     ]
   },
@@ -159,7 +306,7 @@ It also injects a JSON blob into the root `extras` with both CV and Meta scene d
     "supported_labels": ["CEILING","DOOR_FRAME","FLOOR","INVISIBLE_WALL_FACE","WALL_ART","WALL_FACE","WINDOW_FRAME","COUCH","TABLE","BED","LAMP","PLANT","SCREEN","STORAGE","GLOBAL_MESH","OTHER"],
     "anchors": [
       {
-        "uuid": "...",
+        "uuid": "550e8400-e29b-41d4-a716-446655440000",
         "labels": ["COUCH"],
         "position": [0.2, 0.0, 1.1],
         "rotation": [0.0, 0.0, 0.0, 1.0],
@@ -178,6 +325,8 @@ It also injects a JSON blob into the root `extras` with both CV and Meta scene d
   }
 }
 ```
+
+The `pins` array contains entries from **both** systems.  Use the `source` field to distinguish `"CvServer"` vs `"MetaScene"` pins.  The `meta_scene` block contains the full raw anchor data for downstream processing.
 
 ## Notes
 

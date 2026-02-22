@@ -3,6 +3,17 @@ using UnityEngine;
 
 namespace HouseMapper.Mapping
 {
+    /// <summary>
+    /// Identifies which capture system produced a pin.
+    /// </summary>
+    public enum PinSource
+    {
+        /// <summary>Pin produced by the remote CV server pipeline (Florence2 / GroundingDINO / SAM2).</summary>
+        CvServer,
+        /// <summary>Pin produced by Meta Quest Scene Understanding (OVRAnchor / OVRRoomLayout).</summary>
+        MetaScene
+    }
+
     [Serializable]
     public struct SerializableRect
     {
@@ -20,16 +31,35 @@ namespace HouseMapper.Mapping
         }
     }
 
+    /// <summary>
+    /// A spatial observation produced by either the CV server pipeline or Meta Scene
+    /// Understanding. Both systems write to the same <see cref="SpatialPinManager"/>
+    /// using this unified type.
+    /// </summary>
     [Serializable]
     public class SpatialPin
     {
+        // ── Identity ──────────────────────────────────────────────
         public string label;
         public string semanticLabel;
         public float score;
+        public PinSource source;
+
+        // ── Spatial ──────────────────────────────────────────────
         public Vector3 position;
         public Vector3 normal;
+        public Quaternion rotation = Quaternion.identity;
+
+        // ── 2D (CV-only, zeroed for MetaScene pins) ─────────────
         public SerializableRect bboxPixels;
         public SerializableRect bboxNormalized;
+
+        // ── Geometry (MetaScene-only, zeroed for CV pins) ────────
+        public Vector3 planeSize;
+        public Vector3 volumeSize;
+        public string anchorUuid;
+
+        // ── Metadata ─────────────────────────────────────────────
         public string sourcePrompt;
         public double timestamp;
     }

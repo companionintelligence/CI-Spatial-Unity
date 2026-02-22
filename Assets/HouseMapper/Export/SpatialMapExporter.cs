@@ -162,13 +162,17 @@ namespace HouseMapper.Export
                 var pinObj = new JObject
                 {
                     ["label"] = pin.label,
+                    ["semantic_label"] = pin.semanticLabel,
                     ["score"] = pin.score,
+                    ["source"] = pin.source.ToString(),
                     ["position"] = ToArray(pin.position),
                     ["normal"] = ToArray(pin.normal),
+                    ["rotation"] = new JArray(pin.rotation.x, pin.rotation.y, pin.rotation.z, pin.rotation.w),
                     ["bbox_pixels"] = new JArray(pin.bboxPixels.x, pin.bboxPixels.y, pin.bboxPixels.width, pin.bboxPixels.height),
                     ["bbox_normalized"] = new JArray(pin.bboxNormalized.x, pin.bboxNormalized.y, pin.bboxNormalized.width, pin.bboxNormalized.height),
-                    ["semantic_label"] = pin.semanticLabel,
-                    ["source"] = "cv_server",
+                    ["plane_size"] = ToArray(pin.planeSize),
+                    ["volume_size"] = ToArray(pin.volumeSize),
+                    ["anchor_uuid"] = pin.anchorUuid ?? "",
                     ["prompt"] = pin.sourcePrompt,
                     ["timestamp"] = pin.timestamp
                 };
