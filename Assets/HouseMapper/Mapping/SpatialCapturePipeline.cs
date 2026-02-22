@@ -22,7 +22,7 @@ namespace HouseMapper.Mapping
         [SerializeField] private int maxPinsPerCapture = 20;
 
         [Header("Prompts")]
-        [SerializeField] private string detectionPrompt = "couch, bed, screen, table, lamp, plant, wall, floor, ceiling, other";
+        [SerializeField] private string detectionPrompt = "couch, bed, screen, table, lamp, plant, storage, door frame, window frame, wall, floor, ceiling, other";
         [SerializeField] private string segmentationPrompt = "wall. floor. ceiling.";
         [SerializeField] private string captionTask = "<MORE_DETAILED_CAPTION>";
 
@@ -177,6 +177,7 @@ namespace HouseMapper.Mapping
                 var pin = new SpatialPin
                 {
                     label = detection.labels[i],
+                    semanticLabel = SemanticLabelMapper.MapToMetaLabel(detection.labels[i]),
                     score = score,
                     position = hitPoint,
                     normal = hitNormal,

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     florence_model_id: str = os.getenv(
         "FLORENCE_MODEL_ID", "microsoft/Florence-2-large"
     )
+    gltf_upload_dir: str = os.getenv("GLTF_UPLOAD_DIR", "uploads/gltf")
     load_all_models: bool = os.getenv("CV_SERVER_LOAD_ALL", "true").lower() == "true"
     default_box_threshold: float = float(os.getenv("BOX_THRESHOLD", "0.35"))
     default_text_threshold: float = float(os.getenv("TEXT_THRESHOLD", "0.25"))

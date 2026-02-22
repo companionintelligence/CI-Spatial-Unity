@@ -24,6 +24,7 @@ namespace HouseMapper.Mapping
     public class SpatialPin
     {
         public string label;
+        public string semanticLabel;
         public float score;
         public Vector3 position;
         public Vector3 normal;
