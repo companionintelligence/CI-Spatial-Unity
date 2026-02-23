@@ -147,7 +147,7 @@ public class SpatialPin
 
 ## Key Components
 
-Components in `Assets/HouseMapper/`:
+Components in `Assets/CompanionScan/`:
 
 | Component | Role |
 |-----------|------|

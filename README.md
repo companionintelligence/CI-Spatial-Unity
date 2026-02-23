@@ -1,4 +1,4 @@
-# Unity-MetaXR-AI-ZeroShot
+# Companion Scan
 
 Quest 3 local world/space mapper that combines Meta scene understanding with a local CV server (Grounding DINO, SAM 2, Florence-2) to produce a glTF export with rich spatial metadata and sync it back to the server.
 
@@ -15,9 +15,9 @@ Both pipelines write `SpatialPin` objects (tagged `CvServer` or `MetaScene`) to 
 
 ## Key Paths
 
-- Scene: `Assets/XR-AI-ZeroShot/Scenes/XR-AI-ZeroShot.unity`
-- World mapper scripts (HouseMapper): `Assets/HouseMapper/`
-- Controller UI: `Assets/HouseMapper/UI/`
+- Scene: `Assets/CompanionScanLegacy/Scenes/CompanionScanLegacy.unity`
+- Companion Scan runtime: `Assets/CompanionScan/`
+- Controller UI: `Assets/CompanionScan/UI/`
 - CV server: `cv-server/`
 
 ## Architecture
@@ -122,20 +122,20 @@ physics surface is hit:
    - See [cv-server/README.md](cv-server/README.md) for local Docker setup.
 
 2. **Create a Server Config asset**
-   - Project window → Create → HouseMapper → Server Config.
+   - Project window → Create → Companion Scan → Server Config.
    - Set `baseUrl` to your server IP (example: `https://my-server.ts.net`).
 
 3. **Open the Quest scene**
-   - `Assets/XR-AI-ZeroShot/Scenes/XR-AI-ZeroShot.unity`.
+   - `Assets/CompanionScanLegacy/Scenes/CompanionScanLegacy.unity`.
 
 4. **Wire the mapper components**
-   - See [docs/quest-capture-gltf.md](docs/quest-capture-gltf.md) for the full component list.
-   - Make sure `ControllerMenuBuilder` exists on a GameObject in the scene — it
-     auto-discovers all pipeline/renderer/exporter references and builds the
-     controller indicators + HUD at runtime.
+    - See [docs/quest-capture-gltf.md](docs/quest-capture-gltf.md) for the full component list.
+    - Make sure `ControllerMenuBuilder` exists on a GameObject in the scene — it
+       auto-discovers all pipeline/renderer/exporter references and builds the
+       controller indicators + HUD at runtime.
 
 5. **Build to Quest 3**
-   - Menu → HouseMapper → Build Quest APK (or Build and Run).
+   - Menu → Companion Scan → Build Quest APK (or Build and Run).
    - Run Space Setup on the headset and grant `com.oculus.permission.USE_SCENE`.
 
 6. **Use the controller**
@@ -157,7 +157,7 @@ physics surface is hit:
 
 ### Play-Mode Integration Tests
 
-`Assets/HouseMapper/Tests/PlayMode/PerImageModelTests.cs` contains 9
+`Assets/CompanionScan/Tests/PlayMode/PerImageModelTests.cs` contains 9
 integration tests that run all three models against 14 fixture images:
 
 | Test | What it checks |
@@ -188,7 +188,7 @@ pytest
 
 ## Legacy Sample (Cloud API)
 
-The original NVIDIA cloud API sample lives under `Assets/XR-AI-ZeroShot/Scripts/` and is not the primary path anymore. The project now runs locally via the CV server.
+The original NVIDIA cloud API sample lives under `Assets/CompanionScanLegacy/Scripts/` and is not the primary path anymore. The project now runs locally via the CV server.
 
 ## License
 

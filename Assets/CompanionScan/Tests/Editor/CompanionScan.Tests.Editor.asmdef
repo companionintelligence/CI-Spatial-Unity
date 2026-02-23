@@ -1,0 +1,23 @@
+﻿{
+  "name": "CompanionScan.Tests.Editor",
+  "rootNamespace": "CompanionScan.Tests.Editor",
+  "references": [
+    "CompanionScan"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "testAssemblies": true,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
+
