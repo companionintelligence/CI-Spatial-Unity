@@ -211,7 +211,7 @@ namespace HouseMapper.UI
             tmp.fontSize = fontSize;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = textColor;
-            tmp.enableWordWrapping = false;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
             return tmp;
         }
 
@@ -255,7 +255,7 @@ namespace HouseMapper.UI
             tmp.fontSize = labelFontSize;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = color;
-            tmp.enableWordWrapping = false;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
             var tmpRT = tmp.GetComponent<RectTransform>();
             tmpRT.sizeDelta = new Vector2(0.06f, 0.02f);
         }
