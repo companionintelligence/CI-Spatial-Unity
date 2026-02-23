@@ -4,24 +4,25 @@ using HouseMapper.Mapping;
 using HouseMapper.Rendering;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace HouseMapper.UI
 {
     /// <summary>
-    /// World-space controller menu panel with labeled buttons for:
-    /// - Capture (CV pipeline / Meta Scene / Both)
-    /// - Model toggles (Florence, GroundingDINO, SAM2)
-    /// - Display mode cycling (BoundingBox2D / SpatialLabel3D / Both)
-    /// - Save &amp; Export
+    /// Manages controller-driven state for the Quest XR UI.
+    /// All actions are invoked by <see cref="XRControllerInput"/> via public
+    /// methods — no world-space UI buttons.
     ///
-    /// Attach this to a Canvas that is a child of the left controller anchor
-    /// (e.g. LeftControllerAnchor → Canvas → ControllerMenuUI).
+    /// Button mapping:
+    ///   A  (red)    → <see cref="DoCapture"/>
+    ///   B  (blue)   → <see cref="CycleModel"/>
+    ///   Y  (green)  → <see cref="DoSaveExport"/>
+    ///   X  (yellow) → <see cref="CyclePreviewDistance"/>
+    ///   Trigger (orange) → <see cref="CycleDisplayMode"/>
     /// </summary>
     public class ControllerMenuUI : MonoBehaviour
     {
         // ═══════════════════════════════════════════════════════════════
-        //  External references — set in Inspector
+        //  External references (auto-discovered or injected by builder)
         // ═══════════════════════════════════════════════════════════════
 
         [Header("Pipeline")]
@@ -35,43 +36,45 @@ namespace HouseMapper.UI
         [SerializeField] private CaptionPanel captionPanel;
 
         // ═══════════════════════════════════════════════════════════════
-        //  Button references — set in Inspector (world-space UI Buttons)
+        //  HUD labels (set by ControllerMenuBuilder)
         // ═══════════════════════════════════════════════════════════════
 
-        [Header("Buttons")]
-        [SerializeField] private Button captureAllButton;
-        [SerializeField] private Button captureCvButton;
-        [SerializeField] private Button captureMetaButton;
-        [SerializeField] private Button saveExportButton;
-
-        [Header("Toggle Buttons")]
-        [SerializeField] private Button toggleFlorenceButton;
-        [SerializeField] private Button toggleDinoButton;
-        [SerializeField] private Button toggleSam2Button;
-        [SerializeField] private Button toggleDisplayModeButton;
-
-        // ═══════════════════════════════════════════════════════════════
-        //  Status label references
-        // ═══════════════════════════════════════════════════════════════
-
-        [Header("Status Labels")]
-        [SerializeField] private TMP_Text florenceStatusLabel;
-        [SerializeField] private TMP_Text dinoStatusLabel;
-        [SerializeField] private TMP_Text sam2StatusLabel;
+        [Header("HUD Labels")]
+        [SerializeField] private TMP_Text modelLabel;
         [SerializeField] private TMP_Text displayModeLabel;
+        [SerializeField] private TMP_Text previewDistanceLabel;
         [SerializeField] private TMP_Text busyLabel;
+
+        // ═══════════════════════════════════════════════════════════════
+        //  Model cycle enum
+        // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>Active model preset cycled by the B button.</summary>
+        public enum ModelPreset { Florence, GDino, SAM2, All }
+
+        // ═══════════════════════════════════════════════════════════════
+        //  Preview distance enum
+        // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>Preview distance cycled by the X button.</summary>
+        public enum PreviewDistance { Near, Far, Off }
 
         // ═══════════════════════════════════════════════════════════════
         //  State
         // ═══════════════════════════════════════════════════════════════
 
-        private bool _florenceEnabled = true;
-        private bool _dinoEnabled = true;
-        private bool _sam2Enabled = true;
+        private ModelPreset _activeModel = ModelPreset.All;
         private AnchorDisplayMode _displayMode = AnchorDisplayMode.Both;
+        private PreviewDistance _previewDist = PreviewDistance.Near;
+
+        /// <summary>Current model preset.</summary>
+        public ModelPreset ActiveModel => _activeModel;
 
         /// <summary>Current display mode for anchor visualisation.</summary>
         public AnchorDisplayMode DisplayMode => _displayMode;
+
+        /// <summary>Current preview distance setting.</summary>
+        public PreviewDistance CurrentPreviewDistance => _previewDist;
 
         // ═══════════════════════════════════════════════════════════════
         //  Lifecycle
@@ -79,116 +82,71 @@ namespace HouseMapper.UI
 
         private void OnEnable()
         {
-            // Wire buttons
-            if (captureAllButton != null) captureAllButton.onClick.AddListener(OnCaptureAll);
-            if (captureCvButton != null) captureCvButton.onClick.AddListener(OnCaptureCv);
-            if (captureMetaButton != null) captureMetaButton.onClick.AddListener(OnCaptureMeta);
-            if (saveExportButton != null) saveExportButton.onClick.AddListener(OnSaveExport);
-
-            if (toggleFlorenceButton != null) toggleFlorenceButton.onClick.AddListener(OnToggleFlorence);
-            if (toggleDinoButton != null) toggleDinoButton.onClick.AddListener(OnToggleDino);
-            if (toggleSam2Button != null) toggleSam2Button.onClick.AddListener(OnToggleSam2);
-            if (toggleDisplayModeButton != null) toggleDisplayModeButton.onClick.AddListener(OnCycleDisplayMode);
-
-            RefreshLabels();
-        }
-
-        private void OnDisable()
-        {
-            if (captureAllButton != null) captureAllButton.onClick.RemoveListener(OnCaptureAll);
-            if (captureCvButton != null) captureCvButton.onClick.RemoveListener(OnCaptureCv);
-            if (captureMetaButton != null) captureMetaButton.onClick.RemoveListener(OnCaptureMeta);
-            if (saveExportButton != null) saveExportButton.onClick.RemoveListener(OnSaveExport);
-
-            if (toggleFlorenceButton != null) toggleFlorenceButton.onClick.RemoveListener(OnToggleFlorence);
-            if (toggleDinoButton != null) toggleDinoButton.onClick.RemoveListener(OnToggleDino);
-            if (toggleSam2Button != null) toggleSam2Button.onClick.RemoveListener(OnToggleSam2);
-            if (toggleDisplayModeButton != null) toggleDisplayModeButton.onClick.RemoveListener(OnCycleDisplayMode);
+            ApplyModelPreset();
+            ApplyDisplayMode();
+            RefreshHUD();
         }
 
         private void Update()
         {
-            // Update busy indicator
             if (busyLabel != null && pipeline != null)
-            {
                 busyLabel.text = pipeline.IsBusy ? "BUSY…" : "";
-            }
         }
 
         // ═══════════════════════════════════════════════════════════════
-        //  Capture actions
+        //  Public API — called by XRControllerInput
         // ═══════════════════════════════════════════════════════════════
 
-        private void OnCaptureAll()
+        /// <summary>A button — take a capture snapshot.</summary>
+        public void DoCapture()
         {
             if (pipeline == null || pipeline.IsBusy) return;
-            ApplyModelToggles();
+            ApplyModelPreset();
+            ApplyPreviewDistance();
+            Debug.Log($"[ControllerMenu] Capture → model={_activeModel}");
             pipeline.CaptureAll();
         }
 
-        private void OnCaptureCv()
+        /// <summary>B button — cycle active model preset.</summary>
+        public void CycleModel()
         {
-            if (pipeline == null || pipeline.IsBusy) return;
-            ApplyModelToggles();
-            pipeline.CaptureAndPin();
+            _activeModel = _activeModel switch
+            {
+                ModelPreset.Florence => ModelPreset.GDino,
+                ModelPreset.GDino   => ModelPreset.SAM2,
+                ModelPreset.SAM2    => ModelPreset.All,
+                ModelPreset.All     => ModelPreset.Florence,
+                _ => ModelPreset.All
+            };
+            ApplyModelPreset();
+            RefreshHUD();
+            Debug.Log($"[ControllerMenu] Model → {_activeModel}");
         }
 
-        private void OnCaptureMeta()
+        /// <summary>X button — cycle preview distance (near / far / off).</summary>
+        public void CyclePreviewDistance()
         {
-            if (pipeline == null || pipeline.IsBusy) return;
-            pipeline.CaptureMetaScene();
+            _previewDist = _previewDist switch
+            {
+                PreviewDistance.Near => PreviewDistance.Far,
+                PreviewDistance.Far  => PreviewDistance.Off,
+                PreviewDistance.Off  => PreviewDistance.Near,
+                _ => PreviewDistance.Near
+            };
+            RefreshHUD();
+            Debug.Log($"[ControllerMenu] Preview distance → {_previewDist}");
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        //  Save / Export
-        // ═══════════════════════════════════════════════════════════════
-
-        private void OnSaveExport()
+        /// <summary>Y button — save &amp; export GLTF.</summary>
+        public void DoSaveExport()
         {
             if (exporter == null) return;
             Debug.Log("[ControllerMenu] Exporting + syncing…");
             exporter.ExportAndSync();
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        //  Model toggles
-        // ═══════════════════════════════════════════════════════════════
-
-        private void OnToggleFlorence()
-        {
-            _florenceEnabled = !_florenceEnabled;
-            RefreshLabels();
-        }
-
-        private void OnToggleDino()
-        {
-            _dinoEnabled = !_dinoEnabled;
-            RefreshLabels();
-        }
-
-        private void OnToggleSam2()
-        {
-            _sam2Enabled = !_sam2Enabled;
-            RefreshLabels();
-        }
-
-        /// <summary>
-        /// Push the current toggle state into the pipeline's serialised fields
-        /// before triggering a capture.
-        /// </summary>
-        private void ApplyModelToggles()
-        {
-            if (pipeline == null) return;
-            pipeline.RunFlorence = _florenceEnabled;
-            pipeline.RunGroundingDino = _dinoEnabled;
-            pipeline.RunSam2 = _sam2Enabled;
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        //  Display mode
-        // ═══════════════════════════════════════════════════════════════
-
-        private void OnCycleDisplayMode()
+        /// <summary>Trigger — cycle display mode (BBox2D → Label3D → Both).</summary>
+        public void CycleDisplayMode()
         {
             _displayMode = _displayMode switch
             {
@@ -197,63 +155,124 @@ namespace HouseMapper.UI
                 AnchorDisplayMode.Both => AnchorDisplayMode.BoundingBox2D,
                 _ => AnchorDisplayMode.Both
             };
-
             ApplyDisplayMode();
-            RefreshLabels();
+            RefreshHUD();
+            Debug.Log($"[ControllerMenu] Display → {_displayMode}");
         }
 
-        /// <summary>Set display mode programmatically (e.g. from another UI).</summary>
+        /// <summary>Set display mode programmatically (e.g. from tests).</summary>
         public void SetDisplayMode(AnchorDisplayMode mode)
         {
             _displayMode = mode;
             ApplyDisplayMode();
-            RefreshLabels();
+            RefreshHUD();
+        }
+
+        /// <summary>Returns the world-space distance used for preview placement.</summary>
+        public float GetPreviewDistanceMetres()
+        {
+            return _previewDist switch
+            {
+                PreviewDistance.Near => 1.0f,
+                PreviewDistance.Far  => 3.0f,
+                PreviewDistance.Off  => 0f,
+                _ => 1.0f
+            };
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //  Internal — apply state
+        // ═══════════════════════════════════════════════════════════════
+
+        private void ApplyModelPreset()
+        {
+            if (pipeline == null) return;
+            switch (_activeModel)
+            {
+                case ModelPreset.Florence:
+                    pipeline.RunFlorence      = true;
+                    pipeline.RunGroundingDino  = false;
+                    pipeline.RunSam2           = false;
+                    break;
+                case ModelPreset.GDino:
+                    pipeline.RunFlorence      = false;
+                    pipeline.RunGroundingDino  = true;
+                    pipeline.RunSam2           = false;
+                    break;
+                case ModelPreset.SAM2:
+                    pipeline.RunFlorence      = false;
+                    pipeline.RunGroundingDino  = false;
+                    pipeline.RunSam2           = true;
+                    break;
+                case ModelPreset.All:
+                default:
+                    pipeline.RunFlorence      = true;
+                    pipeline.RunGroundingDino  = true;
+                    pipeline.RunSam2           = true;
+                    break;
+            }
         }
 
         private void ApplyDisplayMode()
         {
-            bool show2D = _displayMode == AnchorDisplayMode.BoundingBox2D ||
-                          _displayMode == AnchorDisplayMode.Both;
-            bool show3D = _displayMode == AnchorDisplayMode.SpatialLabel3D ||
-                          _displayMode == AnchorDisplayMode.Both;
+            bool show2D = _displayMode is AnchorDisplayMode.BoundingBox2D
+                       or AnchorDisplayMode.Both;
+            bool show3D = _displayMode is AnchorDisplayMode.SpatialLabel3D
+                       or AnchorDisplayMode.Both;
 
             if (bboxRenderer != null) bboxRenderer.gameObject.SetActive(show2D);
             if (labelRenderer != null) labelRenderer.gameObject.SetActive(show3D);
 
-            // Pipeline also needs to know so it can skip bbox/label creation
-            if (pipeline != null)
-            {
-                pipeline.RenderBoxes = show2D;
-            }
+            if (pipeline != null) pipeline.RenderBoxes = show2D;
+        }
+
+        private void ApplyPreviewDistance()
+        {
+            if (pipeline == null || pipeline.Raycaster == null) return;
+            float metres = GetPreviewDistanceMetres();
+            if (metres > 0f)
+                pipeline.Raycaster.FallbackDistance = metres;
         }
 
         // ═══════════════════════════════════════════════════════════════
-        //  Label refresh
+        //  HUD refresh
         // ═══════════════════════════════════════════════════════════════
 
-        private void RefreshLabels()
+        private void RefreshHUD()
         {
-            SetToggleLabel(florenceStatusLabel, "Florence2", _florenceEnabled);
-            SetToggleLabel(dinoStatusLabel, "GDino", _dinoEnabled);
-            SetToggleLabel(sam2StatusLabel, "SAM2", _sam2Enabled);
+            if (modelLabel != null)
+            {
+                modelLabel.text = _activeModel switch
+                {
+                    ModelPreset.Florence => "Model: Florence",
+                    ModelPreset.GDino   => "Model: GDino",
+                    ModelPreset.SAM2    => "Model: SAM2",
+                    ModelPreset.All     => "Model: All",
+                    _ => "Model: ?"
+                };
+            }
 
             if (displayModeLabel != null)
             {
                 displayModeLabel.text = _displayMode switch
                 {
-                    AnchorDisplayMode.BoundingBox2D => "Display: 2D Box",
+                    AnchorDisplayMode.BoundingBox2D  => "Display: 2D Box",
                     AnchorDisplayMode.SpatialLabel3D => "Display: 3D Label",
-                    AnchorDisplayMode.Both => "Display: Both",
+                    AnchorDisplayMode.Both           => "Display: Both",
                     _ => "Display: ?"
                 };
             }
-        }
 
-        private static void SetToggleLabel(TMP_Text label, string name, bool isOn)
-        {
-            if (label == null) return;
-            label.text = isOn ? $"{name}: ON" : $"{name}: OFF";
-            label.color = isOn ? Color.green : new Color(1f, 0.3f, 0.3f);
+            if (previewDistanceLabel != null)
+            {
+                previewDistanceLabel.text = _previewDist switch
+                {
+                    PreviewDistance.Near => "Preview: Near (1m)",
+                    PreviewDistance.Far  => "Preview: Far (3m)",
+                    PreviewDistance.Off  => "Preview: Off",
+                    _ => "Preview: ?"
+                };
+            }
         }
     }
 }

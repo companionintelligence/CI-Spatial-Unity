@@ -9,11 +9,21 @@ namespace HouseMapper.Rendering
         [SerializeField] private Transform labelRoot;
         [SerializeField] private GameObject labelPrefab;
 
+        /// <summary>
+        /// When true, previous labels are kept when new labels are rendered.
+        /// Set to false and call <see cref="Clear"/> to replicate the old
+        /// clear-on-render behaviour.
+        /// </summary>
+        [SerializeField] private bool persistLabels = true;
+
         private readonly List<GameObject> _instances = new List<GameObject>();
 
         public void RenderLabels(IReadOnlyList<Vector3> positions, IReadOnlyList<string> labels)
         {
-            Clear();
+            // Only clear old labels when persistence is disabled
+            if (!persistLabels)
+                Clear();
+
             if (labelPrefab == null || labelRoot == null)
             {
                 return;

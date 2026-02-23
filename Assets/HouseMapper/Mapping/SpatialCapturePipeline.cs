@@ -117,6 +117,10 @@ namespace HouseMapper.Mapping
         /// <summary>Enable / disable mask overlay rendering at runtime.</summary>
         public bool RenderMasks { get => renderMasks; set => renderMasks = value; }
 
+        /// <summary>The viewport raycaster used for 3D pin placement.
+        /// Exposed so the UI can update <see cref="ViewportRaycaster.FallbackDistance"/>.</summary>
+        public ViewportRaycaster Raycaster => raycaster;
+
         // ═══════════════════════════════════════════════════════════════
         //  Lifecycle
         // ═══════════════════════════════════════════════════════════════

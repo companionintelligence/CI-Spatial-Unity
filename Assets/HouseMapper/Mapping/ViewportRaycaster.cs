@@ -15,6 +15,14 @@ namespace HouseMapper.Mapping
         [SerializeField] private float maxDistance = 10.0f;
         [SerializeField] private LayerMask raycastMask = ~0;
 
+        /// <summary>Runtime-adjustable fallback distance (metres).
+        /// Used when no AR/physics hit is found.</summary>
+        public float FallbackDistance
+        {
+            get => fallbackDistance;
+            set => fallbackDistance = Mathf.Max(0f, value);
+        }
+
     #if UNITY_IOS || UNITY_ANDROID
         [SerializeField] private ARRaycastManager arRaycastManager;
         private readonly List<ARRaycastHit> _arHits = new List<ARRaycastHit>();
