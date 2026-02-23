@@ -13,11 +13,11 @@ namespace CompanionScan.UI
     /// methods â€” no world-space UI buttons.
     ///
     /// Button mapping:
-    ///   A  (red)    â†’ <see cref="DoCapture"/>
-    ///   B  (blue)   â†’ <see cref="CycleModel"/>
-    ///   Y  (green)  â†’ <see cref="DoSaveExport"/>
-    ///   X  (yellow) â†’ <see cref="CyclePreviewDistance"/>
-    ///   Trigger (orange) â†’ <see cref="CycleDisplayMode"/>
+    ///   A  (red)    -> <see cref="DoCapture"/>
+    ///   B  (blue)   -> <see cref="CycleModel"/>
+    ///   Y  (green)  -> <see cref="DoSaveExport"/>
+    ///   X  (yellow) -> <see cref="CyclePreviewDistance"/>
+    ///   Trigger (orange) -> <see cref="CycleDisplayMode"/>
     /// </summary>
     public class ControllerMenuUI : MonoBehaviour
     {
@@ -35,6 +35,7 @@ namespace CompanionScan.UI
         [SerializeField] private LabelRenderer labelRenderer;
         [SerializeField] private CaptionPanel captionPanel;
         [SerializeField] private SpatialPinManager pinManager;
+        [SerializeField] private SnapshotFrustumVisualizer frustumVisualizer;
 
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  HUD labels (set by ControllerMenuBuilder)
@@ -51,7 +52,7 @@ namespace CompanionScan.UI
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
         /// <summary>Active model preset cycled by the B button.</summary>
-        public enum ModelPreset { Florence, GDino, SAM2, All }
+        public enum ModelPreset { Florence, GDino, SAM2 }
 
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Preview distance enum
@@ -64,7 +65,7 @@ namespace CompanionScan.UI
         //  State
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-        private ModelPreset _activeModel = ModelPreset.All;
+        private ModelPreset _activeModel = ModelPreset.Florence;
         private AnchorDisplayMode _displayMode = AnchorDisplayMode.Both;
         private PreviewDistance _previewDist = PreviewDistance.Near;
 
@@ -113,6 +114,14 @@ namespace CompanionScan.UI
             }
             ApplyModelPreset();
             ApplyPreviewDistance();
+            if (pipeline != null)
+            {
+                pipeline.SnapshotDistance = GetPreviewDistanceMetres();
+            }
+            if (frustumVisualizer != null)
+            {
+                frustumVisualizer.FreezeFrustum(GetPreviewDistanceMetres());
+            }
             Debug.Log($"[ControllerMenu] Capture â†’ model={_activeModel} display={_displayMode}");
             pipeline.CaptureAll();
         }
@@ -124,9 +133,8 @@ namespace CompanionScan.UI
             {
                 ModelPreset.Florence => ModelPreset.GDino,
                 ModelPreset.GDino   => ModelPreset.SAM2,
-                ModelPreset.SAM2    => ModelPreset.All,
-                ModelPreset.All     => ModelPreset.Florence,
-                _ => ModelPreset.All
+                ModelPreset.SAM2    => ModelPreset.Florence,
+                _ => ModelPreset.Florence
             };
             ApplyModelPreset();
             RefreshHUD();
@@ -210,15 +218,14 @@ namespace CompanionScan.UI
                     pipeline.RunSam2           = false;
                     break;
                 case ModelPreset.SAM2:
-                    pipeline.RunFlorence      = true;
+                    pipeline.RunFlorence      = false;
                     pipeline.RunGroundingDino  = false;
                     pipeline.RunSam2           = true;
                     break;
-                case ModelPreset.All:
                 default:
                     pipeline.RunFlorence      = true;
-                    pipeline.RunGroundingDino  = true;
-                    pipeline.RunSam2           = true;
+                    pipeline.RunGroundingDino  = false;
+                    pipeline.RunSam2           = false;
                     break;
             }
         }
@@ -267,9 +274,8 @@ namespace CompanionScan.UI
                 modelLabel.text = _activeModel switch
                 {
                     ModelPreset.Florence => "Model: Florence",
-                    ModelPreset.GDino   => "Model: GDino",
+                    ModelPreset.GDino   => "Model: DINO",
                     ModelPreset.SAM2    => "Model: SAM2",
-                    ModelPreset.All     => "Model: All",
                     _ => "Model: ?"
                 };
             }

@@ -15,6 +15,7 @@ namespace CompanionScan.Export
         [SerializeField] private SpatialPinManager pinManager;
         [SerializeField] private BoundaryProvider boundaryProvider;
         [SerializeField] private MetaSceneCollector metaSceneCollector;
+        [SerializeField] private SnapshotFrameStore snapshotStore;
 
         [Header("Floorplan")]
         [SerializeField] private bool includeFloorMesh = true;
@@ -63,6 +64,8 @@ namespace CompanionScan.Export
 
             var floorObject = CreateFloorMesh(root);
 
+            var snapshotExtras = BuildSnapshotExtras(outputDir);
+
             if (!TryExportGltf(root, outputDir, fileName))
             {
                 Debug.LogError("UnityGLTF is not available. Install the UnityGLTF package to export.");
@@ -74,13 +77,13 @@ namespace CompanionScan.Export
                 {
                     gltfPath = string.Empty,
                     binPath = string.Empty,
-                    extras = returnExtras ? BuildExtras(root, metaSnapshot) : null
+                    extras = returnExtras ? BuildExtras(root, metaSnapshot, snapshotExtras) : null
                 };
             }
 
             var gltfPath = Path.Combine(outputDir, fileName + ".gltf");
             var binPath = Path.Combine(outputDir, fileName + ".bin");
-            var extras = BuildExtras(root, metaSnapshot);
+            var extras = BuildExtras(root, metaSnapshot, snapshotExtras);
             if (writeExtras)
             {
                 GltfExtrasWriter.WriteExtras(gltfPath, extras);
@@ -130,7 +133,7 @@ namespace CompanionScan.Export
             return floorObj;
         }
 
-        private JObject BuildExtras(Transform root, MetaSceneSnapshot metaSnapshot)
+        private JObject BuildExtras(Transform root, MetaSceneSnapshot metaSnapshot, JArray snapshotExtras)
         {
             var extras = new JObject
             {
@@ -180,6 +183,11 @@ namespace CompanionScan.Export
             }
             cvMapping["pins"] = pinArray;
 
+            if (snapshotExtras != null)
+            {
+                cvMapping["snapshots"] = snapshotExtras;
+            }
+
             extras["cv_mapping"] = cvMapping;
             extras["meta_scene"] = BuildMetaSceneExtras(metaSnapshot);
 
@@ -187,8 +195,65 @@ namespace CompanionScan.Export
             extras["boundary"] = cvMapping["boundary"];
             extras["floorplan"] = cvMapping["floorplan"];
             extras["pins"] = pinArray;
+            if (snapshotExtras != null)
+            {
+                extras["snapshots"] = snapshotExtras;
+            }
 
             return extras;
+        }
+
+        private JArray BuildSnapshotExtras(string outputDir)
+        {
+            if (snapshotStore == null || snapshotStore.Frames == null || snapshotStore.Frames.Count == 0)
+            {
+                return null;
+            }
+
+            var snapshotDir = Path.Combine(outputDir, "snapshots");
+            Directory.CreateDirectory(snapshotDir);
+
+            var array = new JArray();
+            for (int i = 0; i < snapshotStore.Frames.Count; i++)
+            {
+                var frame = snapshotStore.Frames[i];
+                if (frame == null || frame.jpegBytes == null || frame.jpegBytes.Length == 0)
+                {
+                    continue;
+                }
+
+                string fileId = string.IsNullOrWhiteSpace(frame.id) ? $"snap_{i:0000}" : frame.id;
+                string fileName = fileId + ".jpg";
+                string filePath = Path.Combine(snapshotDir, fileName);
+                File.WriteAllBytes(filePath, frame.jpegBytes);
+
+                var entry = new JObject
+                {
+                    ["id"] = fileId,
+                    ["timestamp"] = frame.timestamp,
+                    ["image"] = Path.Combine("snapshots", fileName).Replace("\\", "/"),
+                    ["image_size"] = new JArray(frame.imageWidth, frame.imageHeight),
+                    ["camera"] = new JObject
+                    {
+                        ["position"] = ToArray(frame.cameraPosition),
+                        ["rotation"] = new JArray(frame.cameraRotation.x, frame.cameraRotation.y, frame.cameraRotation.z, frame.cameraRotation.w)
+                    },
+                    ["frustum"] = new JObject
+                    {
+                        ["distance"] = frame.frustumDistance,
+                        ["corners"] = ToArray(frame.frustumCorners)
+                    },
+                    ["intrinsics"] = new JArray(
+                        frame.cameraIntrinsics.m00, frame.cameraIntrinsics.m01, frame.cameraIntrinsics.m02, frame.cameraIntrinsics.m03,
+                        frame.cameraIntrinsics.m10, frame.cameraIntrinsics.m11, frame.cameraIntrinsics.m12, frame.cameraIntrinsics.m13,
+                        frame.cameraIntrinsics.m20, frame.cameraIntrinsics.m21, frame.cameraIntrinsics.m22, frame.cameraIntrinsics.m23,
+                        frame.cameraIntrinsics.m30, frame.cameraIntrinsics.m31, frame.cameraIntrinsics.m32, frame.cameraIntrinsics.m33)
+                };
+
+                array.Add(entry);
+            }
+
+            return array;
         }
 
         private JObject BuildMetaSceneExtras(MetaSceneSnapshot metaSnapshot)

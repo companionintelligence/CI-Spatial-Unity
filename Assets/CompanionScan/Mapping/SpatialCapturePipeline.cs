@@ -42,6 +42,9 @@ namespace CompanionScan.Mapping
         [Header("Mapping")]
         [SerializeField] private ViewportRaycaster raycaster;
         [SerializeField] private SpatialPinManager pinManager;
+        [SerializeField] private SnapshotFrameStore snapshotStore;
+        [SerializeField] private Camera snapshotCamera;
+        [SerializeField] private float snapshotDistance = 1.0f;
         [SerializeField] private float minScore = 0.3f;
         [SerializeField] private int maxPinsPerCapture = 20;
 
@@ -127,6 +130,13 @@ namespace CompanionScan.Mapping
 
         /// <summary>The label renderer â€” exposed so UI can toggle 3D label visibility.</summary>
         public LabelRenderer LabelRenderer => labelRenderer;
+
+        /// <summary>Distance used when capturing a snapshot frustum frame.</summary>
+        public float SnapshotDistance
+        {
+            get => snapshotDistance;
+            set => snapshotDistance = Mathf.Max(0f, value);
+        }
 
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Lifecycle
@@ -282,6 +292,7 @@ namespace CompanionScan.Mapping
 
             Debug.Log($"[Pipeline-CV] Captured frame ({frame.Length} bytes). Starting CV pipelineâ€¦");
             EnsureFrameTexture(frame);
+            CaptureSnapshotFrame(frame);
 
             // â”€â”€ Step 1: Florence2 caption â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             string caption = null;
@@ -478,6 +489,33 @@ namespace CompanionScan.Mapping
                 _frameTexture = new Texture2D(2, 2, TextureFormat.RGB24, false);
             }
             _frameTexture.LoadImage(jpegBytes);
+        }
+
+        private void CaptureSnapshotFrame(byte[] jpegBytes)
+        {
+            if (snapshotStore == null)
+            {
+                return;
+            }
+
+            var cam = snapshotCamera != null ? snapshotCamera : Camera.main;
+            Pose pose = cam != null
+                ? new Pose(cam.transform.position, cam.transform.rotation)
+                : new Pose(Vector3.zero, Quaternion.identity);
+
+            if (_cameraProvider != null)
+            {
+                pose = _cameraProvider.GetCameraPose();
+            }
+
+            var intrinsics = _cameraProvider != null
+                ? _cameraProvider.GetCameraIntrinsics()
+                : Matrix4x4.identity;
+
+            int width = _frameTexture != null ? _frameTexture.width : 0;
+            int height = _frameTexture != null ? _frameTexture.height : 0;
+
+            snapshotStore.AddSnapshot(jpegBytes, width, height, pose, intrinsics, snapshotDistance, cam);
         }
 
         /// <summary>

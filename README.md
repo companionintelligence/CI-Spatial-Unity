@@ -189,7 +189,3 @@ pytest
 ## Legacy Sample (Cloud API)
 
 The original NVIDIA cloud API sample lives under `Assets/CompanionScanLegacy/Scripts/` and is not the primary path anymore. The project now runs locally via the CV server.
-
-## License
-
-MIT — Free to use, modify and learn from.

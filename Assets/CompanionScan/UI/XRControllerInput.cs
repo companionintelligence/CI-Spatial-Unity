@@ -8,13 +8,13 @@ namespace CompanionScan.UI
     /// approach with direct hardware input.
     ///
     /// Button mapping (right controller):
-    ///   A  (Button.One)   â†’ Capture snapshot
-    ///   B  (Button.Two)   â†’ Cycle active model (Florence â†’ GDino â†’ SAM2 â†’ All)
+    ///   A  (Button.One)   -> Capture snapshot
+    ///   B  (Button.Two)   -> Cycle active model (Florence -> GDino -> SAM2)
     /// Left controller:
-    ///   X  (Button.Three) â†’ Cycle preview distance (Near â†’ Far â†’ Off)
-    ///   Y  (Button.Four)  â†’ Save &amp; Export GLTF
+    ///   X  (Button.Three) -> Cycle preview distance (Near -> Far -> Off)
+    ///   Y  (Button.Four)  -> Save & Export GLTF
     /// Either trigger:
-    ///   Primary / Secondary Index Trigger â†’ Cycle display mode
+    ///   Primary / Secondary Index Trigger -> Cycle display mode
     /// </summary>
     public class XRControllerInput : MonoBehaviour
     {

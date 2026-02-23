@@ -57,14 +57,14 @@ namespace CompanionScan.UI
 
         private static readonly (string name, Color color, string label, Vector3 pos)[] RightButtons =
         {
-            ("A_Circle", new Color(0.9f, 0.15f, 0.15f, 1f),  "CAPTURE",      new Vector3( 0.009f, 0.003f, -0.020f)),
-            ("B_Circle", new Color(0.15f, 0.35f, 0.9f, 1f), "MODEL TOGGLE",  new Vector3( 0.009f, 0.003f, -0.035f)),
+            ("A_Circle", new Color(0.9f, 0.15f, 0.15f, 1f),  "CAPTURE",     new Vector3( 0.009f, 0.003f, -0.020f)),
+            ("B_Circle", new Color(0.15f, 0.35f, 0.9f, 1f), "MODEL",       new Vector3( 0.009f, 0.003f, -0.035f)),
         };
 
         private static readonly (string name, Color color, string label, Vector3 pos)[] LeftButtons =
         {
-            ("X_Circle", new Color(0.95f, 0.85f, 0.1f, 1f),  "PREVIEW",      new Vector3(-0.009f, 0.003f, -0.020f)),
-            ("Y_Circle", new Color(0.1f, 0.85f, 0.25f, 1f),  "SAVE/EXPORT",  new Vector3(-0.009f, 0.003f, -0.035f)),
+            ("X_Circle", new Color(0.95f, 0.85f, 0.1f, 1f),  "PREVIEW",     new Vector3(-0.009f, 0.003f, -0.020f)),
+            ("Y_Circle", new Color(0.1f, 0.85f, 0.25f, 1f),  "SAVE+EXPORT", new Vector3(-0.009f, 0.003f, -0.035f)),
         };
 
         // Trigger indicators (shared color â€” orange)
@@ -136,6 +136,20 @@ namespace CompanionScan.UI
             var labelR    = FindAnyObjectByType<LabelRenderer>();
             var captionP  = FindAnyObjectByType<CaptionPanel>();
             var pinMgr    = FindAnyObjectByType<SpatialPinManager>();
+            var snapStore = FindAnyObjectByType<SnapshotFrameStore>();
+            var frustumViz = FindAnyObjectByType<SnapshotFrustumVisualizer>();
+            if (snapStore == null)
+            {
+                var snapGO = new GameObject("SnapshotFrameStore");
+                snapGO.transform.SetParent(rootGO.transform, false);
+                snapStore = snapGO.AddComponent<SnapshotFrameStore>();
+            }
+            if (frustumViz == null)
+            {
+                var frustumGO = new GameObject("SnapshotFrustumVisualizer");
+                frustumGO.transform.SetParent(rootGO.transform, false);
+                frustumViz = frustumGO.AddComponent<SnapshotFrustumVisualizer>();
+            }
 
             SetField(_menuUI, "pipeline",     pipeline);
             SetField(_menuUI, "exporter",     exporter);
@@ -144,6 +158,16 @@ namespace CompanionScan.UI
             SetField(_menuUI, "labelRenderer",labelR);
             SetField(_menuUI, "captionPanel", captionP);
             SetField(_menuUI, "pinManager",   pinMgr);
+            SetField(_menuUI, "frustumVisualizer", frustumViz);
+
+            if (pipeline != null)
+            {
+                SetField(pipeline, "snapshotStore", snapStore);
+            }
+            if (exporter != null)
+            {
+                SetField(exporter, "snapshotStore", snapStore);
+            }
 
             // 3. HUD panel on wrist
             BuildHUD();
@@ -153,7 +177,7 @@ namespace CompanionScan.UI
             {
                 foreach (var b in RightButtons)
                     SpawnIndicator(rightAnchor, b.name, b.color, b.label, b.pos);
-                SpawnIndicator(rightAnchor, "RTrigger_Circle", TriggerColor, "BBOX/3D",
+                SpawnIndicator(rightAnchor, "RTrigger_Circle", TriggerColor, "DISPLAY",
                     new Vector3(0f, -0.005f, 0.02f));
             }
 
@@ -161,7 +185,7 @@ namespace CompanionScan.UI
             {
                 foreach (var b in LeftButtons)
                     SpawnIndicator(leftAnchor, b.name, b.color, b.label, b.pos);
-                SpawnIndicator(leftAnchor, "LTrigger_Circle", TriggerColor, "BBOX/3D",
+                SpawnIndicator(leftAnchor, "LTrigger_Circle", TriggerColor, "DISPLAY",
                     new Vector3(0f, -0.005f, 0.02f));
             }
 
