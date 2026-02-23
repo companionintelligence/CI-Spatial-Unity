@@ -2,7 +2,7 @@
   "name": "HouseMapper.Tests",
   "rootNamespace": "HouseMapper.Tests",
   "references": [
-    "HouseMapper"
+    "GUID:dbe5d272346c8ec41b52d87c99009bed"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

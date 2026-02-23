@@ -48,5 +48,12 @@ def run_florence2(request: FlorenceRequest) -> FlorenceResponse:
 
     # Also include the raw decoded text for caption-only tasks
     plain_text = mm.florence_processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-    results: Dict[str, Any] = {**task_result, "raw_text": plain_text}
+
+    # task_result is a dict for OD/detection tasks, but a plain string for
+    # caption tasks.  Normalise so the response always has a dict.
+    if isinstance(task_result, str):
+        results: Dict[str, Any] = {"caption": task_result, "raw_text": plain_text}
+    else:
+        results = {**task_result, "raw_text": plain_text}
+
     return FlorenceResponse(task=request.task, results=results, text=plain_text)

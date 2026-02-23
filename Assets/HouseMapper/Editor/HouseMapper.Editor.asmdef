@@ -1,0 +1,18 @@
+{
+  "name": "HouseMapper.Editor",
+  "rootNamespace": "HouseMapper.Editor",
+  "references": [
+    "GUID:dbe5d272346c8ec41b52d87c99009bed"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
