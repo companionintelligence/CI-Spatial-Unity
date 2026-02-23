@@ -88,7 +88,27 @@ Captures a camera frame on Quest and sends it to a local Docker CV server for AI
 | `CaptureAndPin()` | Runs only the **CV Server** pipeline |
 | `CaptureMetaScene()` | Runs only the **Meta Scene** pipeline |
 
-Wire these to input using `TouchControllerEvent` or UI buttons.
+These are wired automatically by the XR controller input system.
+
+### XR Controller Input
+
+All interaction uses physical Quest controller buttons via `XRControllerInput`
+→ `ControllerMenuUI`. No world-space UI panels are needed.
+
+| Button | Controller | Colour | Action |
+|--------|-----------|--------|--------|
+| **A** | Right | Red | Capture (runs `CaptureAll()` with current model preset) |
+| **B** | Right | Blue | Cycle model: Florence → GDino → SAM2 → All |
+| **X** | Left | Yellow | Cycle preview distance: Near (1 m) → Far (3 m) → Off |
+| **Y** | Left | Green | Save & Export glTF |
+| **Trigger** | Either | Orange | Cycle display: BBox2D → Label3D → Both |
+
+Coloured circle indicators and labels are spawned on the controller models at
+runtime by `ControllerMenuBuilder`. A wrist HUD on the left controller shows
+the current model, display mode, preview distance, and busy state.
+
+3D spatial labels **persist** across captures — pressing A repeatedly builds
+up a complete spatial map of the environment.
 
 ## SpatialPin — Unified Data Type
 
@@ -133,7 +153,7 @@ Components in `Assets/HouseMapper/`:
 |-----------|------|
 | `SpatialCapturePipeline` | Orchestrator — runs CV pipeline (Florence2→GDino→SAM2) and/or Meta Scene capture |
 | `MetaSceneCollector` | Queries OVRAnchor/OVRRoomLayout, converts to `SpatialPin`s |
-| `ViewportRaycaster` | Converts image-space UV → world-space hit via Physics or ARRaycast |
+| `ViewportRaycaster` | Converts image-space UV → world-space hit via Physics or ARRaycast. Exposes `FallbackDistance` for runtime control. |
 | `SpatialPinManager` | Stores + spawns pins from both systems |
 | `SpatialPin` | Unified data type with `PinSource` enum |
 | `SemanticLabelMapper` | Normalises CV labels to Meta vocabulary |
@@ -143,6 +163,11 @@ Components in `Assets/HouseMapper/`:
 | `GltfSyncClient` | Uploads exported glTF to the CV server |
 | `CVServerClient` | HTTP client for `/v1/detect`, `/v1/segment`, `/v1/florence` |
 | `ICameraProvider` | Camera abstraction (Quest / Desktop / Mobile implementations) |
+| `XRControllerInput` | Polls OVRInput and dispatches button presses to `ControllerMenuUI` |
+| `ControllerMenuUI` | State machine: model preset, display mode, preview distance |
+| `ControllerMenuBuilder` | Builds coloured button indicators, wrist HUD, and wires everything at runtime |
+| `LabelRenderer` | 3D label spawning with optional persistence across captures |
+| `BBoxRenderer` | 2D bounding-box overlay rendering |
 
 ## Scene Wiring
 
@@ -177,10 +202,16 @@ Components in `Assets/HouseMapper/`:
    - `GltfSyncClient`
      - `Server Config` → same `ServerConfig` ScriptableObject
 
-4. Trigger capture from input:
-   - Use `TouchControllerEvent` to call `SpatialCapturePipeline.CaptureAll()` for both systems,
-     `CaptureAndPin()` for CV-only, or `CaptureMetaScene()` for Meta-only.
-   - Add a UI button to call `SpatialMapExporter.ExportAndSync()` when ready.
+4. Add a `ControllerMenuBuilder` component to any GameObject in the scene.
+   It auto-discovers all pipeline/renderer/exporter singletons and builds:
+   - `ControllerMenuUI` — state machine (model preset, display mode, preview distance)
+   - `XRControllerInput` — OVRInput polling → dispatches to `ControllerMenuUI`
+   - Coloured circle indicators on both controller anchors
+   - Wrist HUD panel on the left controller
+
+   No manual button wiring is needed. The builder uses `FindAnyObjectByType`
+   to locate `SpatialCapturePipeline`, `SpatialMapExporter`, `BBoxRenderer`,
+   `LabelRenderer`, etc.
 
 ## Prompts and Categories
 

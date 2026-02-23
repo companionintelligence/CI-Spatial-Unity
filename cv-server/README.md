@@ -47,6 +47,10 @@ curl http://localhost:8000/v1/health
 - `bin` (file, optional)
 - `extras` (field, optional)
 
+The Quest app triggers this automatically when the user presses the **Y button**
+on the left controller (Save & Export). See the main [README](../README.md) for
+the full controller button mapping.
+
 ## Optional Request Fields
 
 All image endpoints accept `max_side` to let the client request server-side resizing.

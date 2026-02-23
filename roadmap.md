@@ -1,15 +1,30 @@
 # Formal Software Development Plan
-## Cross-Platform House Mapping System with Grounding DINO, Grounded-SAM 2 &amp; Florence-2
+
+## Cross-Platform House Mapping System with Grounding DINO, Grounded-SAM 2 & Florence-2
 
 ## Current Plan (Feb 22, 2026)
 
 This repo is now focused on a Quest 3 local world/space mapper with glTF export and sync.
 
-1) Run the local CV server in Docker (Grounding DINO, SAM 2, Florence-2).
-2) Capture Quest frames and detect/segment/caption via the local server.
-3) Capture Meta scene anchors and semantic labels from Space Setup.
-4) Raycast detections into world space and track pins.
-5) Export glTF with combined extras and upload back to the CV server.
+### Completed
+
+1. Run the local CV server in Docker (Grounding DINO, SAM 2, Florence-2).
+2. Capture Quest frames and detect/segment/caption via the local server.
+3. Capture Meta scene anchors and semantic labels from Space Setup.
+4. Raycast detections into world space and track pins.
+5. Export glTF with combined extras and upload back to the CV server.
+6. XR controller UI with physical button mapping (A/B/X/Y/Triggers).
+7. Coloured circle indicators on controller models + wrist HUD.
+8. 3D spatial labels persist across captures.
+9. Model cycling (Florence / GDino / SAM2 / All) via B button.
+10. Preview distance toggle (Near 1 m / Far 3 m / Off) via X button.
+11. Display mode toggle (BBox2D / Label3D / Both) via Triggers.
+12. QA integration tests (9 tests, 14 images) and CV server smoke tests.
+13. One-click Quest APK build via editor menu.
+
+### In Progress
+
+14. End-to-end on-device validation — confirm full capture→export→upload loop.
 
 The rest of this document is historical context from earlier iterations.
 
