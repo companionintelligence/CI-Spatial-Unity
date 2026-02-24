@@ -13,7 +13,7 @@ PlayerSettings:
   useOnDemandResources: 0
   accelerometerFrequency: 60
   companyName: PresentFutures
-  productName: Unity-XR-AI-Florence
+  productName: CompanionCapture
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b: 0.1254902, a: 1}
@@ -950,7 +950,7 @@ PlayerSettings:
   cloudProjectId: 95ada6cf-dafc-480b-a23d-df420de142c0
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: Unity-XR-AI-Florence
+  projectName: CompanionCapture
   organizationId: mrhegemon
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0

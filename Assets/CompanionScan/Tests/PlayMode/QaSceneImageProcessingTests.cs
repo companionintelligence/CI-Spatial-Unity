@@ -49,10 +49,11 @@ namespace CompanionScan.Tests.PlayMode
             }
 
         #if UNITY_EDITOR
-            var loadOp = EditorSceneManager.LoadSceneInPlayMode(QaScenePath, new LoadSceneParameters(LoadSceneMode.Single));
-            while (!loadOp.isDone)
+            var qaScene = EditorSceneManager.LoadSceneInPlayMode(QaScenePath, new LoadSceneParameters(LoadSceneMode.Single));
+            yield return null;
+            if (!qaScene.IsValid() || !qaScene.isLoaded)
             {
-                yield return null;
+                Assert.Inconclusive("QA scene failed to load: " + QaScenePath);
             }
         #else
             var loadOp = SceneManager.LoadSceneAsync(Path.GetFileNameWithoutExtension(QaScenePath), LoadSceneMode.Single);
