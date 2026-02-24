@@ -11610,8 +11610,8 @@ MonoBehaviour:
   bgColor: {r: 0.05, g: 0.05, b: 0.1, a: 0.85}
   textColor: {r: 1, g: 1, b: 1, a: 1}
   circleRadius: 0.006
-  labelFontSize: 14
-  labelOffset: 0.012
+  labelFontSize: 0.15
+  labelOffset: 0.000375
 --- !u!1 &2110092656
 GameObject:
   m_ObjectHideFlags: 0
