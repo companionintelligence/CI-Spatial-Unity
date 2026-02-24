@@ -37,6 +37,13 @@ namespace CompanionScan.Mapping
             _frames.Clear();
         }
 
+        public List<SnapshotFrame> ConsumeFrames()
+        {
+            var copy = new List<SnapshotFrame>(_frames);
+            _frames.Clear();
+            return copy;
+        }
+
         public void AddSnapshot(byte[] jpegBytes, int width, int height, Pose cameraPose,
                                 Matrix4x4 intrinsics, float frustumDistance, Camera camera)
         {

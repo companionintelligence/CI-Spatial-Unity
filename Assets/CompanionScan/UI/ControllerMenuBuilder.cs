@@ -38,8 +38,8 @@ namespace CompanionScan.UI
 
         [Header("Button Indicator Appearance")]
         [SerializeField] private float circleRadius = 0.006f;
-        [SerializeField] private float labelFontSize = 14f;
-        [SerializeField] private float labelOffset = 0.012f;
+        [SerializeField] private float labelFontSize = 1.2f;
+        [SerializeField] private float labelOffset = 0.003f;
 
         // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         //  Built references
@@ -123,10 +123,18 @@ namespace CompanionScan.UI
 
         private void BuildAll()
         {
-            // 1. Create root GO that holds ControllerMenuUI
-            var rootGO = new GameObject("ControllerMenuRoot");
-            rootGO.transform.SetParent(transform, false);
-            _menuUI = rootGO.AddComponent<ControllerMenuUI>();
+            // 1. Create or reuse ControllerMenuUI
+            var existingMenu = FindAnyObjectByType<ControllerMenuUI>();
+            var rootGO = existingMenu != null ? existingMenu.gameObject : new GameObject("ControllerMenuRoot");
+            if (existingMenu == null)
+            {
+                rootGO.transform.SetParent(transform, false);
+                _menuUI = rootGO.AddComponent<ControllerMenuUI>();
+            }
+            else
+            {
+                _menuUI = existingMenu;
+            }
 
             // 2. Auto-discover scene singletons
             var pipeline  = FindAnyObjectByType<SpatialCapturePipeline>();
@@ -190,7 +198,11 @@ namespace CompanionScan.UI
             }
 
             // 5. Wire XRControllerInput
-            _input = rootGO.AddComponent<XRControllerInput>();
+            _input = FindAnyObjectByType<XRControllerInput>();
+            if (_input == null)
+            {
+                _input = rootGO.AddComponent<XRControllerInput>();
+            }
             SetField(_input, "menuUI", _menuUI);
 
             if (pipeline == null)
@@ -324,7 +336,7 @@ namespace CompanionScan.UI
             tmp.color = color;
             tmp.textWrappingMode = TextWrappingModes.NoWrap;
             var tmpRT = tmp.GetComponent<RectTransform>();
-            tmpRT.sizeDelta = new Vector2(0.06f, 0.02f);
+            tmpRT.sizeDelta = new Vector2(0.015f, 0.006f);
         }
 
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•

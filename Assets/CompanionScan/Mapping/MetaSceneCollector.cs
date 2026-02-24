@@ -92,6 +92,12 @@ namespace CompanionScan.Mapping
                 return snapshot;
             }
 
+            snapshot.roomUuids = rooms
+                .Select(room => room.Uuid.ToString())
+                .Distinct()
+                .ToList();
+            snapshot.primaryRoomUuid = snapshot.roomUuids.Count > 0 ? snapshot.roomUuids[0] : null;
+
             var anchors = new List<OVRAnchor>();
             foreach (var room in rooms)
             {

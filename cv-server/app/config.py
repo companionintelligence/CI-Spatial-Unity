@@ -12,7 +12,7 @@ class Settings(BaseSettings):
         "GDINO_WEIGHTS_PATH", "checkpoints/groundingdino_swint_ogc.pth"
     )
     sam2_config_path: str = os.getenv(
-        "SAM2_CONFIG_PATH", "configs/sam2.1_hiera_t.yaml"
+        "SAM2_CONFIG_PATH", "configs/sam2.1/sam2.1_hiera_t.yaml"
     )
     sam2_weights_path: str = os.getenv(
         "SAM2_WEIGHTS_PATH", "checkpoints/sam2.1_hiera_tiny.pt"

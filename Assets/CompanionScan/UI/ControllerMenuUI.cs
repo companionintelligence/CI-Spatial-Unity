@@ -18,6 +18,7 @@ namespace CompanionScan.UI
     ///   Y  (green)  -> <see cref="DoSaveExport"/>
     ///   X  (yellow) -> <see cref="CyclePreviewDistance"/>
     ///   Trigger (orange) -> <see cref="CycleDisplayMode"/>
+    ///   Inner trigger -> <see cref="PreviewGltf"/>
     /// </summary>
     public class ControllerMenuUI : MonoBehaviour
     {
@@ -176,6 +177,14 @@ namespace CompanionScan.UI
             ApplyDisplayMode();
             RefreshHUD();
             Debug.Log($"[ControllerMenu] Display â†’ {_displayMode}");
+        }
+
+        /// <summary>Inner trigger â€” export a glTF preview (no upload).</summary>
+        public void PreviewGltf()
+        {
+            if (exporter == null) return;
+            Debug.Log("[ControllerMenu] Exporting glTF previewâ€¦");
+            exporter.Export();
         }
 
         /// <summary>Set display mode programmatically (e.g. from tests).</summary>

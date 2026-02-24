@@ -28,6 +28,8 @@ namespace CompanionScan.Mapping
     {
         public List<MetaSceneAnchorSnapshot> anchors = new List<MetaSceneAnchorSnapshot>();
         public List<string> supportedLabels = new List<string>();
+        public List<string> roomUuids = new List<string>();
+        public string primaryRoomUuid;
         public double timestamp;
         public string error;
     }

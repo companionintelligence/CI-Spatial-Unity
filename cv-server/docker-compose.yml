@@ -11,7 +11,7 @@ services:
       - CV_SERVER_LOAD_ALL=true
       - GDINO_CONFIG_PATH=/app/configs/GroundingDINO_SwinT_OGC.py
       - GDINO_WEIGHTS_PATH=/app/checkpoints/groundingdino_swint_ogc.pth
-      - SAM2_CONFIG_PATH=configs/sam2.1/sam2.1_hiera_t
+      - SAM2_CONFIG_PATH=configs/sam2.1/sam2.1_hiera_t.yaml
       - SAM2_WEIGHTS_PATH=/app/checkpoints/sam2.1_hiera_tiny.pt
       - FLORENCE_MODEL_ID=microsoft/Florence-2-large
       - SSL_CERTFILE=/app/certs/liam-razer.capybara-ulmer.ts.net.crt

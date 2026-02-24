@@ -13,8 +13,10 @@ namespace CompanionScan.UI
     /// Left controller:
     ///   X  (Button.Three) -> Cycle preview distance (Near -> Far -> Off)
     ///   Y  (Button.Four)  -> Save & Export GLTF
-    /// Either trigger:
+    /// Either index trigger:
     ///   Primary / Secondary Index Trigger -> Cycle display mode
+    /// Either hand trigger:
+    ///   Primary / Secondary Hand Trigger -> Preview glTF
     /// </summary>
     public class XRControllerInput : MonoBehaviour
     {
@@ -64,6 +66,11 @@ namespace CompanionScan.UI
             if (OVRInput.GetDown(OVRInput.Button.PrimaryIndexTrigger) ||
                 OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger))
                 menuUI.CycleDisplayMode();
+
+            // Either hand trigger â€“ Preview glTF
+            if (OVRInput.GetDown(OVRInput.Button.PrimaryHandTrigger) ||
+                OVRInput.GetDown(OVRInput.Button.SecondaryHandTrigger))
+                menuUI.PreviewGltf();
         }
     }
 }
