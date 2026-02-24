@@ -2,6 +2,7 @@
 using CompanionScan.Core;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace CompanionScan.Rendering
 {
@@ -11,11 +12,15 @@ namespace CompanionScan.Rendering
         [SerializeField] private RectTransform resultImage;
         [SerializeField] private GameObject bboxPrefab;
 
+        private GameObject _runtimePrefab;
+        private RawImage _runtimeImage;
+
         private readonly List<GameObject> _instances = new List<GameObject>();
 
         public void RenderBoxes(DetectionResult result, Texture sourceTexture)
         {
             Clear();
+            EnsureDefaults(sourceTexture);
             if (result == null || sourceTexture == null || container == null || bboxPrefab == null)
             {
                 return;
@@ -54,6 +59,90 @@ namespace CompanionScan.Rendering
 
                 _instances.Add(boxObj);
             }
+        }
+
+        private void EnsureDefaults(Texture sourceTexture)
+        {
+            if (container == null)
+            {
+                container = FindContainer();
+            }
+
+            if (container == null)
+            {
+                CreatePreviewCanvas(sourceTexture, out RectTransform createdContainer, out RawImage createdImage);
+                container = createdContainer;
+                resultImage = createdImage != null ? createdImage.rectTransform : null;
+                _runtimeImage = createdImage;
+            }
+
+            if (container != null && sourceTexture != null)
+            {
+                container.sizeDelta = new Vector2(sourceTexture.width, sourceTexture.height);
+                if (_runtimeImage != null)
+                {
+                    _runtimeImage.texture = sourceTexture;
+                }
+            }
+
+            if (bboxPrefab == null)
+            {
+                if (_runtimePrefab == null && container != null)
+                {
+                    _runtimePrefab = BuildRuntimePrefab(container);
+                }
+                bboxPrefab = _runtimePrefab;
+            }
+        }
+
+        private RectTransform FindContainer()
+        {
+            var containerGo = GameObject.Find("BBOX Container") ?? GameObject.Find("BBoxContainer");
+            return containerGo != null ? containerGo.GetComponent<RectTransform>() : null;
+        }
+
+        private void CreatePreviewCanvas(Texture sourceTexture, out RectTransform createdContainer, out RawImage createdImage)
+        {
+            var canvasGo = new GameObject("CameraPreviewCanvas");
+            var canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasGo.AddComponent<CanvasScaler>();
+            canvasGo.AddComponent<GraphicRaycaster>();
+
+            var imageGo = new GameObject("ResultImage");
+            imageGo.transform.SetParent(canvasGo.transform, false);
+            createdImage = imageGo.AddComponent<RawImage>();
+
+            var imageRt = imageGo.GetComponent<RectTransform>();
+            imageRt.anchorMin = new Vector2(0.5f, 0.5f);
+            imageRt.anchorMax = new Vector2(0.5f, 0.5f);
+            imageRt.pivot = new Vector2(0.5f, 0.5f);
+            float width = sourceTexture != null ? sourceTexture.width : 1280f;
+            float height = sourceTexture != null ? sourceTexture.height : 960f;
+            imageRt.sizeDelta = new Vector2(width, height);
+
+            var containerGo = new GameObject("BBOX Container", typeof(RectTransform));
+            containerGo.transform.SetParent(imageGo.transform, false);
+            createdContainer = containerGo.GetComponent<RectTransform>();
+            createdContainer.anchorMin = new Vector2(0.5f, 0.5f);
+            createdContainer.anchorMax = new Vector2(0.5f, 0.5f);
+            createdContainer.pivot = new Vector2(0.5f, 0.5f);
+            createdContainer.sizeDelta = new Vector2(width, height);
+        }
+
+        private GameObject BuildRuntimePrefab(Transform parent)
+        {
+            var root = new GameObject("BBoxPrefab", typeof(RectTransform));
+            root.transform.SetParent(parent, false);
+            root.SetActive(false);
+
+            var image = root.AddComponent<Image>();
+            image.color = new Color(0f, 1f, 0f, 0.05f);
+            var outline = root.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 1f, 0f, 0.9f);
+            outline.effectDistance = new Vector2(2f, -2f);
+
+            return root;
         }
 
         public void Clear()
