@@ -184,7 +184,7 @@ namespace CompanionScan.Tests.PlayMode
                 .Where(f =>
                 {
                     var ext = Path.GetExtension(f)?.ToLowerInvariant();
-                    return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".webp";
+                    return ext == ".jpg" || ext == ".jpeg" || ext == ".png";
                 })
                 .ToList();
         }

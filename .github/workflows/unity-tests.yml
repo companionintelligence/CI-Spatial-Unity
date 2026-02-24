@@ -1,0 +1,79 @@
+name: Unity Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: "0 4 * * *"
+
+jobs:
+  unit-tests:
+    name: EditMode and PlayMode (unit)
+    runs-on: [self-hosted, windows, x64, gpu]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Unity Test Runner
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          CompanionScan_TEST_ARTIFACTS: ${{ github.workspace }}/artifacts
+        with:
+          unityVersion: 6000.3.9f1
+          projectPath: .
+          testMode: all
+          artifactsPath: artifacts
+
+      - name: Upload Test Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-test-artifacts
+          path: artifacts
+          if-no-files-found: warn
+
+  integration-tests:
+    name: CV Server Integration
+    runs-on: [self-hosted, windows, x64, gpu]
+    needs: unit-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for cv-server health
+        shell: pwsh
+        run: |
+          $healthUrl = "http://localhost:8000/v1/health"
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $resp = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 5
+              if ($resp.StatusCode -eq 200) { exit 0 }
+            } catch {}
+            Start-Sleep -Seconds 10
+          }
+          throw "cv-server did not become healthy at $healthUrl"
+
+      - name: Unity Test Runner (integration)
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          CompanionScan_TEST_SERVER_URL: http://localhost:8000
+          CompanionScan_TEST_ARTIFACTS: ${{ github.workspace }}/artifacts
+        with:
+          unityVersion: 6000.3.9f1
+          projectPath: .
+          testMode: playmode
+          artifactsPath: artifacts
+
+      - name: Upload Test Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-test-artifacts-integration
+          path: artifacts
+          if-no-files-found: warn

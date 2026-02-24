@@ -15,7 +15,8 @@ Both pipelines write `SpatialPin` objects (tagged `CvServer` or `MetaScene`) to 
 
 ## Key Paths
 
-- Scene: `Assets/CompanionScanLegacy/Scenes/CompanionScanLegacy.unity`
+- Scene: `Assets/CompanionScan/Scenes/CompanionCapture.unity`
+- QA XR Scene: `Assets/CompanionScan/Scenes/CompanionScanQA.unity`
 - Companion Scan runtime: `Assets/CompanionScan/`
 - Controller UI: `Assets/CompanionScan/UI/`
 - CV server: `cv-server/`
@@ -57,7 +58,7 @@ to the controller model at runtime.
 | Button | Colour | Action | Details |
 |--------|--------|--------|---------|
 | **A** | Red | **Capture** | Takes a snapshot. Runs both Meta Scene + CV Server pipelines (respects current model preset). 3D labels persist after each capture. |
-| **B** | Blue | **Cycle Model** | Cycles the active AI model preset: Florence → GDino → SAM2 → All → Florence … |
+| **B** | Blue | **Cycle Model** | Cycles the active AI model preset: Florence → GDino → SAM2 → Florence … |
 
 ### Left Controller
 
@@ -78,7 +79,7 @@ A small world-space panel is attached to the left controller wrist showing
 the current state:
 
 ```
-Model: All
+Model: Florence
 Display: Both
 Preview: Near (1m)
 BUSY…            ← shown during capture
@@ -91,7 +92,6 @@ BUSY…            ← shown during capture
 | Florence | ✓ | – | – |
 | GDino | – | ✓ | – |
 | SAM2 | – | – | ✓ |
-| All | ✓ | ✓ | ✓ |
 
 ### Display Modes
 
@@ -126,7 +126,7 @@ physics surface is hit:
    - Set `baseUrl` to your server IP (example: `https://my-server.ts.net`).
 
 3. **Open the Quest scene**
-   - `Assets/CompanionScanLegacy/Scenes/CompanionScanLegacy.unity`.
+   - `Assets/CompanionScan/Scenes/CompanionCapture.unity`.
 
 4. **Wire the mapper components**
     - See [docs/quest-capture-gltf.md](docs/quest-capture-gltf.md) for the full component list.
@@ -173,6 +173,19 @@ integration tests that run all three models against 14 fixture images:
 | Anchor3D_PinData_ValidForAllDetections | 3D pin data is valid |
 
 Run via Unity Test Runner (Play Mode) or CI.
+
+### QA XR Scene Asset
+
+Open `Assets/CompanionScan/Scenes/CompanionScanQA.unity` for a persistent QA
+scene that focuses on button-driven UX validation (controller indicators + HUD).
+
+### CI (Self-hosted GPU Runner)
+
+The CI workflow targets a Windows self-hosted runner with GPU support. Ensure:
+
+- Runner labels include `self-hosted`, `windows`, `x64`, `gpu`.
+- cv-server is running as a stable local service on this machine.
+- Health check is available at `http://localhost:8000/v1/health`.
 
 ### CV Server Tests
 
