@@ -1,4 +1,5 @@
-﻿using CompanionScan.Core;
+﻿using System.Collections;
+using CompanionScan.Core;
 using UnityEngine;
 
 namespace CompanionScan.Platform
@@ -7,6 +8,7 @@ namespace CompanionScan.Platform
     {
         private WebCamTexture _webcam;
         private Texture2D _frame;
+        private bool _isRequesting;
 
         public bool IsAvailable => WebCamTexture.devices.Length > 0;
 
@@ -17,11 +19,18 @@ namespace CompanionScan.Platform
                 return;
             }
 
-            if (_webcam == null)
+#if UNITY_ANDROID
+            if (!Application.HasUserAuthorization(UserAuthorization.WebCam))
             {
-                _webcam = new WebCamTexture();
-                _webcam.Play();
+                if (!_isRequesting)
+                {
+                    StartCoroutine(RequestAndStart());
+                }
+                return;
             }
+#endif
+
+            StartWebcam();
         }
 
         public void StopCapture()
@@ -29,6 +38,54 @@ namespace CompanionScan.Platform
             if (_webcam != null)
             {
                 _webcam.Stop();
+            }
+        }
+
+        private void StartWebcam()
+        {
+            if (_webcam == null)
+            {
+                var deviceName = ResolveDeviceName();
+                _webcam = string.IsNullOrWhiteSpace(deviceName)
+                    ? new WebCamTexture()
+                    : new WebCamTexture(deviceName);
+            }
+
+            if (!_webcam.isPlaying)
+            {
+                _webcam.Play();
+            }
+        }
+
+        private string ResolveDeviceName()
+        {
+            var devices = WebCamTexture.devices;
+            if (devices == null || devices.Length == 0)
+            {
+                return null;
+            }
+
+            foreach (var device in devices)
+            {
+                var name = device.name ?? string.Empty;
+                var lower = name.ToLowerInvariant();
+                if (lower.Contains("passthrough") || lower.Contains("oculus") || lower.Contains("quest"))
+                {
+                    return name;
+                }
+            }
+
+            return devices[0].name;
+        }
+
+        private IEnumerator RequestAndStart()
+        {
+            _isRequesting = true;
+            yield return Application.RequestUserAuthorization(UserAuthorization.WebCam);
+            _isRequesting = false;
+            if (Application.HasUserAuthorization(UserAuthorization.WebCam))
+            {
+                StartWebcam();
             }
         }
 

@@ -12,6 +12,10 @@ namespace CompanionScan.Tests.PlayMode
         [UnityTest]
         public IEnumerator RenderBoxes_CreatesRuntimeUiWhenMissing()
         {
+            var cameraGo = new GameObject("PreviewCamera");
+            cameraGo.tag = "MainCamera";
+            cameraGo.AddComponent<Camera>();
+
             var rendererGo = new GameObject("BBoxRenderer");
             var renderer = rendererGo.AddComponent<BBoxRenderer>();
 
@@ -36,8 +40,13 @@ namespace CompanionScan.Tests.PlayMode
             Assert.IsNotNull(container, "Expected runtime BBOX container to be created.");
             Assert.Greater(container.transform.childCount, 0, "Expected at least one bbox instance.");
 
+            var canvas = GameObject.Find("CameraPreviewCanvas")?.GetComponent<Canvas>();
+            Assert.IsNotNull(canvas, "Expected preview canvas to be created.");
+            Assert.AreEqual(RenderMode.WorldSpace, canvas.renderMode);
+
             Object.DestroyImmediate(tex);
             Object.DestroyImmediate(rendererGo);
+            Object.DestroyImmediate(cameraGo);
         }
     }
 }

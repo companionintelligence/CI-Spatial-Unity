@@ -85,6 +85,7 @@ namespace CompanionScan.UI
 
         private void OnEnable()
         {
+            EnsureHudLabels();
             ApplyModelPreset();
             ApplyDisplayMode();
             RefreshHUD();
@@ -278,6 +279,7 @@ namespace CompanionScan.UI
 
         private void RefreshHUD()
         {
+            EnsureHudLabels();
             if (modelLabel != null)
             {
                 modelLabel.text = _activeModel switch
@@ -310,6 +312,33 @@ namespace CompanionScan.UI
                     _ => "Preview: ?"
                 };
             }
+        }
+
+        private void EnsureHudLabels()
+        {
+            if (modelLabel == null) modelLabel = FindHudLabel("ModelLabel");
+            if (displayModeLabel == null) displayModeLabel = FindHudLabel("DisplayLabel");
+            if (previewDistanceLabel == null) previewDistanceLabel = FindHudLabel("PreviewLabel");
+            if (busyLabel == null) busyLabel = FindHudLabel("BusyLabel");
+        }
+
+        private static TMP_Text FindHudLabel(string name)
+        {
+            var direct = GameObject.Find(name);
+            if (direct != null)
+            {
+                return direct.GetComponent<TMP_Text>();
+            }
+
+            foreach (var tmp in FindObjectsByType<TMP_Text>(FindObjectsSortMode.None))
+            {
+                if (tmp != null && tmp.name == name)
+                {
+                    return tmp;
+                }
+            }
+
+            return null;
         }
     }
 }

@@ -485,7 +485,8 @@ namespace CompanionScan.Export
 
         private bool TryExportGltf(Transform root, string outputDir, string exportName)
         {
-            var exporterType = Type.GetType("UnityGLTF.GLTFSceneExporter, UnityGLTF");
+            var exporterType = Type.GetType("UnityGLTF.GLTFSceneExporter, UnityGLTFScripts")
+                               ?? Type.GetType("UnityGLTF.GLTFSceneExporter, UnityGLTF");
             if (exporterType == null)
             {
                 return false;

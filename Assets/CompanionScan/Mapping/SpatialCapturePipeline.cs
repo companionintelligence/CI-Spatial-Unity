@@ -138,6 +138,9 @@ namespace CompanionScan.Mapping
             set => snapshotDistance = Mathf.Max(0f, value);
         }
 
+        /// <summary>Camera used for snapshot frustum calculations.</summary>
+        public Camera SnapshotCamera => snapshotCamera != null ? snapshotCamera : Camera.main;
+
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Lifecycle
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -292,6 +295,10 @@ namespace CompanionScan.Mapping
 
             Debug.Log($"[Pipeline-CV] Captured frame ({frame.Length} bytes). Starting CV pipelineâ€¦");
             EnsureFrameTexture(frame);
+            if (bboxRenderer != null)
+            {
+                bboxRenderer.SetPreviewTexture(_frameTexture);
+            }
             CaptureSnapshotFrame(frame);
 
             // â”€â”€ Step 1: Florence2 caption â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

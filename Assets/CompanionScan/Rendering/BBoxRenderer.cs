@@ -11,6 +11,10 @@ namespace CompanionScan.Rendering
         [SerializeField] private RectTransform container;
         [SerializeField] private RectTransform resultImage;
         [SerializeField] private GameObject bboxPrefab;
+        [SerializeField] private Transform previewAnchor;
+        [SerializeField] private Vector3 previewOffset = new Vector3(0f, -0.1f, 0.6f);
+        [SerializeField] private Vector3 previewRotation = Vector3.zero;
+        [SerializeField] private float previewScale = 0.0004f;
 
         private GameObject _runtimePrefab;
         private RawImage _runtimeImage;
@@ -21,7 +25,12 @@ namespace CompanionScan.Rendering
         {
             Clear();
             EnsureDefaults(sourceTexture);
-            if (result == null || sourceTexture == null || container == null || bboxPrefab == null)
+            if (sourceTexture == null || container == null || bboxPrefab == null)
+            {
+                return;
+            }
+
+            if (result == null || result.bboxes == null || result.labels == null)
             {
                 return;
             }
@@ -79,9 +88,14 @@ namespace CompanionScan.Rendering
             if (container != null && sourceTexture != null)
             {
                 container.sizeDelta = new Vector2(sourceTexture.width, sourceTexture.height);
-                if (_runtimeImage != null)
+                if (_runtimeImage != null) _runtimeImage.texture = sourceTexture;
+                if (resultImage != null)
                 {
-                    _runtimeImage.texture = sourceTexture;
+                    var rawImage = resultImage.GetComponent<RawImage>();
+                    if (rawImage != null)
+                    {
+                        rawImage.texture = sourceTexture;
+                    }
                 }
             }
 
@@ -95,6 +109,23 @@ namespace CompanionScan.Rendering
             }
         }
 
+        public void SetPreviewTexture(Texture sourceTexture)
+        {
+            EnsureDefaults(sourceTexture);
+            if (_runtimeImage != null && sourceTexture != null)
+            {
+                _runtimeImage.texture = sourceTexture;
+            }
+            else if (resultImage != null && sourceTexture != null)
+            {
+                var rawImage = resultImage.GetComponent<RawImage>();
+                if (rawImage != null)
+                {
+                    rawImage.texture = sourceTexture;
+                }
+            }
+        }
+
         private RectTransform FindContainer()
         {
             var containerGo = GameObject.Find("BBOX Container") ?? GameObject.Find("BBoxContainer");
@@ -105,13 +136,31 @@ namespace CompanionScan.Rendering
         {
             var canvasGo = new GameObject("CameraPreviewCanvas");
             var canvas = canvasGo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvasGo.AddComponent<CanvasScaler>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            var scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.dynamicPixelsPerUnit = 10f;
             canvasGo.AddComponent<GraphicRaycaster>();
+
+            var anchor = previewAnchor != null ? previewAnchor : Camera.main?.transform;
+            if (anchor != null)
+            {
+                canvasGo.transform.SetParent(anchor, false);
+                canvasGo.transform.localPosition = previewOffset;
+                canvasGo.transform.localRotation = Quaternion.Euler(previewRotation);
+                canvasGo.transform.localScale = Vector3.one * previewScale;
+            }
+            else
+            {
+                canvasGo.transform.localScale = Vector3.one * previewScale;
+            }
 
             var imageGo = new GameObject("ResultImage");
             imageGo.transform.SetParent(canvasGo.transform, false);
             createdImage = imageGo.AddComponent<RawImage>();
+            if (sourceTexture != null)
+            {
+                createdImage.texture = sourceTexture;
+            }
 
             var imageRt = imageGo.GetComponent<RectTransform>();
             imageRt.anchorMin = new Vector2(0.5f, 0.5f);

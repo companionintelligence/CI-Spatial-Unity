@@ -14,6 +14,11 @@ namespace CompanionScan.Mapping
         [SerializeField] private Color lineColor = new Color(0.95f, 0.2f, 0.2f, 0.9f);
         [SerializeField] private string frameRootName = "FrustumFrame";
 
+        public void SetTargetCamera(Camera camera)
+        {
+            targetCamera = camera;
+        }
+
         public void FreezeFrustum(float distance)
         {
             if (distance <= 0f)
@@ -83,7 +88,8 @@ namespace CompanionScan.Mapping
             lr.loop = loop;
             lr.startWidth = lineWidth;
             lr.endWidth = lineWidth;
-            lr.material = new Material(Shader.Find("Sprites/Default"));
+            var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
+            lr.material = new Material(shader);
             lr.startColor = lineColor;
             lr.endColor = lineColor;
             lr.numCapVertices = 4;

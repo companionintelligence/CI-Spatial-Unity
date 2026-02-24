@@ -77,6 +77,12 @@ Captures a camera frame on Quest and sends it to a local Docker CV server for AI
 - CV server running (Docker) at the URL in `ServerConfig`
 - A camera provider implementing `ICameraProvider` (e.g. `QuestCameraProvider`)
 - `ViewportRaycaster` for 2D→3D raycasting
+- On Quest, camera preview requires WebCam permission when first used
+
+### Camera Preview + Frustum
+
+- `BBoxRenderer` spawns a world-space camera preview panel and overlays 2D boxes.
+- `SnapshotFrustumVisualizer` draws rays to the camera frustum corners on capture.
 
 ### Triggering Capture
 
@@ -98,7 +104,7 @@ All interaction uses physical Quest controller buttons via `XRControllerInput`
 | Button | Controller | Colour | Action |
 |--------|-----------|--------|--------|
 | **A** | Right | Red | Capture (runs `CaptureAll()` with current model preset) |
-| **B** | Right | Blue | Cycle model: Florence → GDino → SAM2 → All |
+| **B** | Right | Blue | Cycle model: Florence → GDino → SAM2 |
 | **X** | Left | Yellow | Cycle preview distance: Near (1 m) → Far (3 m) → Off |
 | **Y** | Left | Green | Save & Export glTF |
 | **Trigger** | Either | Orange | Cycle display: BBox2D → Label3D → Both |

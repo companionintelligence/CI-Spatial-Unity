@@ -40,6 +40,7 @@ namespace CompanionScan.UI
         [SerializeField] private float circleRadius = 0.006f;
         [SerializeField] private float labelFontSize = 1.2f;
         [SerializeField] private float labelOffset = 0.003f;
+        [SerializeField] private float labelSideOffset = 0.008f;
 
         // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         //  Built references
@@ -159,6 +160,12 @@ namespace CompanionScan.UI
                 frustumViz = frustumGO.AddComponent<SnapshotFrustumVisualizer>();
             }
 
+            if (frustumViz != null)
+            {
+                var targetCam = pipeline != null ? pipeline.SnapshotCamera : Camera.main;
+                frustumViz.SetTargetCamera(targetCam);
+            }
+
             SetField(_menuUI, "pipeline",     pipeline);
             SetField(_menuUI, "exporter",     exporter);
             SetField(_menuUI, "bboxRenderer", bboxR);
@@ -167,6 +174,12 @@ namespace CompanionScan.UI
             SetField(_menuUI, "captionPanel", captionP);
             SetField(_menuUI, "pinManager",   pinMgr);
             SetField(_menuUI, "frustumVisualizer", frustumViz);
+
+            if (bboxR != null)
+            {
+                var previewAnchor = leftAnchor != null ? leftAnchor : Camera.main?.transform;
+                SetField(bboxR, "previewAnchor", previewAnchor);
+            }
 
             if (pipeline != null)
             {
@@ -184,17 +197,17 @@ namespace CompanionScan.UI
             if (rightAnchor != null)
             {
                 foreach (var b in RightButtons)
-                    SpawnIndicator(rightAnchor, b.name, b.color, b.label, b.pos);
+                    SpawnIndicator(rightAnchor, b.name, b.color, b.label, b.pos, true);
                 SpawnIndicator(rightAnchor, "RTrigger_Circle", TriggerColor, "DISPLAY",
-                    new Vector3(0f, -0.005f, 0.02f));
+                    new Vector3(0f, -0.005f, 0.02f), true);
             }
 
             if (leftAnchor != null)
             {
                 foreach (var b in LeftButtons)
-                    SpawnIndicator(leftAnchor, b.name, b.color, b.label, b.pos);
+                    SpawnIndicator(leftAnchor, b.name, b.color, b.label, b.pos, false);
                 SpawnIndicator(leftAnchor, "LTrigger_Circle", TriggerColor, "DISPLAY",
-                    new Vector3(0f, -0.005f, 0.02f));
+                    new Vector3(0f, -0.005f, 0.02f), false);
             }
 
             // 5. Wire XRControllerInput
@@ -299,7 +312,7 @@ namespace CompanionScan.UI
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
         private void SpawnIndicator(Transform anchor, string goName, Color color,
-                                    string label, Vector3 localPos)
+                                    string label, Vector3 localPos, bool isRightController = true)
         {
             // Root
             var root = new GameObject(goName);
@@ -326,17 +339,19 @@ namespace CompanionScan.UI
             // Label (world-space TMP)
             var labelGO = new GameObject("Label");
             labelGO.transform.SetParent(root.transform, false);
-            labelGO.transform.localPosition = new Vector3(0f, labelOffset, 0f);
-            labelGO.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            float sideSign = isRightController ? -1f : 1f;
+            labelGO.transform.localPosition = new Vector3(sideSign * labelSideOffset, labelOffset, 0f);
+            labelGO.transform.localRotation = Quaternion.Euler(0f, sideSign * 90f, 0f);
 
             var tmp = labelGO.AddComponent<TextMeshPro>();
             tmp.text = label;
             tmp.fontSize = labelFontSize;
-            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.alignment = isRightController ? TextAlignmentOptions.Left : TextAlignmentOptions.Right;
             tmp.color = color;
             tmp.textWrappingMode = TextWrappingModes.NoWrap;
             var tmpRT = tmp.GetComponent<RectTransform>();
-            tmpRT.sizeDelta = new Vector2(0.015f, 0.006f);
+            tmpRT.sizeDelta = new Vector2(0.02f, 0.006f);
+            tmpRT.pivot = isRightController ? new Vector2(0f, 0.5f) : new Vector2(1f, 0.5f);
         }
 
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -352,16 +367,25 @@ namespace CompanionScan.UI
             if (rightAnchor != null)
             {
                 foreach (var b in RightButtons)
-                    SpawnIndicator(rightAnchor, b.name, b.color, b.label, b.pos);
+                    SpawnIndicator(rightAnchor, b.name, b.color, b.label, b.pos, true);
                 SpawnIndicator(rightAnchor, "RTrigger_Circle", TriggerColor, "DISPLAY",
-                    new Vector3(0f, -0.005f, 0.02f));
+                    new Vector3(0f, -0.005f, 0.02f), true);
             }
             if (leftAnchor != null)
             {
                 foreach (var b in LeftButtons)
-                    SpawnIndicator(leftAnchor, b.name, b.color, b.label, b.pos);
+                    SpawnIndicator(leftAnchor, b.name, b.color, b.label, b.pos, false);
                 SpawnIndicator(leftAnchor, "LTrigger_Circle", TriggerColor, "DISPLAY",
-                    new Vector3(0f, -0.005f, 0.02f));
+                    new Vector3(0f, -0.005f, 0.02f), false);
+            }
+
+            if (leftAnchor != null)
+            {
+                var bbox = FindAnyObjectByType<BBoxRenderer>();
+                if (bbox != null)
+                {
+                    SetField(bbox, "previewAnchor", leftAnchor);
+                }
             }
             // Re-parent HUD to left wrist if it was on fallback transform
             var hud = transform.Find("ControllerMenuRoot")?.Find("ControllerHUD") ??
@@ -404,21 +428,31 @@ namespace CompanionScan.UI
                 }
             }
 
-            // Strategy 2: Search all transforms for partial match
-            string controllerKey = side + "Controller";
-            string handKey = side + "Hand";
+            // Strategy 2: Search all transforms for partial match (case-insensitive)
+            string sideLower = side.ToLowerInvariant();
+            Transform fallback = null;
             foreach (var t in FindObjectsByType<Transform>(FindObjectsSortMode.None))
             {
                 string n = t.name;
-                if (n.Contains(controllerKey) || n.Contains(handKey))
+                string nLower = n.ToLowerInvariant();
+                if (!nLower.Contains(sideLower))
                 {
-                    // Prefer "Anchor" suffix, but take any match
-                    if (n.Contains("Anchor"))
+                    continue;
+                }
+                if (nLower.Contains("controller") || nLower.Contains("hand"))
+                {
+                    if (nLower.Contains("anchor"))
                     {
                         Debug.Log($"[MenuBuilder] Found {side} anchor by search: {n}");
                         return t;
                     }
+                    fallback ??= t;
                 }
+            }
+            if (fallback != null)
+            {
+                Debug.Log($"[MenuBuilder] Found {side} anchor by fallback: {fallback.name}");
+                return fallback;
             }
 
             // Strategy 3: OVRCameraRig hierarchy

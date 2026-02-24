@@ -116,6 +116,12 @@ physics surface is hit:
 | Far | 3 m |
 | Off | 0 m (disabled) |
 
+### Camera Preview + Frustum
+
+- A world-space preview panel shows the latest camera frame with 2D box overlays.
+- Frustum rays are drawn on capture using the current preview distance.
+- On Quest, camera preview requires WebCam permission; grant when prompted.
+
 ## Quick Start
 
 1. **Run the CV server**

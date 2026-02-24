@@ -14,6 +14,7 @@
 
 2) PlayMode (runtime, no external services)
 - Controller UI state machine (model, display, preview)
+- Controller HUD label binding (auto-discovery)
 - BBoxRenderer auto-created preview UI
 - Snapshot frame store and frustum visualization
 - XR QA scene screenshot (controllers + anchors)
