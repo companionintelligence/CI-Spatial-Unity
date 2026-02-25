@@ -75,9 +75,11 @@ Captures a camera frame on Quest and sends it to a local Docker CV server for AI
 
 **Prerequisites:**
 - CV server running (Docker) at the URL in `ServerConfig`
-- A camera provider implementing `ICameraProvider` (e.g. `QuestCameraProvider`)
+- A camera provider implementing `ICameraProvider`
+  - Quest: prefer Meta OpenXR + ARFoundation PCA (`MobileCameraProvider`)
+  - Desktop: `DesktopCameraProvider`
 - `ViewportRaycaster` for 2D→3D raycasting
-- On Quest, camera preview requires WebCam permission when first used
+- On Quest, PCA requires passthrough camera permission
 
 ### Camera Preview + Frustum
 
@@ -177,7 +179,9 @@ Components in `Assets/CompanionScan/`:
 
 ## Scene Wiring
 
-1. Add a camera provider that implements `ICameraProvider` (Quest uses `QuestCameraProvider`).
+1. Add a camera provider that implements `ICameraProvider`.
+  - Quest: prefer Meta OpenXR + ARFoundation PCA (`MobileCameraProvider`).
+  - Desktop: `DesktopCameraProvider`.
 2. Add an empty GameObject called `SpatialMapping` and add:
    - `SpatialCapturePipeline`
    - `ViewportRaycaster`
@@ -189,7 +193,7 @@ Components in `Assets/CompanionScan/`:
 3. Set references:
    - `SpatialCapturePipeline`
      - `Server Config` → your `ServerConfig` ScriptableObject
-     - `Camera Provider Source` → your `QuestCameraProvider`
+    - `Camera Provider Source` → your PCA provider (`MobileCameraProvider`)
      - `Raycaster` → the `ViewportRaycaster` on the same GameObject
      - `Pin Manager` → the `SpatialPinManager` on the same GameObject
      - `Meta Scene Collector` → the `MetaSceneCollector` on the same GameObject
@@ -255,6 +259,32 @@ COUCH, TABLE, BED, LAMP, PLANT, SCREEN, STORAGE, GLOBAL_MESH, OTHER
 
 `MetaSceneCollector` queries the scene model and stores anchors with labels, transforms, plane bounds, volume bounds, and optional boundary points.
 This requires the `com.oculus.permission.USE_SCENE` permission to be granted on device.
+
+## Scene Mesh Export
+
+Meta scene triangle meshes can be exported into the glTF when `MetaSceneCollector.includeMeshes`
+and `SpatialMapExporter.includeSceneMeshes` are enabled. During export, scene mesh GameObjects
+are created from `OVRTriangleMesh` data and included in the exported glTF.
+
+Implementation notes:
+
+- Meshes are pulled from `OVRTriangleMesh.TryGetCounts` + `TryGetMesh` and converted into
+  `UnityEngine.Mesh` instances at export time.
+- Mesh objects are created under the export root for the duration of the export and destroyed
+  immediately after writing the glTF.
+
+References:
+
+- https://developers.meta.com/horizon/design/mr-design-scene
+- https://developers.meta.com/horizon/documentation/unity/unity-scene-build-mixed-reality/
+
+## Implementation Improvements
+
+- Prefer PCA camera capture on Quest (Meta OpenXR + ARFoundation) to avoid WebCamTexture
+  compatibility issues.
+- Track camera intrinsics when available and include them in `SnapshotFrameStore` for
+  more accurate 2D→3D projection.
+- Consider smoothing / temporal filtering for repeated captures to reduce anchor jitter.
 
 ## Design Alignment
 

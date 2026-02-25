@@ -22,6 +22,10 @@ namespace CompanionScan.Export
         [SerializeField] private Material floorMaterial;
         [SerializeField] private float floorY = 0.0f;
 
+        [Header("Scene Mesh")]
+        [SerializeField] private bool includeSceneMeshes = true;
+        [SerializeField] private Material sceneMeshMaterial;
+
         [Header("Output")]
         [SerializeField] private string fileName = "spatial-map";
         [SerializeField] private bool writeExtras = true;
@@ -71,6 +75,7 @@ namespace CompanionScan.Export
             var exportName = BuildExportName(spaceToken);
 
             var floorObject = CreateFloorMesh(root);
+            var sceneMeshObjects = CreateSceneMeshes(root);
 
             var snapshotExtras = BuildSnapshotExtras(outputDir);
             var existingExtras = ReadExistingExtras(Path.Combine(outputDir, exportName + ".gltf"));
@@ -102,6 +107,17 @@ namespace CompanionScan.Export
             if (floorObject != null)
             {
                 Destroy(floorObject);
+            }
+
+            if (sceneMeshObjects != null)
+            {
+                for (int i = 0; i < sceneMeshObjects.Count; i++)
+                {
+                    if (sceneMeshObjects[i] != null)
+                    {
+                        Destroy(sceneMeshObjects[i]);
+                    }
+                }
             }
 
             Debug.Log($"glTF export complete: {gltfPath}");
@@ -141,6 +157,21 @@ namespace CompanionScan.Export
             }
 
             return floorObj;
+        }
+
+        private List<GameObject> CreateSceneMeshes(Transform root)
+        {
+            if (!includeSceneMeshes || metaSceneCollector == null)
+            {
+                return null;
+            }
+
+            if (metaSceneCollector.TryBuildSceneMeshes(root, sceneMeshMaterial, out var meshes))
+            {
+                return meshes;
+            }
+
+            return null;
         }
 
         private JObject BuildExtras(Transform root, MetaSceneSnapshot metaSnapshot, JArray snapshotExtras, string spaceId)

@@ -18,6 +18,7 @@
 - BBoxRenderer auto-created preview UI
 - Snapshot frame store and frustum visualization
 - XR QA scene screenshot (controllers + anchors)
+- Meta scene mesh capture (simulator required)
 
 3) PlayMode Integration (requires cv-server)
 - CV server connectivity and model endpoints

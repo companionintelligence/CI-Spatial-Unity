@@ -120,7 +120,8 @@ physics surface is hit:
 
 - A world-space preview panel shows the latest camera frame with 2D box overlays.
 - Frustum rays are drawn on capture using the current preview distance.
-- On Quest, camera preview requires WebCam permission; grant when prompted.
+- On Quest, passthrough camera capture should use Meta OpenXR + ARFoundation PCA.
+   If WebCamTexture is used, ensure camera permission is granted.
 
 ## Quick Start
 
@@ -156,7 +157,7 @@ physics surface is hit:
 - Exports `.gltf` + `.bin` and injects extras for:
   - Unified pins from both CV Server and Meta Scene (tagged by `source`)
   - CV-derived floorplan and bounds
-  - Full Meta scene anchor data (labels, planes, volumes)
+   - Full Meta scene anchor data (labels, planes, volumes, optional meshes)
 - Uploads to the local server at `POST /v1/gltf`.
 
 ## Testing
@@ -203,6 +204,8 @@ pytest
 ## Documentation
 
 - World mapper pipeline + glTF schema: [docs/quest-capture-gltf.md](docs/quest-capture-gltf.md)
+- Spatial capture architecture: [docs/spatial-capture-architecture.md](docs/spatial-capture-architecture.md)
+- Scan/export pipeline details: [docs/scan-export-pipeline.md](docs/scan-export-pipeline.md)
 - Current build plan: [docs/plan.md](docs/plan.md)
 
 ## Legacy Sample (Cloud API)

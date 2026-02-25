@@ -1628,7 +1628,7 @@ MonoBehaviour:
   trackingSpace: {fileID: 0}
   includePlanes: 1
   includeVolumes: 1
-  includeMeshes: 0
+  includeMeshes: 1
   includePlaneBoundary: 1
 --- !u!114 &319536155
 MonoBehaviour:

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace CompanionScan.Mapping
 {
@@ -16,10 +17,11 @@ namespace CompanionScan.Mapping
         [SerializeField] private Transform trackingSpace;
         [SerializeField] private bool includePlanes = true;
         [SerializeField] private bool includeVolumes = true;
-        [SerializeField] private bool includeMeshes = false;
+        [SerializeField] private bool includeMeshes = true;
         [SerializeField] private bool includePlaneBoundary = true;
 
         public MetaSceneSnapshot LastSnapshot { get; private set; }
+        private List<OVRAnchor> _lastAnchors = new List<OVRAnchor>();
 
         /// <summary>
         /// Convert every anchor in the last snapshot into a <see cref="SpatialPin"/>
@@ -107,6 +109,8 @@ namespace CompanionScan.Mapping
                 }
             }
 
+            _lastAnchors = new List<OVRAnchor>(anchors);
+
             foreach (var anchor in anchors)
             {
                 if (!anchor.TryGetComponent(out OVRLocatable locatable))
@@ -190,6 +194,54 @@ namespace CompanionScan.Mapping
 
             LastSnapshot = snapshot;
             return snapshot;
+        }
+
+        public bool TryBuildSceneMeshes(Transform parent, Material meshMaterial, out List<GameObject> meshObjects)
+        {
+            meshObjects = new List<GameObject>();
+            if (!includeMeshes || parent == null || _lastAnchors == null || _lastAnchors.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var anchor in _lastAnchors)
+            {
+                if (!anchor.TryGetComponent(out OVRTriangleMesh mesh) || !mesh.IsEnabled)
+                {
+                    continue;
+                }
+
+                if (!mesh.TryGetCounts(out int vertexCount, out int triangleCount) || vertexCount <= 0 || triangleCount <= 0)
+                {
+                    continue;
+                }
+
+                using var vertices = new NativeArray<Vector3>(vertexCount, Allocator.Temp);
+                using var triangles = new NativeArray<int>(triangleCount * 3, Allocator.Temp);
+                if (!mesh.TryGetMesh(vertices, triangles))
+                {
+                    continue;
+                }
+
+                var unityMesh = new Mesh { indexFormat = IndexFormat.UInt32 };
+                unityMesh.SetVertices(vertices);
+                unityMesh.SetTriangles(triangles.ToArray(), 0);
+                unityMesh.RecalculateNormals();
+                unityMesh.RecalculateBounds();
+
+                var meshGo = new GameObject($"SceneMesh_{meshObjects.Count:000}");
+                meshGo.transform.SetParent(parent, false);
+                var filter = meshGo.AddComponent<MeshFilter>();
+                filter.sharedMesh = unityMesh;
+                var renderer = meshGo.AddComponent<MeshRenderer>();
+                if (meshMaterial != null)
+                {
+                    renderer.sharedMaterial = meshMaterial;
+                }
+                meshObjects.Add(meshGo);
+            }
+
+            return meshObjects.Count > 0;
         }
 
         private static string ToMetaLabelString(OVRSemanticLabels.Classification classification)
