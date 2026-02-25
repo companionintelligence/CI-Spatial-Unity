@@ -37,10 +37,21 @@ Build a Quest 3 local world/space mapper that captures CV detections and Meta sc
    - 9 play-mode integration tests across 14 fixture images
    - CV server smoke tests via pytest
 
+6.1 Scene mesh export validation — **in progress**
+   - Verify `OVRTriangleMesh` data is captured and exported into glTF
+   - Confirm `meta_scene.anchors[].has_mesh` and `mesh_*_count` are non-zero
+   - Validate scene mesh nodes exist in exported glTF
+
 7. End-to-end test on Quest 3 — **in progress**
    - Capture → pin → export → upload
    - Verify glTF extras on server
    - Confirm pins align to scene anchors for common classes
+
+8. Capture accuracy improvements — **in progress**
+   - CaptureFrame metadata (pose + intrinsics) for every snapshot
+   - Intrinsics-based raycasting for bbox centers
+   - Temporal smoothing + de-duplication for stable pins
+   - Placement confidence based on raycast hit type
 
 ## Component Map
 

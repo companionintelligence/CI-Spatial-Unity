@@ -218,7 +218,13 @@ namespace CompanionScan.Export
                     ["volume_size"] = ToArray(pin.volumeSize),
                     ["anchor_uuid"] = pin.anchorUuid ?? "",
                     ["prompt"] = pin.sourcePrompt,
-                    ["timestamp"] = pin.timestamp
+                    ["timestamp"] = pin.timestamp,
+                    ["capture_id"] = pin.captureId ?? string.Empty,
+                    ["capture_session_id"] = pin.captureSessionId ?? string.Empty,
+                    ["capture_frame_index"] = pin.captureFrameIndex,
+                    ["track_id"] = pin.trackId,
+                    ["placement_confidence"] = pin.placementConfidence,
+                    ["hit_type"] = pin.hitType.ToString()
                 };
                 pinArray.Add(pinObj);
             }

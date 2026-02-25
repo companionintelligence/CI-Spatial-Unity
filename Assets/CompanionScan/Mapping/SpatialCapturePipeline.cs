@@ -44,6 +44,14 @@ namespace CompanionScan.Mapping
         [SerializeField] private int jpegQuality = 75;
         [SerializeField] private bool preferArCameraOnQuest = true;
 
+        [Header("Placement Quality")]
+        [SerializeField] private bool enableTemporalSmoothing = true;
+        [SerializeField, Range(0f, 1f)] private float smoothingAlpha = 0.5f;
+        [SerializeField] private bool preferSemanticPlanes = true;
+        [SerializeField] private float semanticPlaneMaxDistance = 6f;
+        [SerializeField] private float trackDistanceThreshold = 0.4f;
+        [SerializeField] private float trackMaxAgeSeconds = 2.5f;
+
         [Header("Mapping")]
         [SerializeField] private ViewportRaycaster raycaster;
         [SerializeField] private SpatialPinManager pinManager;
@@ -89,6 +97,19 @@ namespace CompanionScan.Mapping
         private CVServerClient _client;
         private bool _isBusy;
         private Texture2D _frameTexture;
+        private CaptureFrame _lastCaptureFrame;
+        private readonly Dictionary<string, Vector3> _smoothedPositions = new Dictionary<string, Vector3>();
+        private readonly Dictionary<string, List<TrackState>> _tracksByLabel = new Dictionary<string, List<TrackState>>();
+        private string _captureSessionId;
+        private int _captureFrameIndex;
+        private int _nextTrackId = 1;
+
+        private class TrackState
+        {
+            public int id;
+            public Vector3 position;
+            public double timestamp;
+        }
 
         /// <summary>Last caption produced by Florence2.</summary>
         public string LastCaption { get; private set; }
@@ -153,6 +174,7 @@ namespace CompanionScan.Mapping
         private void Awake()
         {
             _client = new CVServerClient(serverConfig);
+            _captureSessionId = Guid.NewGuid().ToString("N");
 #if UNITY_ANDROID
             if (preferArCameraOnQuest)
             {
@@ -340,11 +362,14 @@ namespace CompanionScan.Mapping
 
             Debug.Log($"[Pipeline-CV] Captured frame ({frame.Length} bytes). Starting CV pipelineâ€¦");
             EnsureFrameTexture(frame);
+            var capture = BuildCaptureFrame(frame);
+            _lastCaptureFrame = capture;
             if (bboxRenderer != null)
             {
                 bboxRenderer.SetPreviewTexture(_frameTexture);
             }
-            CaptureSnapshotFrame(frame);
+            CaptureSnapshotFrame(capture);
+            _captureFrameIndex++;
 
             // â”€â”€ Step 1: Florence2 caption â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             string caption = null;
@@ -411,7 +436,7 @@ namespace CompanionScan.Mapping
                         bboxRenderer.RenderBoxes(detection, _frameTexture);
                     }
 
-                    AddCvPinsFromDetections(detection);
+                    AddCvPinsFromDetections(detection, capture);
                 }
                 catch (Exception ex)
                 {
@@ -440,7 +465,7 @@ namespace CompanionScan.Mapping
                     // annotations (which include GDino results from the server).
                     if (!runGroundingDino && segmentation?.annotations != null)
                     {
-                        AddCvPinsFromSegmentation(segmentation);
+                        AddCvPinsFromSegmentation(segmentation, capture);
                     }
                 }
                 catch (Exception ex)
@@ -543,13 +568,8 @@ namespace CompanionScan.Mapping
             _frameTexture.LoadImage(jpegBytes);
         }
 
-        private void CaptureSnapshotFrame(byte[] jpegBytes)
+        private CaptureFrame BuildCaptureFrame(byte[] jpegBytes)
         {
-            if (snapshotStore == null)
-            {
-                return;
-            }
-
             var cam = snapshotCamera != null ? snapshotCamera : Camera.main;
             Pose pose = cam != null
                 ? new Pose(cam.transform.position, cam.transform.rotation)
@@ -567,20 +587,35 @@ namespace CompanionScan.Mapping
             int width = _frameTexture != null ? _frameTexture.width : 0;
             int height = _frameTexture != null ? _frameTexture.height : 0;
 
-            snapshotStore.AddSnapshot(jpegBytes, width, height, pose, intrinsics, snapshotDistance, cam);
+            var capture = CaptureFrame.Create(jpegBytes, width, height, pose, intrinsics);
+            capture.sessionId = _captureSessionId;
+            capture.frameIndex = _captureFrameIndex;
+            capture.id = $"{_captureSessionId}_{_captureFrameIndex:0000}";
+            return capture;
+        }
+
+        private void CaptureSnapshotFrame(CaptureFrame capture)
+        {
+            if (snapshotStore == null)
+            {
+                return;
+            }
+
+            var cam = snapshotCamera != null ? snapshotCamera : Camera.main;
+            capture.id = snapshotStore.AddSnapshot(capture, snapshotDistance, cam);
         }
 
         /// <summary>
         /// Create spatial pins from SAM2 segment annotations (used when GDino
         /// detection step is skipped but /v1/segment returns GDino results).
         /// </summary>
-        private void AddCvPinsFromSegmentation(SegmentationResult segmentation)
+        private void AddCvPinsFromSegmentation(SegmentationResult segmentation, CaptureFrame capture)
         {
             if (segmentation?.annotations == null || raycaster == null || pinManager == null)
                 return;
 
-            int imgW = _frameTexture != null ? _frameTexture.width : 0;
-            int imgH = _frameTexture != null ? _frameTexture.height : 0;
+            int imgW = capture != null ? capture.imageWidth : (_frameTexture != null ? _frameTexture.width : 0);
+            int imgH = capture != null ? capture.imageHeight : (_frameTexture != null ? _frameTexture.height : 0);
             int added = 0;
 
             foreach (var ann in segmentation.annotations)
@@ -596,21 +631,35 @@ namespace CompanionScan.Mapping
                 float v = 1.0f - (normalized.y + normalized.height * 0.5f);
                 Rect pixelRect = BoundingBoxUtils.NormalizedToPixels(normalized, imgW, imgH);
 
-                if (!raycaster.TryRaycastViewport(new Vector2(u, v), out Vector3 hitPoint, out Vector3 hitNormal))
+                var pixel = new Vector2(pixelRect.x + pixelRect.width * 0.5f,
+                                        pixelRect.y + pixelRect.height * 0.5f);
+
+                if (!TryResolveHit(capture, new Vector2(u, v), pixel, out Vector3 hitPoint, out Vector3 hitNormal, out RaycastHitType hitType))
                     hitNormal = Vector3.up;
 
+                string semantic = SemanticLabelMapper.MapToMetaLabel(ann.label);
+                var position = ApplySmoothing(semantic, hitPoint);
+                float confidence = ComputePlacementConfidence(ann.score, hitType);
+
+                int trackId = AssignTrackId(semantic, position, capture?.timestamp ?? Time.timeAsDouble);
                 var pin = new SpatialPin
                 {
                     label = ann.label,
-                    semanticLabel = SemanticLabelMapper.MapToMetaLabel(ann.label),
+                    semanticLabel = semantic,
                     score = ann.score,
                     source = PinSource.CvServer,
-                    position = hitPoint,
+                    position = position,
                     normal = hitNormal,
                     bboxPixels = new SerializableRect(pixelRect.x, pixelRect.y, pixelRect.width, pixelRect.height),
                     bboxNormalized = new SerializableRect(normalized.x, normalized.y, normalized.width, normalized.height),
                     sourcePrompt = "segment",
-                    timestamp = Time.timeAsDouble
+                    timestamp = capture != null ? capture.timestamp : Time.timeAsDouble,
+                    captureId = capture?.id,
+                    captureSessionId = capture?.sessionId,
+                    captureFrameIndex = capture?.frameIndex ?? 0,
+                    placementConfidence = confidence,
+                    hitType = hitType,
+                    trackId = trackId
                 };
 
                 pinManager.AddPin(pin);
@@ -620,7 +669,7 @@ namespace CompanionScan.Mapping
             Debug.Log($"[Pipeline-CV] Created {added} spatial pins from SAM2 annotations.");
         }
 
-        private void AddCvPinsFromDetections(DetectionResult detection)
+        private void AddCvPinsFromDetections(DetectionResult detection, CaptureFrame capture)
         {
             if (detection == null || detection.bboxes == null || raycaster == null || pinManager == null)
             {
@@ -640,35 +689,314 @@ namespace CompanionScan.Mapping
                 var bbox = detection.bboxes[i];
                 if (bbox == null || bbox.Length < 4) continue;
 
-                if (!BoundingBoxUtils.TryNormalize(bbox, _frameTexture.width, _frameTexture.height, out Rect normalized))
+                int imgW = capture != null ? capture.imageWidth : (_frameTexture != null ? _frameTexture.width : 0);
+                int imgH = capture != null ? capture.imageHeight : (_frameTexture != null ? _frameTexture.height : 0);
+                if (!BoundingBoxUtils.TryNormalize(bbox, imgW, imgH, out Rect normalized))
                     continue;
 
                 float u = normalized.x + normalized.width * 0.5f;
                 float v = 1.0f - (normalized.y + normalized.height * 0.5f);
-                Rect pixelRect = BoundingBoxUtils.NormalizedToPixels(normalized, _frameTexture.width, _frameTexture.height);
+                Rect pixelRect = BoundingBoxUtils.NormalizedToPixels(normalized, imgW, imgH);
 
-                if (!raycaster.TryRaycastViewport(new Vector2(u, v), out Vector3 hitPoint, out Vector3 hitNormal))
+                var pixel = new Vector2(pixelRect.x + pixelRect.width * 0.5f,
+                                        pixelRect.y + pixelRect.height * 0.5f);
+
+                if (!TryResolveHit(capture, new Vector2(u, v), pixel, out Vector3 hitPoint, out Vector3 hitNormal, out RaycastHitType hitType))
                 {
                     hitNormal = Vector3.up;
                 }
 
+                string semantic = SemanticLabelMapper.MapToMetaLabel(detection.labels[i]);
+                var position = ApplySmoothing(semantic, hitPoint);
+                float confidence = ComputePlacementConfidence(score, hitType);
+
+                int trackId = AssignTrackId(semantic, position, capture?.timestamp ?? Time.timeAsDouble);
                 var pin = new SpatialPin
                 {
                     label = detection.labels[i],
-                    semanticLabel = SemanticLabelMapper.MapToMetaLabel(detection.labels[i]),
+                    semanticLabel = semantic,
                     score = score,
                     source = PinSource.CvServer,
-                    position = hitPoint,
+                    position = position,
                     normal = hitNormal,
                     bboxPixels = new SerializableRect(pixelRect.x, pixelRect.y, pixelRect.width, pixelRect.height),
                     bboxNormalized = new SerializableRect(normalized.x, normalized.y, normalized.width, normalized.height),
                     sourcePrompt = BuildDinoPrompt(null),
-                    timestamp = Time.timeAsDouble
+                    timestamp = capture != null ? capture.timestamp : Time.timeAsDouble,
+                    captureId = capture?.id,
+                    captureSessionId = capture?.sessionId,
+                    captureFrameIndex = capture?.frameIndex ?? 0,
+                    placementConfidence = confidence,
+                    hitType = hitType,
+                    trackId = trackId
                 };
 
                 pinManager.AddPin(pin);
                 added++;
             }
+        }
+
+        private bool TryResolveHit(CaptureFrame capture, Vector2 uv, Vector2 pixel,
+                                   out Vector3 hitPoint, out Vector3 hitNormal, out RaycastHitType hitType)
+        {
+            if (raycaster == null)
+            {
+                hitPoint = Vector3.zero;
+                hitNormal = Vector3.up;
+                hitType = RaycastHitType.Fallback;
+                return false;
+            }
+
+            if (capture != null && capture.HasIntrinsics && capture.imageWidth > 0 && capture.imageHeight > 0)
+            {
+                bool hit = raycaster.TryRaycastCapture(capture, pixel, false, out hitPoint, out hitNormal, out hitType);
+                if (hit)
+                {
+                    return true;
+                }
+
+                if (preferSemanticPlanes && TryProjectToSemanticPlane(capture, pixel, out hitPoint, out hitNormal))
+                {
+                    hitType = RaycastHitType.MetaPlane;
+                    return true;
+                }
+
+                return raycaster.TryRaycastCapture(capture, pixel, true, out hitPoint, out hitNormal, out hitType);
+            }
+
+            bool viewportHit = raycaster.TryRaycastViewport(uv, out hitPoint, out hitNormal, out hitType);
+            if (viewportHit)
+            {
+                return true;
+            }
+
+            if (preferSemanticPlanes && TryProjectToSemanticPlaneFromViewport(uv, out hitPoint, out hitNormal))
+            {
+                hitType = RaycastHitType.MetaPlane;
+                return true;
+            }
+
+            return raycaster.TryRaycastViewport(uv, out hitPoint, out hitNormal, out hitType);
+        }
+
+        private Vector3 ApplySmoothing(string semanticLabel, Vector3 position)
+        {
+            if (!enableTemporalSmoothing || string.IsNullOrWhiteSpace(semanticLabel))
+            {
+                return position;
+            }
+
+            if (_smoothedPositions.TryGetValue(semanticLabel, out var previous))
+            {
+                var smoothed = Vector3.Lerp(previous, position, smoothingAlpha);
+                _smoothedPositions[semanticLabel] = smoothed;
+                return smoothed;
+            }
+
+            _smoothedPositions[semanticLabel] = position;
+            return position;
+        }
+
+        private static float ComputePlacementConfidence(float modelScore, RaycastHitType hitType)
+        {
+            float weight = hitType switch
+            {
+                RaycastHitType.ArPlane => 1f,
+                RaycastHitType.MetaPlane => 0.85f,
+                RaycastHitType.Physics => 0.7f,
+                _ => 0.4f
+            };
+
+            return Mathf.Clamp01(modelScore * weight);
+        }
+
+        private int AssignTrackId(string semanticLabel, Vector3 position, double timestamp)
+        {
+            if (string.IsNullOrWhiteSpace(semanticLabel))
+            {
+                return 0;
+            }
+
+            if (!_tracksByLabel.TryGetValue(semanticLabel, out var tracks))
+            {
+                tracks = new List<TrackState>();
+                _tracksByLabel[semanticLabel] = tracks;
+            }
+
+            tracks.RemoveAll(t => (timestamp - t.timestamp) > trackMaxAgeSeconds);
+
+            TrackState best = null;
+            float bestDist = float.MaxValue;
+            foreach (var track in tracks)
+            {
+                float dist = Vector3.Distance(track.position, position);
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    best = track;
+                }
+            }
+
+            if (best != null && bestDist <= trackDistanceThreshold)
+            {
+                best.position = position;
+                best.timestamp = timestamp;
+                return best.id;
+            }
+
+            var created = new TrackState
+            {
+                id = _nextTrackId++,
+                position = position,
+                timestamp = timestamp
+            };
+            tracks.Add(created);
+            return created.id;
+        }
+
+        private bool TryProjectToSemanticPlane(CaptureFrame capture, Vector2 pixel, out Vector3 point, out Vector3 normal)
+        {
+            point = Vector3.zero;
+            normal = Vector3.up;
+
+            if (metaSceneCollector == null || metaSceneCollector.LastSnapshot == null)
+            {
+                return false;
+            }
+
+            var ray = ViewportRaycaster.BuildRayFromIntrinsics(capture, pixel);
+            return TryProjectToSemanticPlane(ray, out point, out normal);
+        }
+
+        private bool TryProjectToSemanticPlaneFromViewport(Vector2 uv, out Vector3 point, out Vector3 normal)
+        {
+            point = Vector3.zero;
+            normal = Vector3.up;
+
+            var cam = snapshotCamera != null ? snapshotCamera : Camera.main;
+            if (cam == null)
+            {
+                return false;
+            }
+
+            var ray = cam.ViewportPointToRay(new Vector3(uv.x, uv.y, 0f));
+            return TryProjectToSemanticPlane(ray, out point, out normal);
+        }
+
+        private bool TryProjectToSemanticPlane(Ray ray, out Vector3 point, out Vector3 normal)
+        {
+            point = Vector3.zero;
+            normal = Vector3.up;
+
+            if (!preferSemanticPlanes || metaSceneCollector == null || metaSceneCollector.LastSnapshot == null)
+            {
+                return false;
+            }
+
+            float bestT = float.MaxValue;
+            MetaSceneAnchorSnapshot bestAnchor = null;
+
+            foreach (var anchor in metaSceneCollector.LastSnapshot.anchors)
+            {
+                if (!anchor.hasPlane)
+                {
+                    continue;
+                }
+
+                if (!IsPreferredPlaneLabel(anchor.labels))
+                {
+                    continue;
+                }
+
+                var planeNormal = anchor.rotation * Vector3.up;
+                float denom = Vector3.Dot(planeNormal, ray.direction);
+                if (Mathf.Abs(denom) < 0.0001f)
+                {
+                    continue;
+                }
+
+                float t = Vector3.Dot(anchor.position - ray.origin, planeNormal) / denom;
+                if (t <= 0f || t > semanticPlaneMaxDistance || t >= bestT)
+                {
+                    continue;
+                }
+
+                var hit = ray.origin + ray.direction * t;
+                if (!IsPointOnPlane(anchor, hit))
+                {
+                    continue;
+                }
+
+                bestT = t;
+                bestAnchor = anchor;
+            }
+
+            if (bestAnchor == null)
+            {
+                return false;
+            }
+
+            normal = bestAnchor.rotation * Vector3.up;
+            point = ray.origin + ray.direction * bestT;
+            return true;
+        }
+
+        private static bool IsPreferredPlaneLabel(List<string> labels)
+        {
+            if (labels == null || labels.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var label in labels)
+            {
+                switch (label)
+                {
+                    case "FLOOR":
+                    case "TABLE":
+                    case "WALL_FACE":
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsPointOnPlane(MetaSceneAnchorSnapshot anchor, Vector3 point)
+        {
+            var local = Quaternion.Inverse(anchor.rotation) * (point - anchor.position);
+            if (anchor.planeBoundary != null && anchor.planeBoundary.Count >= 3)
+            {
+                var polygon = new List<Vector2>(anchor.planeBoundary.Count);
+                for (int i = 0; i < anchor.planeBoundary.Count; i++)
+                {
+                    var localPoint = Quaternion.Inverse(anchor.rotation) * (anchor.planeBoundary[i] - anchor.position);
+                    polygon.Add(new Vector2(localPoint.x, localPoint.y));
+                }
+
+                return PointInPolygon(new Vector2(local.x, local.y), polygon);
+            }
+
+            float halfX = anchor.planeSize.x * 0.5f;
+            float halfY = anchor.planeSize.y * 0.5f;
+            return Mathf.Abs(local.x) <= halfX && Mathf.Abs(local.y) <= halfY;
+        }
+
+        private static bool PointInPolygon(Vector2 point, List<Vector2> polygon)
+        {
+            bool inside = false;
+            for (int i = 0, j = polygon.Count - 1; i < polygon.Count; j = i++)
+            {
+                var pi = polygon[i];
+                var pj = polygon[j];
+                bool intersect = ((pi.y > point.y) != (pj.y > point.y)) &&
+                                 (point.x < (pj.x - pi.x) * (point.y - pi.y) / (pj.y - pi.y + 0.0001f) + pi.x);
+                if (intersect)
+                {
+                    inside = !inside;
+                }
+            }
+            return inside;
         }
     }
 }

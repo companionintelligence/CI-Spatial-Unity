@@ -14,6 +14,17 @@ namespace CompanionScan.Mapping
         MetaScene
     }
 
+    /// <summary>
+    /// Records which raycast strategy produced the 3D placement.
+    /// </summary>
+    public enum RaycastHitType
+    {
+        ArPlane,
+        MetaPlane,
+        Physics,
+        Fallback
+    }
+
     [Serializable]
     public struct SerializableRect
     {
@@ -62,6 +73,12 @@ namespace CompanionScan.Mapping
         // â”€â”€ Metadata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         public string sourcePrompt;
         public double timestamp;
+            public string captureId;
+        public string captureSessionId;
+        public int captureFrameIndex;
+            public float placementConfidence;
+            public RaycastHitType hitType;
+        public int trackId;
     }
 }
 

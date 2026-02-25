@@ -17,7 +17,8 @@ namespace CompanionScan.Tests.PlayMode
 
             var jpeg = new byte[] { 1, 2, 3, 4 };
             var pose = new Pose(Vector3.one, Quaternion.identity);
-            store.AddSnapshot(jpeg, 640, 480, pose, Matrix4x4.identity, 1.5f, cam);
+            var capture = CaptureFrame.Create(jpeg, 640, 480, pose, Matrix4x4.identity);
+            store.AddSnapshot(capture, 1.5f, cam);
 
             Assert.AreEqual(1, store.Frames.Count);
             var frame = store.Frames[0];

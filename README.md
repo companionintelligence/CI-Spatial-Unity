@@ -101,14 +101,13 @@ BUSY…            ← shown during capture
 | SpatialLabel3D | – | ✓ |
 | Both | ✓ | ✓ |
 
-3D spatial labels **persist** across captures. Previous labels are not cleared
-when a new capture completes — they accumulate in the scene so you can build
-up a complete spatial map by walking around and pressing A repeatedly.
+3D spatial labels **persist** across captures by default. The pin manager can
+optionally prune stale pins and merge updates by track ID to reduce clutter.
 
 ### Preview Distance
 
-Controls the `ViewportRaycaster` fallback distance used when no AR plane or
-physics surface is hit:
+Controls the `ViewportRaycaster` fallback distance used when no AR plane,
+semantic plane, or physics surface is hit:
 
 | Setting | Distance |
 |---------|----------|
@@ -157,7 +156,9 @@ physics surface is hit:
 - Exports `.gltf` + `.bin` and injects extras for:
   - Unified pins from both CV Server and Meta Scene (tagged by `source`)
   - CV-derived floorplan and bounds
-   - Full Meta scene anchor data (labels, planes, volumes, optional meshes)
+    - Full Meta scene anchor data (labels, planes, volumes, optional meshes)
+   - Pin metadata: `capture_id`, `capture_session_id`, `capture_frame_index`,
+      `placement_confidence`, `hit_type`, `track_id`
 - Uploads to the local server at `POST /v1/gltf`.
 
 ## Testing

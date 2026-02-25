@@ -55,12 +55,16 @@ and exported to glTF with unified metadata.
 
 - `GltfSyncClient` uploads to `/v1/gltf` with multipart payload.
 
-## Suggested System Updates
+## Implemented Improvements
 
-- Store camera intrinsics and pose for every capture and use them to
-  produce 3D rays instead of relying on viewport coordinates.
-- Preserve per-capture IDs to correlate 2D overlays with 3D pins in the export.
-- Add a lightweight confidence score that combines model score and
-  raycast hit quality (AR plane > physics > fallback).
-- Add a pin deduplication stage based on spatial proximity and semantic
-  label matching to reduce clutter.
+- Capture metadata is now stored per frame (pose + intrinsics).
+- Per-capture IDs are attached to pins and exported in glTF extras.
+- Placement confidence now combines model score and raycast hit quality.
+- Pin de-duplication merges nearby pins with the same semantic label.
+- Semantic plane hits (floor, wall, table) are preferred when available.
+- Pins carry capture session/frame IDs and per-label track IDs.
+- Pin lifecycle prunes stale pins and merges updates by track ID.
+
+## Remaining Improvements
+
+- Add a regression test for semantic plane projection to validate hit ordering.

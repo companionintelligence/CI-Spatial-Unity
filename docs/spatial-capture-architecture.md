@@ -54,29 +54,33 @@ should map to real-world space, and the key improvements required for accuracy.
 - The raycast origin must use the capture camera transform, not a later pose.
 - Fallback distance must be explicit and logged in export metadata.
 
-### Improvements
+### Improvements (Implemented)
 
-- Cache the capture camera pose and intrinsics with every snapshot.
-- Use camera intrinsics to map the bbox center to a ray in camera space rather
-  than relying solely on viewport coordinates when the aspect ratio is not 1:1.
-- Prefer AR plane hits with semantic labels (floor, wall, table) to improve
-  pin stability and alignment with scene understanding.
+- CaptureFrame stores image bytes, size, pose, and intrinsics for each capture.
+- Intrinsics-based rays are used for bbox centers when available.
+- Placement confidence combines model score with raycast hit type.
+- Pins are smoothed and de-duplicated by semantic label.
+- Pins prefer semantic plane intersections (floor, wall, table) when available.
+- Pins carry capture session/frame IDs plus per-label track IDs.
+- Pin lifecycle prunes stale pins and merges updates by track ID.
+
+### Improvements (Remaining)
+
+- Add a test harness for semantic plane intersections to validate plane
+  hit selection and boundary checks.
 
 ## Correctness Pitfalls
 
 - Pose drift: moving between capture and raycast yields incorrect placement.
 - Resolution mismatch: camera resolution changes break bbox normalization.
-- Wrong camera: using `Camera.main` instead of the capture camera skews rays.
+- Wrong camera: using a later pose instead of the capture pose skews rays.
 
 ## Export Considerations
 
-- Every `SpatialPin` should include a timestamp and the camera pose used to place it.
-- For repeat captures, keep a stable ID per capture to correlate 2D and 3D outputs.
+- Every `SpatialPin` should include a timestamp and capture ID.
 - If a fallback ray is used, record the fallback distance in extras.
+- Preserve the capture camera pose and intrinsics alongside snapshot metadata.
 
 ## Recommended Next Steps
 
-- Add a `CaptureFrame` struct that stores image bytes, size, camera pose, and
-  intrinsics, and pass it through the pipeline.
-- Implement temporal smoothing for repeated detections of the same label.
-- Track per-label placement confidence based on raycast hit type.
+- Add per-label temporal clustering to reduce label drift in dense scenes.

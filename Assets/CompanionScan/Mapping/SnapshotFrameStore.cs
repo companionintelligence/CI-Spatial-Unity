@@ -44,25 +44,24 @@ namespace CompanionScan.Mapping
             return copy;
         }
 
-        public void AddSnapshot(byte[] jpegBytes, int width, int height, Pose cameraPose,
-                                Matrix4x4 intrinsics, float frustumDistance, Camera camera)
+        public string AddSnapshot(CaptureFrame capture, float frustumDistance, Camera camera)
         {
-            if (jpegBytes == null || jpegBytes.Length == 0)
+            if (capture == null || capture.jpegBytes == null || capture.jpegBytes.Length == 0)
             {
-                return;
+                return null;
             }
 
             var frame = new SnapshotFrame
             {
                 id = BuildId(),
-                timestamp = Time.timeAsDouble,
-                jpegBytes = jpegBytes,
-                imageWidth = width,
-                imageHeight = height,
-                cameraPosition = cameraPose.position,
-                cameraRotation = cameraPose.rotation,
+                timestamp = capture.timestamp > 0 ? capture.timestamp : Time.timeAsDouble,
+                jpegBytes = capture.jpegBytes,
+                imageWidth = capture.imageWidth,
+                imageHeight = capture.imageHeight,
+                cameraPosition = capture.cameraPose.position,
+                cameraRotation = capture.cameraPose.rotation,
                 frustumDistance = frustumDistance,
-                cameraIntrinsics = intrinsics,
+                cameraIntrinsics = capture.cameraIntrinsics,
                 frustumCorners = BuildFrustumCorners(camera, frustumDistance)
             };
 
@@ -72,6 +71,8 @@ namespace CompanionScan.Mapping
             {
                 _frames.RemoveAt(0);
             }
+
+            return frame.id;
         }
 
         private string BuildId()

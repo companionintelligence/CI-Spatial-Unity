@@ -20,6 +20,18 @@
 - XR QA scene screenshot (controllers + anchors)
 - Meta scene mesh capture (simulator required)
 
+## Simulator Setup (Meta Scene Mesh Tests)
+
+- Enable Meta XR Simulator and ensure `OVRManager` + `OVRSceneManager` are active.
+- Load a simulated scene model so mesh anchors exist (Scene Model / Rooms).
+- The mesh test will be **Inconclusive** if no scene model data is present.
+
+## CI Skip Guidance
+
+- Mesh simulator tests should be excluded in headless CI runs unless the Meta XR
+  Simulator is explicitly launched.
+- Use test filters to skip `MetaSceneMeshSimulatorTests` in CI pipelines.
+
 3) PlayMode Integration (requires cv-server)
 - CV server connectivity and model endpoints
 - Per-image model tests using /test images

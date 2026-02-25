@@ -65,13 +65,15 @@ Captures a camera frame on Quest and sends it to a local Docker CV server for AI
 | Step | What happens |
 |------|-------------|
 | 1 | `ICameraProvider.GetCurrentFrameJpeg()` captures a passthrough camera frame |
-| 2 | Florence2 caption (`<MORE_DETAILED_CAPTION>`) → `LastCaption` |
-| 3 | Florence2 OD (`<OD>`) → extract unique labels |
-| 4 | GroundingDINO detect (prompt from Florence labels or fallback) → `DetectionResult` with normalised bboxes |
-| 5 | For each detection: `ViewportRaycaster.TryRaycastViewport()` → world hit point |
-| 6 | `SemanticLabelMapper.MapToMetaLabel()` normalises CV labels to Meta vocabulary |
-| 7 | Each detection → `SpatialPin` with `source = PinSource.CvServer` → `SpatialPinManager.AddPin()` |
-| 8 | SAM2 segment → `SegmentationResult` → optional mask overlay via `MaskRenderer` |
+| 2 | A `CaptureFrame` is built with image size, pose, intrinsics, session ID, and frame index |
+| 3 | Florence2 caption (`<MORE_DETAILED_CAPTION>`) → `LastCaption` |
+| 4 | Florence2 OD (`<OD>`) → extract unique labels |
+| 5 | GroundingDINO detect (prompt from Florence labels or fallback) → `DetectionResult` with normalised bboxes |
+| 6 | For each detection: `ViewportRaycaster.TryRaycastCapture()` → world hit point (intrinsics-based when available) |
+| 7 | Prefer semantic plane intersections (floor, wall, table) before fallback distance |
+| 8 | `SemanticLabelMapper.MapToMetaLabel()` normalises CV labels to Meta vocabulary |
+| 9 | Each detection → `SpatialPin` with `source = PinSource.CvServer` → `SpatialPinManager.AddPin()` |
+| 10 | SAM2 segment → `SegmentationResult` → optional mask overlay via `MaskRenderer` |
 
 **Prerequisites:**
 - CV server running (Docker) at the URL in `ServerConfig`
@@ -115,8 +117,8 @@ Coloured circle indicators and labels are spawned on the controller models at
 runtime by `ControllerMenuBuilder`. A wrist HUD on the left controller shows
 the current model, display mode, preview distance, and busy state.
 
-3D spatial labels **persist** across captures — pressing A repeatedly builds
-up a complete spatial map of the environment.
+3D spatial labels **persist** across captures by default, but the
+`SpatialPinManager` can prune stale pins when lifecycle is enabled.
 
 ## SpatialPin — Unified Data Type
 
@@ -148,10 +150,17 @@ public class SpatialPin
     // Metadata
     string sourcePrompt;
     double timestamp;
+    string captureId;
+    string captureSessionId;
+    int    captureFrameIndex;
+    float  placementConfidence;
+    RaycastHitType hitType;
+    int    trackId;
 }
 ```
 
 `SpatialPinManager` provides filtered views: `.Pins` (all), `.CvPins`, `.MetaScenePins`.
+When lifecycle is enabled, stale pins are removed and updates are merged by `trackId`.
 
 ## Key Components
 
