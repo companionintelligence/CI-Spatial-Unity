@@ -82,6 +82,43 @@ namespace CompanionScan.Tests
             Object.DestroyImmediate(go);
         }
 
+        [Test]
+        public void AddPin_DeduplicatesBySemanticLabel()
+        {
+            var go = new GameObject("PinManager");
+            var manager = go.AddComponent<SpatialPinManager>();
+            SetPrivateField(manager, "enablePinLifecycle", false);
+            SetPrivateField(manager, "preferTrackIds", false);
+            SetPrivateField(manager, "enableDeduplication", true);
+            SetPrivateField(manager, "dedupDistance", 2f);
+
+            var first = new SpatialPin
+            {
+                label = "Chair",
+                semanticLabel = "chair",
+                position = Vector3.zero,
+                normal = Vector3.up,
+                timestamp = 1.0
+            };
+
+            var second = new SpatialPin
+            {
+                label = "Chair",
+                semanticLabel = "CHAIR",
+                position = new Vector3(1f, 0f, 0f),
+                normal = Vector3.up,
+                timestamp = 2.0
+            };
+
+            manager.AddPin(first);
+            manager.AddPin(second);
+
+            Assert.That(manager.Pins.Count, Is.EqualTo(1));
+            Assert.That(manager.Pins[0].position.x, Is.EqualTo(0.5f).Within(0.0001f));
+
+            Object.DestroyImmediate(go);
+        }
+
         private static void SetPrivateField(object target, string fieldName, object value)
         {
             var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);

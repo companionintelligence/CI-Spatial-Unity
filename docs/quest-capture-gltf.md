@@ -6,7 +6,7 @@ This document describes the two spatial capture systems, how they feed a unified
 
 The project has **two independent capture pipelines** that both write to the same `SpatialPinManager`.  Every `SpatialPin` carries a `PinSource` enum (`CvServer` or `MetaScene`) so downstream code can filter or merge them.
 
-```
+```text
 ┌──────────────────────────────────────────────────────┐
 │                    SpatialCapturePipeline             │
 │  (orchestrates both pipelines, calls CaptureAll)     │

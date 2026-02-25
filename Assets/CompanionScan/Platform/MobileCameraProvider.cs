@@ -74,7 +74,18 @@ namespace CompanionScan.Platform
 
         public Matrix4x4 GetCameraIntrinsics()
         {
-            return Matrix4x4.identity;
+            if (_cameraManager != null && _cameraManager.TryGetIntrinsics(out var intrinsics))
+            {
+                var matrix = Matrix4x4.zero;
+                matrix.m00 = intrinsics.focalLength.x;
+                matrix.m11 = intrinsics.focalLength.y;
+                matrix.m02 = intrinsics.principalPoint.x;
+                matrix.m12 = intrinsics.principalPoint.y;
+                matrix.m22 = 1f;
+                return matrix;
+            }
+
+            return Matrix4x4.zero;
         }
 
         public Pose GetCameraPose()
@@ -89,7 +100,7 @@ namespace CompanionScan.Platform
         public void StartCapture() { }
         public void StopCapture() { }
         public byte[] GetCurrentFrameJpeg(int quality = 75) => null;
-        public Matrix4x4 GetCameraIntrinsics() => Matrix4x4.identity;
+        public Matrix4x4 GetCameraIntrinsics() => Matrix4x4.zero;
         public Pose GetCameraPose() => new Pose(Vector3.zero, Quaternion.identity);
     }
 #endif

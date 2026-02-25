@@ -181,7 +181,7 @@ namespace CompanionScan.Platform
 
         public Matrix4x4 GetCameraIntrinsics()
         {
-            return Matrix4x4.identity;
+            return Matrix4x4.zero;
         }
 
         public Pose GetCameraPose()

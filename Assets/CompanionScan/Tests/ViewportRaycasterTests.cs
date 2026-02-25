@@ -51,5 +51,34 @@ namespace CompanionScan.Tests
 
             Assert.That(Vector3.Distance(ray.direction, expected), Is.LessThan(0.0001f));
         }
+
+        [Test]
+        public void TryRaycastCapture_FallsBackToDistance()
+        {
+            var go = new GameObject("Raycaster");
+            var raycaster = go.AddComponent<ViewportRaycaster>();
+            SetPrivateField(raycaster, "fallbackDistance", 2f);
+
+            var frame = new CaptureFrame
+            {
+                cameraPose = new Pose(Vector3.zero, Quaternion.identity),
+                cameraIntrinsics = Matrix4x4.zero
+            };
+
+            bool hit = raycaster.TryRaycastCapture(frame, Vector2.zero, true,
+                out var point, out _, out _);
+
+            Assert.IsFalse(hit);
+            Assert.That(Vector3.Distance(point, new Vector3(0f, 0f, 2f)), Is.LessThan(0.0001f));
+
+            Object.DestroyImmediate(go);
+        }
+
+        private static void SetPrivateField(object target, string fieldName, object value)
+        {
+            var field = target.GetType().GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, $"Missing field {fieldName}");
+            field.SetValue(target, value);
+        }
     }
 }

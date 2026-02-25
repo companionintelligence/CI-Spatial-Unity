@@ -21,6 +21,7 @@ namespace CompanionScan.UI
     public class XRControllerInput : MonoBehaviour
     {
         [SerializeField] private ControllerMenuUI menuUI;
+        private bool _loggedNoController;
 
         /// <summary>
         /// If null, <see cref="menuUI"/> is found at Awake via
@@ -28,6 +29,12 @@ namespace CompanionScan.UI
         /// </summary>
         private void Awake()
         {
+            if (FindAnyObjectByType<OVRManager>() == null)
+            {
+                var managerGo = new GameObject("OVRManager");
+                managerGo.AddComponent<OVRManager>();
+            }
+
             if (menuUI == null)
                 menuUI = FindAnyObjectByType<ControllerMenuUI>();
 
@@ -44,6 +51,12 @@ namespace CompanionScan.UI
                 menuUI = FindAnyObjectByType<ControllerMenuUI>();
                 if (menuUI == null) return;
                 Debug.Log("[XRControllerInput] Late-bound ControllerMenuUI.");
+            }
+
+            if (!_loggedNoController && OVRInput.GetActiveController() == OVRInput.Controller.None)
+            {
+                _loggedNoController = true;
+                Debug.LogWarning("[XRControllerInput] No active OVR controller detected.");
             }
 
             // A â€“ Capture
