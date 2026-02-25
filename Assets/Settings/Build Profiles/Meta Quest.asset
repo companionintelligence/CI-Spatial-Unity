@@ -999,7 +999,7 @@ MonoBehaviour:
     - line: '|   cloudProjectId: 95ada6cf-dafc-480b-a23d-df420de142c0'
     - line: '|   framebufferDepthMemorylessMode: 0'
     - line: '|   qualitySettingsNames: []'
-    - line: '|   projectName: CompanionCapture'
+    - line: '|   projectName: Unity-XR-AI-Florence'
     - line: '|   organizationId: mrhegemon'
     - line: '|   cloudEnabled: 0'
     - line: '|   legacyClampBlendShapeWeights: 0'

@@ -3,10 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CompanionScan.Core;
+using CompanionScan.Platform;
 using CompanionScan.Rendering;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Serialization;
+#if UNITY_ANDROID || UNITY_IOS
+using UnityEngine.XR.ARFoundation;
+#endif
 
 namespace CompanionScan.Mapping
 {
@@ -38,6 +42,7 @@ namespace CompanionScan.Mapping
         [Header("Camera")]
         [SerializeField] private MonoBehaviour cameraProviderSource;
         [SerializeField] private int jpegQuality = 75;
+        [SerializeField] private bool preferArCameraOnQuest = true;
 
         [Header("Mapping")]
         [SerializeField] private ViewportRaycaster raycaster;
@@ -147,9 +152,49 @@ namespace CompanionScan.Mapping
 
         private void Awake()
         {
-            _cameraProvider = cameraProviderSource as ICameraProvider;
             _client = new CVServerClient(serverConfig);
+#if UNITY_ANDROID
+            if (preferArCameraOnQuest)
+            {
+                TryAutoSetupArCameraProvider();
+            }
+#endif
+            _cameraProvider = cameraProviderSource as ICameraProvider;
         }
+
+#if UNITY_ANDROID
+        private void TryAutoSetupArCameraProvider()
+        {
+            if (cameraProviderSource is MobileCameraProvider)
+            {
+                return;
+            }
+
+            var existingProvider = FindAnyObjectByType<MobileCameraProvider>();
+            if (existingProvider == null)
+            {
+                var session = FindAnyObjectByType<ARSession>();
+                if (session == null)
+                {
+                    var sessionGo = new GameObject("ARSession");
+                    session = sessionGo.AddComponent<ARSession>();
+                }
+
+                var cameraGo = new GameObject("PcaCamera");
+                cameraGo.transform.SetParent(transform, false);
+                var camera = cameraGo.AddComponent<Camera>();
+                camera.enabled = false;
+                camera.clearFlags = CameraClearFlags.Nothing;
+                camera.cullingMask = 0;
+                cameraGo.AddComponent<ARCameraManager>();
+                cameraGo.AddComponent<ARCameraBackground>();
+                existingProvider = cameraGo.AddComponent<MobileCameraProvider>();
+                Debug.Log("[Pipeline] Created ARSession + PCA camera for passthrough capture.");
+            }
+
+            cameraProviderSource = existingProvider;
+        }
+#endif
 
         private void OnEnable()
         {
