@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 #if UNITY_IOS || UNITY_ANDROID
@@ -14,6 +17,13 @@ namespace CompanionScan.Mapping
         [SerializeField] private float fallbackDistance = 2.0f;
         [SerializeField] private float maxDistance = 10.0f;
         [SerializeField] private LayerMask raycastMask = ~0;
+        [SerializeField] private MonoBehaviour environmentRaycastManager;
+        [SerializeField] private bool preferEnvironmentRaycast = true;
+        [SerializeField] private bool requireEnvironmentRaycast = false;
+
+        private bool _loggedEnvironmentUnsupported;
+        private bool _loggedEnvironmentPermission;
+        private bool _loggedEnvironmentMiss;
 
         /// <summary>Runtime-adjustable fallback distance (metres).
         /// Used when no AR/physics hit is found.</summary>
@@ -64,6 +74,25 @@ namespace CompanionScan.Mapping
     #endif
 
             Ray ray = targetCamera.ViewportPointToRay(new Vector3(uv.x, uv.y, 0));
+            if (preferEnvironmentRaycast)
+            {
+                bool envAvailable = IsEnvironmentRaycastAvailable();
+                if (envAvailable && TryEnvironmentRaycast(ray, out point, out normal))
+                {
+                    hitType = RaycastHitType.Environment;
+                    return true;
+                }
+
+                if (requireEnvironmentRaycast && envAvailable)
+                {
+                    if (!_loggedEnvironmentMiss)
+                    {
+                        _loggedEnvironmentMiss = true;
+                        Debug.LogWarning("[Raycaster] Environment raycast required but no hit returned.");
+                    }
+                    return false;
+                }
+            }
             if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, raycastMask))
             {
                 point = hit.point;
@@ -109,6 +138,25 @@ namespace CompanionScan.Mapping
     #endif
 
             var ray = BuildRayFromIntrinsics(frame, pixel);
+            if (preferEnvironmentRaycast)
+            {
+                bool envAvailable = IsEnvironmentRaycastAvailable();
+                if (envAvailable && TryEnvironmentRaycast(ray, out point, out normal))
+                {
+                    hitType = RaycastHitType.Environment;
+                    return true;
+                }
+
+                if (requireEnvironmentRaycast && envAvailable)
+                {
+                    if (!_loggedEnvironmentMiss)
+                    {
+                        _loggedEnvironmentMiss = true;
+                        Debug.LogWarning("[Raycaster] Environment raycast required but no hit returned.");
+                    }
+                    return false;
+                }
+            }
             if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, raycastMask))
             {
                 point = hit.point;
@@ -144,6 +192,150 @@ namespace CompanionScan.Mapping
             var dirCamera = new Vector3(x, -y, 1f).normalized;
             var dirWorld = frame.cameraPose.rotation * dirCamera;
             return new Ray(frame.cameraPose.position, dirWorld.normalized);
+        }
+
+        private bool TryEnvironmentRaycast(Ray ray, out Vector3 point, out Vector3 normal)
+        {
+            point = Vector3.zero;
+            normal = Vector3.up;
+
+            var manager = ResolveEnvironmentRaycastManager();
+            if (manager == null)
+            {
+                return false;
+            }
+
+            var managerType = manager.GetType();
+            var method = managerType.GetMethods()
+                .FirstOrDefault(m => m.Name == "Raycast"
+                                     && m.GetParameters().Length == 2
+                                     && m.GetParameters()[0].ParameterType == typeof(Ray)
+                                     && m.GetParameters()[1].ParameterType.IsByRef);
+            if (method == null)
+            {
+                return false;
+            }
+
+            var hitType = method.GetParameters()[1].ParameterType.GetElementType();
+            var hitInfo = hitType != null ? Activator.CreateInstance(hitType) : null;
+            var args = new object[] { ray, hitInfo };
+            var result = method.Invoke(manager, args);
+            if (result is bool hit && hit)
+            {
+                hitInfo = args[1];
+                if (!TryReadVector3(hitInfo, "point", out point))
+                {
+                    return false;
+                }
+
+                if (!TryReadVector3(hitInfo, "normal", out normal))
+                {
+                    normal = Vector3.up;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool IsEnvironmentRaycastAvailable()
+        {
+            var manager = ResolveEnvironmentRaycastManager();
+            if (manager == null)
+            {
+                return false;
+            }
+
+            var managerType = manager.GetType();
+            var supportedProp = managerType.GetProperty("IsSupported", BindingFlags.Public | BindingFlags.Static);
+            if (supportedProp != null && supportedProp.PropertyType == typeof(bool))
+            {
+                bool supported = (bool)supportedProp.GetValue(null);
+                if (!supported)
+                {
+                    if (!_loggedEnvironmentUnsupported)
+                    {
+                        _loggedEnvironmentUnsupported = true;
+                        Debug.LogWarning("[Raycaster] Environment raycast not supported on this device.");
+                    }
+                    return false;
+                }
+            }
+
+#if UNITY_ANDROID
+            const string permission = "com.oculus.permission.USE_SCENE";
+            if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(permission))
+            {
+                if (!_loggedEnvironmentPermission)
+                {
+                    _loggedEnvironmentPermission = true;
+                    Debug.LogWarning("[Raycaster] Environment raycast permission not granted (USE_SCENE).");
+                }
+                return false;
+            }
+#endif
+
+            return true;
+        }
+
+        private MonoBehaviour ResolveEnvironmentRaycastManager()
+        {
+            if (environmentRaycastManager != null)
+            {
+                return environmentRaycastManager;
+            }
+
+            var type = FindType("Meta.XR.EnvironmentRaycastManager")
+                       ?? FindType("EnvironmentRaycastManager");
+            if (type == null)
+            {
+                return null;
+            }
+
+            var found = UnityEngine.Object.FindObjectOfType(type) as MonoBehaviour;
+            environmentRaycastManager = found;
+            return environmentRaycastManager;
+        }
+
+        private static Type FindType(string fullName)
+        {
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = asm.GetType(fullName);
+                if (type != null)
+                {
+                    return type;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool TryReadVector3(object obj, string memberName, out Vector3 value)
+        {
+            value = Vector3.zero;
+            if (obj == null)
+            {
+                return false;
+            }
+
+            var type = obj.GetType();
+            var prop = type.GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance);
+            if (prop != null && prop.PropertyType == typeof(Vector3))
+            {
+                value = (Vector3)prop.GetValue(obj);
+                return true;
+            }
+
+            var field = type.GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
+            if (field != null && field.FieldType == typeof(Vector3))
+            {
+                value = (Vector3)field.GetValue(obj);
+                return true;
+            }
+
+            return false;
         }
     }
 }

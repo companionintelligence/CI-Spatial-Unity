@@ -248,7 +248,7 @@ namespace CompanionScan.UI
             scaler.dynamicPixelsPerUnit = 10f;
             canvasGO.AddComponent<UnityEngine.UI.GraphicRaycaster>();
 
-            float panelW = 260f, panelH = 140f;
+            float panelW = 260f, panelH = 170f;
             canvasGO.GetComponent<RectTransform>().sizeDelta = new Vector2(panelW, panelH);
 
             // Background
@@ -281,6 +281,7 @@ namespace CompanionScan.UI
             var modelLbl   = MakeLabel(layoutGO.transform, "ModelLabel",   "Model: All",        260f, 26f);
             var displayLbl = MakeLabel(layoutGO.transform, "DisplayLabel", "Display: Both",     260f, 26f);
             var previewLbl = MakeLabel(layoutGO.transform, "PreviewLabel", "Preview: Near (1m)",260f, 26f);
+            var statusLbl  = MakeLabel(layoutGO.transform, "StatusLabel",  "Raycast: --",       260f, 26f);
             var busyLbl    = MakeLabel(layoutGO.transform, "BusyLabel",    "",                  260f, 26f);
             busyLbl.color = Color.yellow;
 
@@ -288,6 +289,7 @@ namespace CompanionScan.UI
             SetField(_menuUI, "modelLabel",           modelLbl);
             SetField(_menuUI, "displayModeLabel",     displayLbl);
             SetField(_menuUI, "previewDistanceLabel", previewLbl);
+            SetField(_menuUI, "statusLabel",          statusLbl);
             SetField(_menuUI, "busyLabel",            busyLbl);
         }
 

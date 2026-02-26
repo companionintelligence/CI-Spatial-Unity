@@ -10,6 +10,9 @@ namespace CompanionScan.Core
         public string baseUrl = "https://liam-razer.capybara-ulmer.ts.net";
         public float boxThreshold = 0.35f;
         public float textThreshold = 0.25f;
+        public int requestTimeoutSeconds = 6;
+        public int retryCount = 2;
+        public float retryDelaySeconds = 0.5f;
 
         public string ResolveBaseUrl()
         {

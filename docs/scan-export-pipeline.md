@@ -19,11 +19,13 @@ and exported to glTF with unified metadata.
 - Florence2 OD (optional) yields coarse labels.
 - GroundingDINO produces precise bboxes.
 - SAM2 segmentation produces masks.
+- Requests use timeout/retry settings from `ServerConfig`.
 
 ### Step 3: 2D + 3D Outputs
 
 - `BBoxRenderer` overlays 2D rectangles onto a preview canvas.
 - `ViewportRaycaster` maps bbox centers to a 3D position.
+- Optional: MRUK `EnvironmentRaycastManager` provides depth-based raycasts (can be required via `ViewportRaycaster.requireEnvironmentRaycast`).
 - `LabelRenderer` spawns a world-space label at each 3D position.
 
 ### Step 4: Meta Scene Capture (Parallel)

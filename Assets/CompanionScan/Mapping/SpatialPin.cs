@@ -20,6 +20,7 @@ namespace CompanionScan.Mapping
     public enum RaycastHitType
     {
         ArPlane,
+        Environment,
         MetaPlane,
         Physics,
         Fallback

@@ -43,7 +43,7 @@ The project has **two independent capture pipelines** that both write to the sam
 Runs entirely on the Quest headset using the [Meta Scene API](https://developers.meta.com/horizon/documentation/unity/unity-scene-overview/).  No network required.
 
 | Step | What happens |
-|------|-------------|
+| --- | --- |
 | 1 | `MetaSceneCollector.CaptureSnapshotAsync()` queries `OVRAnchor.FetchAnchorsAsync` for rooms with `OVRRoomLayout` |
 | 2 | For each room, fetches child anchors via `OVRAnchorContainer` |
 | 3 | Per anchor reads: `OVRLocatable` (world pose), `OVRSemanticLabels` (classification), `OVRBounded2D` (plane), `OVRBounded3D` (volume), `OVRTriangleMesh` (mesh counts) |
@@ -52,6 +52,7 @@ Runs entirely on the Quest headset using the [Meta Scene API](https://developers
 | 6 | Pins added to `SpatialPinManager` |
 
 **Prerequisites:**
+
 - User must run **Space Setup** on the Quest headset
 - Permission `com.oculus.permission.USE_SCENE` must be granted
 - `MetaSceneCollector.trackingSpace` must reference the XR tracking space `Transform`
@@ -63,7 +64,7 @@ Runs entirely on the Quest headset using the [Meta Scene API](https://developers
 Captures a camera frame on Quest and sends it to a local Docker CV server for AI inference. Detected objects are raycasted into world space.
 
 | Step | What happens |
-|------|-------------|
+| --- | --- |
 | 1 | `ICameraProvider.GetCurrentFrameJpeg()` captures a passthrough camera frame |
 | 2 | A `CaptureFrame` is built with image size, pose, intrinsics, session ID, and frame index |
 | 3 | Florence2 caption (`<MORE_DETAILED_CAPTION>`) → `LastCaption` |
@@ -76,11 +77,14 @@ Captures a camera frame on Quest and sends it to a local Docker CV server for AI
 | 10 | SAM2 segment → `SegmentationResult` → optional mask overlay via `MaskRenderer` |
 
 **Prerequisites:**
+
 - CV server running (Docker) at the URL in `ServerConfig`
+- Requests use timeout/retry settings from `ServerConfig`
 - A camera provider implementing `ICameraProvider`
   - Quest: prefer Meta OpenXR + ARFoundation PCA (`MobileCameraProvider`)
   - Desktop: `DesktopCameraProvider`
 - `ViewportRaycaster` for 2D→3D raycasting
+- Optional: MRUK `EnvironmentRaycastManager` for depth-based raycasts (can be required via `ViewportRaycaster.requireEnvironmentRaycast`)
 - On Quest, PCA requires passthrough camera permission
 
 ### Camera Preview + Frustum
@@ -93,7 +97,7 @@ Captures a camera frame on Quest and sends it to a local Docker CV server for AI
 `SpatialCapturePipeline` provides three public methods:
 
 | Method | What it does |
-|--------|-------------|
+| --- | --- |
 | `CaptureAll()` | Runs **both** pipelines: Meta Scene first, then CV Server |
 | `CaptureAndPin()` | Runs only the **CV Server** pipeline |
 | `CaptureMetaScene()` | Runs only the **Meta Scene** pipeline |
@@ -106,7 +110,7 @@ All interaction uses physical Quest controller buttons via `XRControllerInput`
 → `ControllerMenuUI`. No world-space UI panels are needed.
 
 | Button | Controller | Colour | Action |
-|--------|-----------|--------|--------|
+| --- | --- | --- | --- |
 | **A** | Right | Red | Capture (runs `CaptureAll()` with current model preset) |
 | **B** | Right | Blue | Cycle model: Florence → GDino → SAM2 |
 | **X** | Left | Yellow | Cycle preview distance: Near (1 m) → Far (3 m) → Off |
@@ -116,6 +120,9 @@ All interaction uses physical Quest controller buttons via `XRControllerInput`
 Coloured circle indicators and labels are spawned on the controller models at
 runtime by `ControllerMenuBuilder`. A wrist HUD on the left controller shows
 the current model, display mode, preview distance, and busy state.
+It also reports raycast status (intrinsics vs pose-only) and fallback hit count
+for the most recent capture.
+Network timeout/retry settings are shown from the active `ServerConfig`.
 
 3D spatial labels **persist** across captures by default, but the
 `SpatialPinManager` can prune stale pins when lifecycle is enabled.
@@ -167,7 +174,7 @@ When lifecycle is enabled, stale pins are removed and updates are merged by `tra
 Components in `Assets/CompanionScan/`:
 
 | Component | Role |
-|-----------|------|
+| --- | --- |
 | `SpatialCapturePipeline` | Orchestrator — runs CV pipeline (Florence2→GDino→SAM2) and/or Meta Scene capture |
 | `MetaSceneCollector` | Queries OVRAnchor/OVRRoomLayout, converts to `SpatialPin`s |
 | `ViewportRaycaster` | Converts image-space UV → world-space hit via Physics or ARRaycast. Exposes `FallbackDistance` for runtime control. |
@@ -189,8 +196,8 @@ Components in `Assets/CompanionScan/`:
 ## Scene Wiring
 
 1. Add a camera provider that implements `ICameraProvider`.
-  - Quest: prefer Meta OpenXR + ARFoundation PCA (`MobileCameraProvider`).
-  - Desktop: `DesktopCameraProvider`.
+   - Quest: prefer Meta OpenXR + ARFoundation PCA (`MobileCameraProvider`).
+   - Desktop: `DesktopCameraProvider`.
 2. Add an empty GameObject called `SpatialMapping` and add:
    - `SpatialCapturePipeline`
    - `ViewportRaycaster`
@@ -202,7 +209,7 @@ Components in `Assets/CompanionScan/`:
 3. Set references:
    - `SpatialCapturePipeline`
      - `Server Config` → your `ServerConfig` ScriptableObject
-    - `Camera Provider Source` → your PCA provider (`MobileCameraProvider`)
+     - `Camera Provider Source` → your PCA provider (`MobileCameraProvider`)
      - `Raycaster` → the `ViewportRaycaster` on the same GameObject
      - `Pin Manager` → the `SpatialPinManager` on the same GameObject
      - `Meta Scene Collector` → the `MetaSceneCollector` on the same GameObject
@@ -220,7 +227,6 @@ Components in `Assets/CompanionScan/`:
      - `Sync Client` → the `GltfSyncClient`
    - `GltfSyncClient`
      - `Server Config` → same `ServerConfig` ScriptableObject
-
 4. Add a `ControllerMenuBuilder` component to any GameObject in the scene.
    It auto-discovers all pipeline/renderer/exporter singletons and builds:
    - `ControllerMenuUI` — state machine (model preset, display mode, preview distance)
@@ -247,7 +253,7 @@ Each prompt stage feeds the next.  Update `florenceCaptionTask`, `florenceDetect
 
 `ServerConfig` should point to the CV server (HTTPS preferred for Quest builds):
 
-```
+```text
 https://<server-hostname>
 ```
 
@@ -261,7 +267,7 @@ https://<server-hostname>
 
 Meta scene understanding provides semantic labels and surface geometry (planes and volumes). Supported labels include:
 
-```
+```text
 CEILING, DOOR_FRAME, FLOOR, INVISIBLE_WALL_FACE, WALL_ART, WALL_FACE, WINDOW_FRAME,
 COUCH, TABLE, BED, LAMP, PLANT, SCREEN, STORAGE, GLOBAL_MESH, OTHER
 ```
@@ -284,8 +290,8 @@ Implementation notes:
 
 References:
 
-- https://developers.meta.com/horizon/design/mr-design-scene
-- https://developers.meta.com/horizon/documentation/unity/unity-scene-build-mixed-reality/
+- <https://developers.meta.com/horizon/design/mr-design-scene>
+- <https://developers.meta.com/horizon/documentation/unity/unity-scene-build-mixed-reality/>
 
 ## Implementation Improvements
 
@@ -307,7 +313,7 @@ The mapping pipeline is aligned with Meta scene understanding guidance:
 
 `SpatialMapExporter.Export()` writes a `.gltf` + `.bin` under:
 
-```
+```text
 Application.persistentDataPath/exports
 ```
 
@@ -316,7 +322,7 @@ Application.persistentDataPath/exports
 `SpatialMapExporter.ExportAndSync()` calls `GltfSyncClient` to upload the exported `.gltf` and `.bin` back to the CV server.
 The server expects a multipart POST at:
 
-```
+```text
 POST /v1/gltf
 ```
 

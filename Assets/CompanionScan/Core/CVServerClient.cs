@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using UnityEngine;
 using UnityEngine.Networking;
 
 namespace CompanionScan.Core
@@ -63,23 +65,42 @@ namespace CompanionScan.Core
 
             var url = baseUrl.TrimEnd('/') + endpoint;
             var json = JsonConvert.SerializeObject(payload);
-            using var request = new UnityWebRequest(url, "POST");
-            request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
+            int retries = Mathf.Max(0, _config != null ? _config.retryCount : 0);
+            int timeout = Mathf.Max(1, _config != null ? _config.requestTimeoutSeconds : 6);
+            float delaySeconds = _config != null ? _config.retryDelaySeconds : 0.5f;
 
-            var operation = request.SendWebRequest();
-            while (!operation.isDone)
+            Exception lastError = null;
+            for (int attempt = 0; attempt <= retries; attempt++)
             {
-                await Task.Yield();
+                using var request = new UnityWebRequest(url, "POST");
+                request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.timeout = timeout;
+
+                var operation = request.SendWebRequest();
+                while (!operation.isDone)
+                {
+                    await Task.Yield();
+                }
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    return JsonConvert.DeserializeObject<T>(request.downloadHandler.text);
+                }
+
+                string error = request.error;
+                long status = request.responseCode;
+                lastError = new Exception($"CV server error ({status}): {error}");
+
+                if (attempt < retries)
+                {
+                    int delayMs = Mathf.Max(0, Mathf.RoundToInt(delaySeconds * 1000f * (attempt + 1)));
+                    await Task.Delay(delayMs, CancellationToken.None);
+                }
             }
 
-            if (request.result != UnityWebRequest.Result.Success)
-            {
-                throw new Exception(request.error);
-            }
-
-            return JsonConvert.DeserializeObject<T>(request.downloadHandler.text);
+            throw lastError ?? new Exception("CV server request failed.");
         }
     }
 }

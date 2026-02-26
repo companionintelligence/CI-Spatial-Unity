@@ -103,6 +103,9 @@ namespace CompanionScan.Mapping
         private string _captureSessionId;
         private int _captureFrameIndex;
         private int _nextTrackId = 1;
+        private bool _lastCaptureHadIntrinsics;
+        private int _lastFallbackHits;
+        private bool _loggedMissingIntrinsics;
 
         private class TrackState
         {
@@ -122,6 +125,10 @@ namespace CompanionScan.Mapping
 
         /// <summary>Last Meta Scene Understanding snapshot.</summary>
         public MetaSceneSnapshot LastMetaSnapshot { get; private set; }
+
+        public bool LastCaptureHadIntrinsics => _lastCaptureHadIntrinsics;
+        public int LastFallbackHitCount => _lastFallbackHits;
+        public ServerConfig ServerConfig => serverConfig;
 
         public bool IsBusy => _isBusy;
 
@@ -363,6 +370,13 @@ namespace CompanionScan.Mapping
             Debug.Log($"[Pipeline-CV] Captured frame ({frame.Length} bytes). Starting CV pipelineâ€¦");
             EnsureFrameTexture(frame);
             var capture = BuildCaptureFrame(frame);
+            _lastCaptureHadIntrinsics = capture.HasIntrinsics;
+            _lastFallbackHits = 0;
+            if (!_lastCaptureHadIntrinsics && !_loggedMissingIntrinsics)
+            {
+                _loggedMissingIntrinsics = true;
+                Debug.LogWarning("[Pipeline-CV] Camera intrinsics unavailable; using pose-only rays.");
+            }
             _lastCaptureFrame = capture;
             if (bboxRenderer != null)
             {
@@ -761,7 +775,12 @@ namespace CompanionScan.Mapping
                     return true;
                 }
 
-                return raycaster.TryRaycastCapture(capture, pixel, true, out hitPoint, out hitNormal, out hitType);
+                bool fallbackHit = raycaster.TryRaycastCapture(capture, pixel, true, out hitPoint, out hitNormal, out hitType);
+                if (hitType == RaycastHitType.Fallback)
+                {
+                    _lastFallbackHits++;
+                }
+                return fallbackHit;
             }
 
             bool viewportHit = raycaster.TryRaycastViewport(uv, out hitPoint, out hitNormal, out hitType);
@@ -776,7 +795,12 @@ namespace CompanionScan.Mapping
                 return true;
             }
 
-            return raycaster.TryRaycastViewport(uv, out hitPoint, out hitNormal, out hitType);
+            bool viewportFallback = raycaster.TryRaycastViewport(uv, out hitPoint, out hitNormal, out hitType);
+            if (hitType == RaycastHitType.Fallback)
+            {
+                _lastFallbackHits++;
+            }
+            return viewportFallback;
         }
 
         private Vector3 ApplySmoothing(string semanticLabel, Vector3 position)
@@ -802,6 +826,7 @@ namespace CompanionScan.Mapping
             float weight = hitType switch
             {
                 RaycastHitType.ArPlane => 1f,
+                RaycastHitType.Environment => 0.9f,
                 RaycastHitType.MetaPlane => 0.85f,
                 RaycastHitType.Physics => 0.7f,
                 _ => 0.4f

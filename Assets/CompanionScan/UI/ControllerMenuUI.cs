@@ -47,6 +47,7 @@ namespace CompanionScan.UI
         [SerializeField] private TMP_Text displayModeLabel;
         [SerializeField] private TMP_Text previewDistanceLabel;
         [SerializeField] private TMP_Text busyLabel;
+        [SerializeField] private TMP_Text statusLabel;
 
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Model cycle enum
@@ -312,6 +313,19 @@ namespace CompanionScan.UI
                     _ => "Preview: ?"
                 };
             }
+
+            if (statusLabel != null && pipeline != null)
+            {
+                string intrinsics = pipeline.LastCaptureHadIntrinsics ? "Intrinsics" : "PoseOnly";
+                string fallback = pipeline.LastFallbackHitCount > 0
+                    ? $"Fallback: {pipeline.LastFallbackHitCount}"
+                    : "Fallback: 0";
+                var config = pipeline.ServerConfig;
+                string net = config != null
+                    ? $"Net: {Mathf.Max(1, config.requestTimeoutSeconds)}s x{Mathf.Max(0, config.retryCount)}"
+                    : "Net: ?";
+                statusLabel.text = $"Raycast: {intrinsics} | {fallback} | {net}";
+            }
         }
 
         private void EnsureHudLabels()
@@ -320,6 +334,7 @@ namespace CompanionScan.UI
             if (displayModeLabel == null) displayModeLabel = FindHudLabel("DisplayLabel");
             if (previewDistanceLabel == null) previewDistanceLabel = FindHudLabel("PreviewLabel");
             if (busyLabel == null) busyLabel = FindHudLabel("BusyLabel");
+            if (statusLabel == null) statusLabel = FindHudLabel("StatusLabel");
         }
 
         private static TMP_Text FindHudLabel(string name)
