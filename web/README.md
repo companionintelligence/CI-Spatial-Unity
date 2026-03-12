@@ -18,12 +18,14 @@ workflow as the Unity build without requiring a native APK.
 | **Grounding DINO detect** | `POST /v1/detect` |
 | **SAM 2 segment** | `POST /v1/segment` |
 | **XR plane detection** | IWSDK `SceneUnderstandingSystem` + `XRPlane` component |
-| **XR mesh overlay** | IWSDK `XRMesh` component → Three.js semi-transparent mesh |
+| **XR mesh overlay** | IWSDK `XRMesh` component → shared GLTF mapping layer overlay |
 | **glTF export** | Three.js `GLTFExporter` + pin metadata injected as `extras` |
 | **glTF upload** | `POST /v1/gltf` multipart form |
 | **Browser download fallback** | `<a download>` when server unavailable |
 | **Quest controller input** | WebXR Gamepad API (A/B/X/Y + trigger + grip buttons) |
 | **HUD overlay** | DOM-based status bar mirroring wrist HUD |
+| **Desktop fallback** | Explicit **Start Desktop** mode with webcam + DOM controls |
+| **Mapping layer import** | Load `.gltf` / `.glb` overlays directly in the browser |
 
 ## Architecture
 
@@ -65,7 +67,7 @@ Mirrors the Unity `XRControllerInput.cs` button mapping:
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20.19+
 - cv-server running locally (`cd cv-server && docker compose up`)
 
 ### Development
@@ -80,6 +82,9 @@ Open `http://localhost:5173` in your browser.
 
 The dev server proxies `/v1/*` requests to `http://localhost:8000`, so you
 don't need CORS configuration during development.
+
+If you are not on a WebXR-capable browser, click **Start Desktop** to run the
+scanner with the webcam and the DOM control bar.
 
 ### Production build
 
@@ -105,6 +110,13 @@ The URL is persisted in `localStorage` and applied to all subsequent requests.
 | CV Server Base URL | `http://localhost:8000` | Must be reachable from the device |
 | Box Threshold | `0.35` | Grounding DINO confidence threshold |
 | Text Threshold | `0.25` | Grounding DINO text threshold |
+
+### Mapping overlays
+
+Use **Load Mapping** to import an existing `.gltf` or `.glb` scene export as a
+browser-side mapping layer. Imported meshes are rendered with the same
+semi-transparent overlay material used for WebXR scene-understanding meshes.
+Use **Clear Mapping** to remove loaded overlays.
 
 ## Differences from the Unity Build
 

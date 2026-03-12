@@ -4,7 +4,7 @@
  * Updates the 2-D status overlay in the browser UI based on pipeline state.
  */
 
-import type { PipelineState } from '../mapping/ScanningPipeline.js';
+import type { PipelineState, PreviewDistance } from '../mapping/ScanningPipeline.js';
 
 export class HudDisplay {
   private readonly modelEl: HTMLElement;
@@ -13,36 +13,42 @@ export class HudDisplay {
   private readonly statusEl: HTMLElement;
 
   constructor() {
-    this.modelEl = document.getElementById('hud-model')!;
-    this.displayEl = document.getElementById('hud-display')!;
-    this.previewEl = document.getElementById('hud-preview')!;
-    this.statusEl = document.getElementById('hud-status')!;
+    this.modelEl = getRequiredElement('hud-model');
+    this.displayEl = getRequiredElement('hud-display');
+    this.previewEl = getRequiredElement('hud-preview');
+    this.statusEl = getRequiredElement('hud-status');
   }
 
   update(state: Readonly<PipelineState>): void {
-    if (this.modelEl) this.modelEl.textContent = state.model;
-    if (this.displayEl) this.displayEl.textContent = state.displayMode;
-    if (this.previewEl) this.previewEl.textContent = previewLabel(state.previewDistance);
-    if (this.statusEl) {
-      if (state.busy) {
-        this.statusEl.textContent = 'BUSY…';
-        this.statusEl.style.color = '#ffd700';
-      } else {
-        this.statusEl.textContent = `Captures: ${state.captureCount}`;
-        this.statusEl.style.color = '#88ff88';
-      }
+    this.modelEl.textContent = state.model;
+    this.displayEl.textContent = state.displayMode;
+    this.previewEl.textContent = previewLabel(state.previewDistance);
+
+    if (state.busy) {
+      this.statusEl.textContent = 'BUSY…';
+      this.statusEl.style.color = '#ffd700';
+    } else {
+      this.statusEl.textContent = `Captures: ${state.captureCount}`;
+      this.statusEl.style.color = '#88ff88';
     }
   }
 
   setStatus(msg: string, color = '#ffffff'): void {
-    if (this.statusEl) {
-      this.statusEl.textContent = msg;
-      this.statusEl.style.color = color;
-    }
+    this.statusEl.textContent = msg;
+    this.statusEl.style.color = color;
   }
 }
 
-function previewLabel(d: string): string {
+function getRequiredElement(id: string): HTMLElement {
+  const element = document.getElementById(id);
+  if (!element) {
+    throw new Error(`HudDisplay: required element "#${id}" was not found.`);
+  }
+
+  return element;
+}
+
+function previewLabel(d: PreviewDistance): string {
   if (d === 'Near') return 'Near (1m)';
   if (d === 'Far') return 'Far (3m)';
   return 'Off';

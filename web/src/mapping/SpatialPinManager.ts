@@ -84,6 +84,7 @@ export class SpatialPinManager {
     if (source == null) {
       // Remove all objects from scene
       for (const obj of this.objects) {
+        this.disposeObject(obj);
         this.scene.remove(obj);
       }
       this.objects.length = 0;
@@ -91,10 +92,8 @@ export class SpatialPinManager {
     } else {
       for (let i = this.pins.length - 1; i >= 0; i--) {
         if (this.pins[i].source === source) {
-          const obj = this.objects[i];
-          if (obj) this.scene.remove(obj);
+          this.removeObjectAt(i);
           this.pins.splice(i, 1);
-          this.objects.splice(i, 1);
         }
       }
     }
@@ -107,10 +106,8 @@ export class SpatialPinManager {
     const maxAge = this.cfg.pinMaxAgeSeconds;
     for (let i = this.pins.length - 1; i >= 0; i--) {
       if (now - this.pins[i].timestamp > maxAge) {
-        const obj = this.objects[i];
-        if (obj) this.scene.remove(obj);
+        this.removeObjectAt(i);
         this.pins.splice(i, 1);
-        this.objects.splice(i, 1);
       }
     }
   }
@@ -164,6 +161,34 @@ export class SpatialPinManager {
     const obj = buildLabelObject(pin);
     this.scene.add(obj);
     this.objects[index] = obj;
+  }
+
+  private removeObjectAt(index: number): void {
+    const obj = this.objects[index];
+    if (obj) {
+      this.disposeObject(obj);
+      this.scene.remove(obj);
+    }
+
+    this.objects.splice(index, 1);
+  }
+
+  private disposeObject(obj: THREE.Object3D): void {
+    obj.traverse((child) => {
+      if (child instanceof THREE.Sprite) {
+        const material = child.material;
+        if (Array.isArray(material)) {
+          for (const entry of material) {
+            entry.map?.dispose();
+            entry.dispose();
+          }
+          return;
+        }
+
+        material.map?.dispose();
+        material.dispose();
+      }
+    });
   }
 }
 

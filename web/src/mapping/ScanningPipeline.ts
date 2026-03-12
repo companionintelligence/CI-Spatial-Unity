@@ -160,7 +160,7 @@ export class ScanningPipeline {
           captureId,
           captureSessionId: this.state.sessionId,
           captureFrameIndex: frameIdx,
-          trackId: i,
+          trackId: 0,
         }),
       );
     }
@@ -187,7 +187,7 @@ export class ScanningPipeline {
           captureId,
           captureSessionId: this.state.sessionId,
           captureFrameIndex: frameIdx,
-          trackId: i,
+          trackId: 0,
         }),
       );
     }
@@ -212,7 +212,7 @@ export class ScanningPipeline {
           captureId,
           captureSessionId: this.state.sessionId,
           captureFrameIndex: frameIdx,
-          trackId: i,
+          trackId: 0,
         }),
       );
     }

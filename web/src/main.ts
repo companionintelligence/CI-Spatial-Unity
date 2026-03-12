@@ -17,12 +17,15 @@ const canvasContainer = document.getElementById('xr-canvas') as HTMLDivElement;
 const inputBaseUrl = document.getElementById('input-base-url') as HTMLInputElement;
 const inputBoxThresh = document.getElementById('input-box-thresh') as HTMLInputElement;
 const inputTextThresh = document.getElementById('input-text-thresh') as HTMLInputElement;
+const fileInputMapping = document.getElementById('input-mapping-file') as HTMLInputElement;
 
 // ── Settings initialisation ───────────────────────────────────────────────────
 function readConfig(): ServerConfig {
   const baseUrl = inputBaseUrl.value.trim() || config.resolveBaseUrl();
-  const boxThreshold = parseFloat(inputBoxThresh.value) || 0.35;
-  const textThreshold = parseFloat(inputTextThresh.value) || 0.25;
+  const parsedBoxThreshold = parseFloat(inputBoxThresh.value);
+  const boxThreshold = Number.isNaN(parsedBoxThreshold) ? 0.35 : parsedBoxThreshold;
+  const parsedTextThreshold = parseFloat(inputTextThresh.value);
+  const textThreshold = Number.isNaN(parsedTextThreshold) ? 0.25 : parsedTextThreshold;
   const cfg = new ServerConfig({ baseUrl, boxThreshold, textThreshold });
   cfg.setBaseUrlOverride(baseUrl);
   return cfg;
@@ -38,10 +41,15 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── Scene initialisation (lazy, triggered on first launch) ───────────────────
 async function ensureInitialised(): Promise<void> {
   if (initialised) return;
-  initialised = true;
   config = readConfig();
-  await xrScene.init(canvasContainer, config);
-  wireButtons();
+  try {
+    await xrScene.init(canvasContainer, config);
+    wireButtons();
+    initialised = true;
+  } catch (error) {
+    initialised = false;
+    throw error;
+  }
 }
 
 // ── XR launch buttons ─────────────────────────────────────────────────────────
@@ -57,6 +65,12 @@ document.getElementById('btn-vr')?.addEventListener('click', async () => {
   await xrScene.launchVR();
 });
 
+document.getElementById('btn-desktop')?.addEventListener('click', async () => {
+  launchOverlay.style.display = 'none';
+  await ensureInitialised();
+  await xrScene.startDesktop();
+});
+
 // ── Desktop / non-XR action buttons ──────────────────────────────────────────
 function wireButtons(): void {
   document.getElementById('btn-capture')?.addEventListener('click', () => {
@@ -64,11 +78,15 @@ function wireButtons(): void {
   });
 
   document.getElementById('btn-cycle-model')?.addEventListener('click', () => {
-    xrScene['pipeline']?.cycleModel();
+    xrScene.cycleModel();
   });
 
   document.getElementById('btn-cycle-display')?.addEventListener('click', () => {
-    xrScene['pipeline']?.cycleDisplayMode();
+    xrScene.cycleDisplayMode();
+  });
+
+  document.getElementById('btn-cycle-preview')?.addEventListener('click', () => {
+    xrScene.cyclePreviewDistance();
   });
 
   document.getElementById('btn-export')?.addEventListener('click', () => {
@@ -77,6 +95,21 @@ function wireButtons(): void {
 
   document.getElementById('btn-preview-gltf')?.addEventListener('click', () => {
     void xrScene.previewGltf();
+  });
+
+  document.getElementById('btn-load-mapping')?.addEventListener('click', () => {
+    fileInputMapping.click();
+  });
+
+  document.getElementById('btn-clear-mapping')?.addEventListener('click', () => {
+    xrScene.clearMappingLayers();
+  });
+
+  fileInputMapping.addEventListener('change', () => {
+    const file = fileInputMapping.files?.[0];
+    if (!file) return;
+    void xrScene.loadMappingFile(file);
+    fileInputMapping.value = '';
   });
 
   // Settings inputs update config in real time

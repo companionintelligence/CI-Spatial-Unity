@@ -158,6 +158,34 @@ export class XRScene {
     await this.startCameraCapture();
   }
 
+  /** Start the non-immersive desktop/webcam mode. */
+  async startDesktop(): Promise<void> {
+    await this.startCameraCapture();
+    this.hud.setStatus('Desktop mode active', '#88ff88');
+  }
+
+  cycleModel(): void {
+    this.pipeline.cycleModel();
+  }
+
+  cycleDisplayMode(): void {
+    this.pipeline.cycleDisplayMode();
+  }
+
+  cyclePreviewDistance(): void {
+    this.pipeline.cyclePreviewDistance();
+  }
+
+  async loadMappingFile(file: Blob): Promise<void> {
+    await this.mappingLayer.loadMapping(file);
+    this.hud.setStatus('Loaded mapping overlay', '#88ff88');
+  }
+
+  clearMappingLayers(): void {
+    this.mappingLayer.clearMappings();
+    this.hud.setStatus('Cleared mapping overlays', '#88ff88');
+  }
+
   // ── Actions wired to DOM buttons and controller ───────────────────────────
 
   async doCapture(): Promise<void> {
@@ -226,6 +254,8 @@ export class XRScene {
   private async buildCaptureFrame(): Promise<CaptureFrame | null> {
     const raw = await this.cameraCapture.captureFrame({
       xrFrame: this.latestXrFrame,
+      xrSession: this.world?.session ?? null,
+      fallbackPose: cameraToPose(this.camera),
     });
     if (!raw) return null;
 
@@ -333,7 +363,7 @@ export class XRScene {
                     });
                   }
                 });
-                self.scene.add(clone);
+                self.mappingLayer.addObject(clone, false);
               }
             } catch {
               // Ignore errors during mesh ingestion
@@ -351,4 +381,16 @@ export class XRScene {
     world.registerSystem(PlaneIngestSystem);
     world.registerSystem(MeshIngestSystem);
   }
+}
+
+function cameraToPose(camera: THREE.Camera): import('../core/types.js').CameraPose {
+  const position = new THREE.Vector3();
+  const rotation = new THREE.Quaternion();
+  camera.getWorldPosition(position);
+  camera.getWorldQuaternion(rotation);
+
+  return {
+    position: [position.x, position.y, position.z],
+    rotation: [rotation.x, rotation.y, rotation.z, rotation.w],
+  };
 }

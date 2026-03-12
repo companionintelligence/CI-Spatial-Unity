@@ -271,6 +271,7 @@
         <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center">
           <button class="launch-btn" id="btn-ar">▶ Enter AR (Passthrough)</button>
           <button class="launch-btn" id="btn-vr">▶ Enter VR</button>
+          <button class="launch-btn" id="btn-desktop" style="background:#6d4c41;color:#fff">▶ Start Desktop</button>
         </div>
       </div>
 
@@ -303,10 +304,14 @@
       <div id="btn-bar">
         <button class="action-btn" id="btn-capture">A · Capture</button>
         <button class="action-btn" id="btn-cycle-model">B · Cycle Model</button>
+        <button class="action-btn" id="btn-cycle-preview" style="background:#fdd835;color:#111">X · Preview Dist</button>
         <button class="action-btn" id="btn-cycle-display">Trigger · Display</button>
         <button class="action-btn" id="btn-export">Y · Export glTF</button>
         <button class="action-btn" id="btn-preview-gltf">Grip · Preview glTF</button>
+        <button class="action-btn" id="btn-load-mapping" style="background:#00897b;color:#fff">Load Mapping</button>
+        <button class="action-btn" id="btn-clear-mapping" style="background:#546e7a;color:#fff">Clear Mapping</button>
       </div>
+      <input type="file" id="input-mapping-file" accept=".gltf,.glb,model/gltf+json,model/gltf-binary" hidden />
 
       <!-- GLTF preview overlay -->
       <div id="gltf-preview">

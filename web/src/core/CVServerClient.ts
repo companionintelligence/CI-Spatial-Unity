@@ -16,13 +16,24 @@ import type {
 
 /** Convert a Blob to a base-64 string without the data-URI prefix. */
 async function blobToBase64(blob: Blob): Promise<string> {
-  const buf = await blob.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error('Unexpected FileReader.result type.'));
+    };
+    reader.onerror = () => {
+      reject(reader.error ?? new Error('Failed to read Blob as data URL.'));
+    };
+    reader.readAsDataURL(blob);
+  });
+
+  const commaIndex = dataUrl.indexOf(',');
+  return commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : '';
 }
 
 /** Sleep for `ms` milliseconds. */

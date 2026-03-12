@@ -60,6 +60,15 @@ export class GltfMappingLayer {
     });
   }
 
+  /** Add an existing Three.js object into the mapping layer with overlay styling. */
+  addObject(object: THREE.Object3D, applyOverlayMaterial = true): void {
+    if (applyOverlayMaterial) {
+      this.applyOverlayMaterial(object);
+    }
+
+    this.root.add(object);
+  }
+
   /** Remove all loaded mapping meshes from the scene. */
   clearMappings(): void {
     while (this.root.children.length > 0) {

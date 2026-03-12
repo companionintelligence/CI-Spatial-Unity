@@ -78,10 +78,17 @@ export class CameraCapture {
     xrSession?: XRSession | null;
     xrRefSpace?: XRReferenceSpace | null;
     viewerPose?: XRViewerPose | null;
+    fallbackPose?: CameraPose | null;
   } = {}): Promise<FrameCapture | null> {
     // ── WebXR path ────────────────────────────────────────────────────────
-    if (opts.xrFrame && opts.xrSession) {
-      return this.captureFromXRFrame(opts.xrFrame, opts.xrSession, opts.viewerPose ?? null);
+    const xrSession = opts.xrSession ?? opts.xrFrame?.session ?? null;
+    if (opts.xrFrame && xrSession) {
+      return this.captureFromXRFrame(
+        opts.xrFrame,
+        xrSession,
+        opts.viewerPose ?? null,
+        opts.fallbackPose ?? null,
+      );
     }
 
     // ── getUserMedia fallback ─────────────────────────────────────────────
@@ -109,9 +116,12 @@ export class CameraCapture {
     frame: XRFrame,
     session: XRSession,
     viewerPose: XRViewerPose | null,
+    fallbackPose: CameraPose | null,
   ): Promise<FrameCapture | null> {
     // Build pose from viewer
-    const pose = viewerPose ? xrViewerPoseToCameraPose(viewerPose) : identityPose();
+    const pose = viewerPose
+      ? xrViewerPoseToCameraPose(viewerPose)
+      : (fallbackPose ?? identityPose());
 
     // Try to access the raw camera image via WebXR Camera Access API
     type XRWebGLBindingCtor = new (
@@ -120,9 +130,14 @@ export class CameraCapture {
     ) => { getCameraImage?: (view: XRView) => { width: number; height: number } | null };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const BindingClass = (window as any)['XRWebGLBinding'] as XRWebGLBindingCtor | undefined;
-    const binding = BindingClass
-      ? new BindingClass(session, document.createElement('canvas').getContext('webgl2') as WebGL2RenderingContext)
-      : null;
+    let binding: InstanceType<XRWebGLBindingCtor> | null = null;
+    if (BindingClass) {
+      const glCanvas = document.createElement('canvas');
+      const gl = glCanvas.getContext('webgl2');
+      if (gl instanceof WebGL2RenderingContext) {
+        binding = new BindingClass(session, gl);
+      }
+    }
 
     if (binding) {
       for (const view of viewerPose?.views ?? []) {
