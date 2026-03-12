@@ -209,6 +209,26 @@ pytest
 - Scan/export pipeline details: [docs/scan-export-pipeline.md](docs/scan-export-pipeline.md)
 - Current build plan: [docs/plan.md](docs/plan.md)
 
+## Web Immersive Client (IWS)
+
+A browser-based version of the scanner lives in `web/` and uses the Immersive Web SDK + WebXR to mirror the Quest flow: camera capture → Florence caption + GDino detection → SAM2 prompt path (server) → pin visualisation → glTF export/upload.
+
+**Run it**
+
+```bash
+cd web
+npm install
+npm run dev   # start Vite dev server
+npm run build # production build
+```
+
+**Features**
+
+- Immersive AR session with plane harvesting (Meta Scene analogue) and fallback camera capture.
+- CV server integration (`/v1/florence`, `/v1/detect`, `/v1/segment`, `/v1/gltf`) with prompt chaining.
+- Unified pin store rendered in-browser (bbox/label/both modes) and exported to glTF with extras matching the Quest exporter.
+- UI controls that mirror controller actions: model cycle, display mode cycle, preview distance cycle, capture, save/export.
+
 ## Legacy Sample (Cloud API)
 
 The original NVIDIA cloud API sample lives under `Assets/CompanionScanLegacy/Scripts/` and is not the primary path anymore. The project now runs locally via the CV server.

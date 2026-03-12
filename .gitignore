@@ -6,6 +6,8 @@
 /cv-server/checkpoints/
 /cv-server/configs/
 /cv-server/certs/
+/web/node_modules/
+/web/dist/
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
