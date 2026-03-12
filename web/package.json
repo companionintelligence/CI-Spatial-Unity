@@ -1,0 +1,22 @@
+{
+  "name": "companion-scan-web",
+  "version": "0.1.0",
+  "description": "Web version of Companion Scan using Meta Immersive Web SDK",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@iwsdk/core": "^0.3.1",
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "@types/three": "^0.177.0",
+    "typescript": "^5.4.5",
+    "vite": "^6.4.1"
+  }
+}
