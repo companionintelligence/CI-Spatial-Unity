@@ -190,12 +190,12 @@ async function capture() {
     const frame = await camera.captureFrame()
     const imageBase64 = dataUrlToBase64(frame.dataUrl)
 
-    setStatus('Florence captioning…')
+    setStatus(`Captioning with model preset: ${state.model}…`)
     const florence = await cvClient.runFlorence(imageBase64)
     captionText = florence.caption || captionText
 
     const prompt = buildPrompt(florence.labels || [], 'object . room . floor . wall . table . chair .')
-    setStatus('GroundingDINO detection…')
+    setStatus(`Running detection with model preset: ${state.model}…`)
     const detections = await cvClient.detect(imageBase64, prompt)
     const pins = detections.bboxes.map((bbox, i) => detectionToPin(bbox, detections.labels[i], detections.scores[i], frame, prompt))
 
