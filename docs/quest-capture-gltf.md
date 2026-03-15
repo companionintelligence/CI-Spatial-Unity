@@ -1,6 +1,10 @@
 # Quest 3 Capture Pipeline and glTF Export
 
-This document describes the two spatial capture systems, how they feed a unified pin store, and the glTF export format.
+This document describes the two spatial capture systems, how they feed a unified
+pin store, and the glTF export format for the Unity Quest runtime.
+
+For the WebXR client that mirrors this flow in the browser, see
+[`web/README.md`](../web/README.md).
 
 ## Architecture: Two Capture Systems, One Pin Store
 

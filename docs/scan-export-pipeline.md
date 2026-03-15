@@ -1,7 +1,11 @@
 # Scan and Export Pipeline
 
-This document provides a detailed breakdown of how scans are captured, processed,
-and exported to glTF with unified metadata.
+This document provides a detailed breakdown of how scans are captured,
+processed, and exported to glTF with unified metadata in the Unity Quest
+runtime.
+
+For the WebXR/browser implementation of the same scan → detect → export flow,
+see [`web/README.md`](../web/README.md).
 
 ## Capture Pipeline (Quest Runtime)
 

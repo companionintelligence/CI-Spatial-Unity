@@ -3,6 +3,8 @@
 ## Goals
 
 - Expand Unity Test Runner coverage across UI, mapping, and CV server integration.
+- Keep the web client covered with Playwright browser tests for desktop fallback
+  and WebXR-adjacent control flow.
 - Add visual regression and screenshot artifacts for XR UI and anchors.
 - Provide CI pipelines for fast unit tests and optional integration tests.
 
@@ -37,6 +39,11 @@
 - Per-image model tests using /test images
 - Mapping QA tests: render boxes, simulate anchors
 
+4) Web Browser Automation
+- Playwright tests in `web/tests/app.spec.ts`
+- Covers desktop startup, HUD state changes, settings persistence, glTF preview,
+  export fallback, and mapping overlay import/clear flows
+
 ## Artifacts
 
 - Screenshots written to folder set by env var: CompanionScan_TEST_ARTIFACTS
@@ -52,6 +59,10 @@
   - Runs on main or scheduled (nightly)
   - Starts cv-server via docker compose
   - Sets CompanionScan_TEST_SERVER_URL to the local server
+
+- Job C: Web client browser tests
+  - Builds the Vite app in `web/`
+  - Runs Playwright coverage for the browser client workflows
 
 ## Environment Variables
 
