@@ -215,7 +215,18 @@ export class MapRenderer {
     const mesh = group.getObjectByName('pin-box') as Mesh | null
     if (!mesh) return
     const size = this.boxSizeFromPin(pin)
-    mesh.scale.set(size[0], size[1], size[2])
+    const geometry = mesh.geometry as BoxGeometry
+
+    // Avoid unnecessary work if the geometry already has the desired size
+    const { width, height, depth } = geometry.parameters
+    if (width === size[0] && height === size[1] && depth === size[2]) {
+      return
+    }
+
+    // Reset scale to avoid compounding dimensions and recreate geometry at the new size
+    mesh.scale.set(1, 1, 1)
+    geometry.dispose()
+    mesh.geometry = new BoxGeometry(size[0], size[1], size[2])
   }
 
   private boxSizeFromPin(pin: SpatialPin): [number, number, number] {
