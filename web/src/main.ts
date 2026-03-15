@@ -213,7 +213,8 @@ async function capture() {
 function detectionToPin(bbox: number[], rawLabel: string, score: number, frame: { width: number; height: number; timestamp: number }, prompt: string): SpatialPin {
   const [x1, y1, x2, y2] = bbox
   const uv = { x: (x1 + x2) / (2 * frame.width), y: (y1 + y2) / (2 * frame.height) }
-  const projection = xr.projectFromUv(uv, state.previewDistance || 1) || {
+  const rawProjection = xr.projectFromUv(uv, state.previewDistance || 1)
+  const projection = rawProjection || {
     position: [0, 0, -state.previewDistance || -1] as [number, number, number],
     normal: [0, 0, -1] as [number, number, number],
   }
@@ -244,7 +245,7 @@ function detectionToPin(bbox: number[], rawLabel: string, score: number, frame: 
     captureFrameIndex: state.frameIndex,
     sourcePrompt: prompt,
     placementConfidence: score,
-    hitType: projection ? 'projected' : 'fallback',
+    hitType: rawProjection ? 'projected' : 'fallback',
   }
 }
 
