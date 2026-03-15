@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Companion Scan — Web</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0a0a0a;
+        color: #fff;
+        font-family: system-ui, sans-serif;
+      }
+
+      #app {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      #xr-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      /* ── Launch overlay ── */
+      #launch-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 10;
+      }
+
+      #launch-overlay h1 {
+        font-size: 1.8rem;
+        letter-spacing: 0.05em;
+      }
+
+      #launch-overlay p {
+        font-size: 0.9rem;
+        color: #aaa;
+        max-width: 380px;
+        text-align: center;
+        line-height: 1.5;
+      }
+
+      .launch-btn {
+        padding: 0.75rem 2rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: opacity 0.2s;
+      }
+
+      .launch-btn:hover {
+        opacity: 0.85;
+      }
+
+      #btn-ar {
+        background: #4caf50;
+        color: #fff;
+      }
+
+      #btn-vr {
+        background: #2196f3;
+        color: #fff;
+      }
+
+      /* ── Settings panel ── */
+      #settings-panel {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid #333;
+        border-radius: 10px;
+        padding: 1rem;
+        width: 280px;
+        z-index: 5;
+      }
+
+      #settings-panel label {
+        display: block;
+        font-size: 0.8rem;
+        color: #aaa;
+        margin-bottom: 0.25rem;
+      }
+
+      #settings-panel input[type='text'],
+      #settings-panel input[type='number'] {
+        width: 100%;
+        padding: 0.4rem 0.6rem;
+        background: #1a1a1a;
+        border: 1px solid #444;
+        border-radius: 5px;
+        color: #fff;
+        font-size: 0.85rem;
+        margin-bottom: 0.75rem;
+      }
+
+      #settings-panel h3 {
+        font-size: 0.95rem;
+        margin-bottom: 0.75rem;
+        color: #ddd;
+      }
+
+      /* ── Status HUD ── */
+      #hud {
+        position: absolute;
+        bottom: 1.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.65);
+        border: 1px solid #555;
+        border-radius: 10px;
+        padding: 0.6rem 1.2rem;
+        font-size: 0.85rem;
+        color: #eee;
+        text-align: center;
+        pointer-events: none;
+        z-index: 5;
+        min-width: 260px;
+      }
+
+      #hud .hud-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1.5rem;
+        margin-bottom: 0.2rem;
+      }
+
+      #hud .hud-status {
+        color: #ffd700;
+        font-weight: 600;
+        margin-top: 0.2rem;
+      }
+
+      /* ── Button bar ── */
+      #btn-bar {
+        position: absolute;
+        bottom: 5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 0.75rem;
+        z-index: 5;
+      }
+
+      .action-btn {
+        padding: 0.55rem 1.2rem;
+        border: none;
+        border-radius: 7px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+
+      .action-btn:hover {
+        opacity: 0.8;
+      }
+
+      #btn-capture {
+        background: #e53935;
+        color: #fff;
+      }
+
+      #btn-cycle-model {
+        background: #1e88e5;
+        color: #fff;
+      }
+
+      #btn-cycle-display {
+        background: #fb8c00;
+        color: #fff;
+      }
+
+      #btn-export {
+        background: #43a047;
+        color: #fff;
+      }
+
+      #btn-preview-gltf {
+        background: #8e24aa;
+        color: #fff;
+      }
+
+      /* ── GLTF preview overlay ── */
+      #gltf-preview {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 8;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #gltf-preview.visible {
+        display: flex;
+      }
+
+      #gltf-preview-inner {
+        background: #111;
+        border: 1px solid #444;
+        border-radius: 12px;
+        padding: 1.5rem;
+        max-width: 500px;
+        width: 90%;
+        color: #eee;
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+
+      #gltf-preview-inner h3 {
+        margin-bottom: 0.75rem;
+        font-size: 1rem;
+      }
+
+      #gltf-preview-inner pre {
+        background: #1a1a1a;
+        border-radius: 6px;
+        padding: 0.75rem;
+        overflow-x: auto;
+        font-size: 0.75rem;
+        max-height: 300px;
+        overflow-y: auto;
+        margin-bottom: 1rem;
+      }
+
+      #btn-close-preview {
+        background: #555;
+        color: #fff;
+        border: none;
+        padding: 0.5rem 1.2rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Three.js / IWSDK canvas target -->
+      <div id="xr-canvas"></div>
+
+      <!-- Launch overlay -->
+      <div id="launch-overlay">
+        <h1>Companion Scan Web</h1>
+        <p>
+          XR spatial scanner powered by the Meta Immersive Web SDK. Requires a
+          Meta Quest browser or any WebXR-capable device for immersive modes.
+        </p>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center">
+          <button class="launch-btn" id="btn-ar">▶ Enter AR (Passthrough)</button>
+          <button class="launch-btn" id="btn-vr">▶ Enter VR</button>
+          <button class="launch-btn" id="btn-desktop" style="background:#6d4c41;color:#fff">▶ Start Desktop</button>
+        </div>
+      </div>
+
+      <!-- Settings panel -->
+      <div id="settings-panel">
+        <h3>⚙ Server Settings</h3>
+        <label for="input-base-url">CV Server Base URL</label>
+        <input
+          type="text"
+          id="input-base-url"
+          placeholder="http://localhost:8000"
+        />
+        <label for="input-box-thresh">Box Threshold</label>
+        <input type="number" id="input-box-thresh" value="0.35" step="0.01" min="0" max="1" />
+        <label for="input-text-thresh">Text Threshold</label>
+        <input type="number" id="input-text-thresh" value="0.25" step="0.01" min="0" max="1" />
+      </div>
+
+      <!-- HUD -->
+      <div id="hud">
+        <div class="hud-row">
+          <span>Model: <strong id="hud-model">Florence</strong></span>
+          <span>Display: <strong id="hud-display">Both</strong></span>
+          <span>Preview: <strong id="hud-preview">Near (1m)</strong></span>
+        </div>
+        <div id="hud-status" class="hud-status"></div>
+      </div>
+
+      <!-- Button bar (desktop / non-XR fallback) -->
+      <div id="btn-bar">
+        <button class="action-btn" id="btn-capture">A · Capture</button>
+        <button class="action-btn" id="btn-cycle-model">B · Cycle Model</button>
+        <button class="action-btn" id="btn-cycle-preview" style="background:#fdd835;color:#111">X · Preview Dist</button>
+        <button class="action-btn" id="btn-cycle-display">Trigger · Display</button>
+        <button class="action-btn" id="btn-export">Y · Export glTF</button>
+        <button class="action-btn" id="btn-preview-gltf">Grip · Preview glTF</button>
+        <button class="action-btn" id="btn-load-mapping" style="background:#00897b;color:#fff">Load Mapping</button>
+        <button class="action-btn" id="btn-clear-mapping" style="background:#546e7a;color:#fff">Clear Mapping</button>
+      </div>
+      <input type="file" id="input-mapping-file" accept=".gltf,.glb,model/gltf+json,model/gltf-binary" hidden />
+
+      <!-- GLTF preview overlay -->
+      <div id="gltf-preview">
+        <div id="gltf-preview-inner">
+          <h3>glTF Preview</h3>
+          <pre id="gltf-preview-content"></pre>
+          <button id="btn-close-preview">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
