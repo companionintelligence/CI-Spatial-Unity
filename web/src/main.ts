@@ -67,6 +67,9 @@ let cvPins: SpatialPin[] = []
 let metaPins: SpatialPin[] = []
 let captionText = ''
 
+const PIN_SYNC_INTERVAL_MS = 250
+let lastPinSyncTime = 0
+
 const state: CaptureState = {
   model: 'Florence',
   displayMode: 'both',
@@ -145,10 +148,14 @@ async function startSession() {
     const session = await xr.startSession()
     renderer.start(session, (frame) => {
       xr.handleFrame(frame)
-      const anchors = xr.collectPlanes()
-      metaPins = anchors.map((a) => anchorToPin(a))
-      renderPins()
-      updateHud()
+      const now = performance.now()
+      if (now - lastPinSyncTime >= PIN_SYNC_INTERVAL_MS) {
+        const anchors = xr.collectPlanes()
+        metaPins = anchors.map((a) => anchorToPin(a))
+        renderPins()
+        updateHud()
+        lastPinSyncTime = now
+      }
     })
     setStatus('Session ready — capture when ready')
     log('Immersive session started')
