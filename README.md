@@ -1,10 +1,21 @@
 # Companion Scan
 
-Quest 3 local world/space mapper that combines Meta scene understanding with a local CV server (Grounding DINO, SAM 2, Florence-2) to produce a glTF export with rich spatial metadata and sync it back to the server.
+Companion Scan includes both a native Quest 3 Unity runtime and a WebXR web client.
+Both clients combine scene understanding with a local CV server (Grounding DINO,
+SAM 2, Florence-2) to produce a glTF export with rich spatial metadata and sync
+it back to the server.
 
 ![florence-xr-Trim-Trim-ezgif com-optimize](https://github.com/user-attachments/assets/429c9837-574e-4857-8843-1727167f73c3)
 
 ## Overview
+
+This repository now ships two capture front ends that target the same local CV
+server and export pipeline:
+
+- **Unity Quest runtime** — the original native headset experience under
+  `Assets/CompanionScan/`
+- **Web client** — a Vite/TypeScript WebXR client under `web/` for Quest Browser
+  and desktop fallback workflows
 
 Two independent capture systems feed a **unified spatial pin store**:
 
@@ -20,8 +31,9 @@ Both pipelines write `SpatialPin` objects (tagged `CvServer` or `MetaScene`) to 
 - Companion Scan runtime: `Assets/CompanionScan/`
 - Controller UI: `Assets/CompanionScan/UI/`
 - CV server: `cv-server/`
+- Web client: `web/`
 
-## Architecture
+## Architecture (Unity Quest Runtime)
 
 ```text
 Quest 3 App
@@ -124,6 +136,8 @@ semantic plane, or physics surface is hit:
 
 ## Quick Start
 
+### Unity Quest Runtime
+
 1. **Run the CV server**
    - See [cv-server/README.md](cv-server/README.md) for local Docker setup.
 
@@ -145,11 +159,30 @@ semantic plane, or physics surface is hit:
    - Run Space Setup on the headset and grant `com.oculus.permission.USE_SCENE`.
 
 6. **Use the controller**
-   - **A** — capture (both pipelines run, 3D labels appear in world space).
-   - **B** — switch model if you only want one AI model active.
-   - **X** — change preview distance.
-   - **Y** — export and upload glTF.
-   - **Trigger** — toggle between 2D boxes, 3D labels, or both.
+    - **A** — capture (both pipelines run, 3D labels appear in world space).
+    - **B** — switch model if you only want one AI model active.
+    - **X** — change preview distance.
+    - **Y** — export and upload glTF.
+    - **Trigger** — toggle between 2D boxes, 3D labels, or both.
+
+### Web Client
+
+1. **Install dependencies**
+   ```bash
+   cd web
+   npm install
+   ```
+2. **Run locally**
+   ```bash
+   npm run dev
+   ```
+3. **Open the web client**
+   - Visit `http://localhost:5173`
+   - Click **Start Desktop** for webcam-based testing on non-WebXR browsers
+   - On Meta Quest Browser, use **Enter AR** for passthrough scanning
+
+For full web setup, architecture, deployment, and automated browser test
+instructions, see [web/README.md](web/README.md).
 
 ## glTF Export + Sync
 
@@ -204,6 +237,7 @@ pytest
 
 ## Documentation
 
+- Web client guide: [web/README.md](web/README.md)
 - World mapper pipeline + glTF schema: [docs/quest-capture-gltf.md](docs/quest-capture-gltf.md)
 - Spatial capture architecture: [docs/spatial-capture-architecture.md](docs/spatial-capture-architecture.md)
 - Scan/export pipeline details: [docs/scan-export-pipeline.md](docs/scan-export-pipeline.md)
@@ -211,4 +245,4 @@ pytest
 
 ## Legacy Sample (Cloud API)
 
-The original NVIDIA cloud API sample lives under `Assets/CompanionScanLegacy/Scripts/` and is not the primary path anymore. The project now runs locally via the CV server.
+The original NVIDIA cloud API sample lives under `Assets/CompanionScanLegacy/Scripts/` and is not the primary path anymore. The project now runs locally via the CV server from both the Unity and web clients.

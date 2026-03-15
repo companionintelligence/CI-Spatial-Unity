@@ -1,7 +1,10 @@
 # Spatial Capture Architecture
 
-This document details how BoundingBox2D and SpatialLabel3D are produced, how they
-should map to real-world space, and the key improvements required for accuracy.
+This document details how BoundingBox2D and SpatialLabel3D are produced, how
+they should map to real-world space, and the key improvements required for
+accuracy in the Unity Quest runtime.
+
+For the browser/WebXR implementation, see [`web/README.md`](../web/README.md).
 
 ## Data Flow Summary
 

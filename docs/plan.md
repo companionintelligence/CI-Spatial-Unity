@@ -2,7 +2,9 @@
 
 ## Goal
 
-Build a Quest 3 local world/space mapper that captures CV detections and Meta scene anchors, exports a glTF with unified extras, and syncs it back to the local server.
+Build Companion Scan clients for Quest 3 and WebXR that capture CV detections
+and scene anchors, export a glTF with unified extras, and sync it back to the
+local server.
 
 ## Milestones
 
@@ -37,7 +39,12 @@ Build a Quest 3 local world/space mapper that captures CV detections and Meta sc
    - 9 play-mode integration tests across 14 fixture images
    - CV server smoke tests via pytest
 
-6.1 Scene mesh export validation — **in progress**
+6.1 Web client — **done**
+   - Vite/TypeScript WebXR client in `web/`
+   - Desktop fallback workflow for non-WebXR browsers
+   - Playwright browser coverage for capture/export UI flows
+
+6.2 Scene mesh export validation — **in progress**
    - Verify `OVRTriangleMesh` data is captured and exported into glTF
    - Confirm `meta_scene.anchors[].has_mesh` and `mesh_*_count` are non-zero
    - Validate scene mesh nodes exist in exported glTF
