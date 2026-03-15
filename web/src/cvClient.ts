@@ -91,22 +91,28 @@ export function buildPrompt(labels: string[], fallback = 'object . furniture .')
 }
 
 export function pinsToExtras(pins: SpatialPin[], caption?: string) {
-  const bounds = pins.reduce(
-    (acc, pin) => {
-      const [x, y, z] = pin.position
-      acc.min[0] = Math.min(acc.min[0], x)
-      acc.min[1] = Math.min(acc.min[1], y)
-      acc.min[2] = Math.min(acc.min[2], z)
-      acc.max[0] = Math.max(acc.max[0], x)
-      acc.max[1] = Math.max(acc.max[1], y)
-      acc.max[2] = Math.max(acc.max[2], z)
-      return acc
-    },
-    {
-      min: [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
-      max: [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY],
-    },
-  )
+  const bounds =
+    pins.length > 0
+      ? pins.reduce(
+          (acc, pin) => {
+            const [x, y, z] = pin.position
+            acc.min[0] = Math.min(acc.min[0], x)
+            acc.min[1] = Math.min(acc.min[1], y)
+            acc.min[2] = Math.min(acc.min[2], z)
+            acc.max[0] = Math.max(acc.max[0], x)
+            acc.max[1] = Math.max(acc.max[1], y)
+            acc.max[2] = Math.max(acc.max[2], z)
+            return acc
+          },
+          {
+            min: [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
+            max: [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY],
+          },
+        )
+      : {
+          min: [0, 0, 0] as [number, number, number],
+          max: [0, 0, 0] as [number, number, number],
+        }
 
   const center: [number, number, number] = [
     (bounds.min[0] + bounds.max[0]) / 2,
