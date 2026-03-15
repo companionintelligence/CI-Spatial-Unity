@@ -62,7 +62,13 @@ export class XRCoordinator {
 
     const clip = vec4.fromValues(uv.x * 2 - 1, (1 - uv.y) * 2 - 1, 1, 1)
     vec4.transformMat4(clip, clip, invProj)
-    const direction = vec3.fromValues(clip[0], clip[1], -1)
+    // Perform perspective divide to get view-space coordinates
+    if (clip[3] !== 0) {
+      clip[0] /= clip[3]
+      clip[1] /= clip[3]
+      clip[2] /= clip[3]
+    }
+    const direction = vec3.fromValues(clip[0], clip[1], clip[2])
     vec3.normalize(direction, direction)
 
     const o = view.transform.orientation
