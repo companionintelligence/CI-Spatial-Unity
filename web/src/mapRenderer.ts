@@ -90,18 +90,22 @@ export class MapRenderer {
     this.running = false
   }
 
+  private disposePinGroup(group: Group) {
+    group.traverse((child) => {
+      const mesh = child as Mesh
+      if (mesh.geometry) mesh.geometry.dispose()
+      if (mesh.material) {
+        const mat = mesh.material as MeshBasicMaterial | SpriteMaterial
+        mat.dispose()
+        if ((mat as SpriteMaterial).map) (mat as SpriteMaterial).map?.dispose()
+      }
+    })
+    this.pinGroup.remove(group)
+  }
+
   clearPins() {
     this.pinObjects.forEach((group) => {
-      group.traverse((child) => {
-        const mesh = child as Mesh
-        if (mesh.geometry) mesh.geometry.dispose()
-        if (mesh.material) {
-          const mat = mesh.material as MeshBasicMaterial | SpriteMaterial
-          mat.dispose()
-          if ((mat as SpriteMaterial).map) (mat as SpriteMaterial).map?.dispose()
-        }
-      })
-      this.pinGroup.remove(group)
+      this.disposePinGroup(group)
     })
     this.pinObjects.clear()
   }
@@ -112,7 +116,7 @@ export class MapRenderer {
     // Remove stale
     for (const [id, obj] of this.pinObjects.entries()) {
       if (!nextIds.has(id)) {
-        this.pinGroup.remove(obj)
+        this.disposePinGroup(obj)
         this.pinObjects.delete(id)
       }
     }
