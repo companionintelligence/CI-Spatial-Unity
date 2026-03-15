@@ -93,6 +93,32 @@ npm run build
 # Serve from web/dist/
 ```
 
+### Automated browser tests
+
+The web app now includes Playwright-based automation for the desktop fallback
+and WebXR-adjacent control flow:
+
+```bash
+cd web
+npx playwright install --with-deps chromium
+npm run test:e2e
+```
+
+The automated suite covers:
+- desktop startup without an immersive headset session
+- Unity-style HUD state changes from model/display/preview controls
+- settings persistence and zero-threshold request handling
+- Florence capture → pin creation → glTF preview metadata
+- glTF export fallback download behavior
+- loading and clearing browser-side mapping overlays
+
+For local immersive-session experimentation beyond CI, the test setup is
+compatible with Playwright's Chromium emulation flags and can be extended with
+Meta's immersive web emulation runtime / browser emulator tooling:
+- https://meta-quest.github.io/immersive-web-emulation-runtime/getting-started.html
+- https://playwright.dev/docs/emulation
+- https://chromewebstore.google.com/detail/immersive-web-emulator/cgffilbpcibhmcfbgggfhfolhkfbhmik
+
 ### Deploying to Meta Quest
 
 1. Build the app (`npm run build`).

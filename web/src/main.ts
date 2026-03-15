@@ -26,9 +26,12 @@ function readConfig(): ServerConfig {
   const boxThreshold = Number.isNaN(parsedBoxThreshold) ? 0.35 : parsedBoxThreshold;
   const parsedTextThreshold = parseFloat(inputTextThresh.value);
   const textThreshold = Number.isNaN(parsedTextThreshold) ? 0.25 : parsedTextThreshold;
-  const cfg = new ServerConfig({ baseUrl, boxThreshold, textThreshold });
-  cfg.setBaseUrlOverride(baseUrl);
-  return cfg;
+
+  config.baseUrl = baseUrl;
+  config.boxThreshold = boxThreshold;
+  config.textThreshold = textThreshold;
+  config.setBaseUrlOverride(baseUrl);
+  return config;
 }
 
 // Pre-fill inputs from stored config

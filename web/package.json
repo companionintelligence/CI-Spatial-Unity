@@ -11,13 +11,17 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
     "@iwsdk/core": "^0.3.1",
     "three": "^0.183.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/three": "^0.177.0",
     "typescript": "^5.4.5",
     "vite": "^6.4.1"
