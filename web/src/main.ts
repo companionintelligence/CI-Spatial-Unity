@@ -93,19 +93,39 @@ function combinedPins() {
 function renderPins() {
   renderer.setDisplayMode(state.displayMode)
   renderer.syncPins(combinedPins())
-  pinListEl.innerHTML = combinedPins()
-    .map(
-      (p) => `
-        <div class="pin-row">
-          <div class="pill ${p.source === 'CvServer' ? 'cv' : 'meta'}">${p.source}</div>
-          <div>
-            <div class="pin-label">${p.semanticLabel || p.label}</div>
-            <div class="pin-meta">${p.position.map((n) => n.toFixed(2)).join(', ')}</div>
-          </div>
-        </div>
-      `,
-    )
-    .join('')
+
+  // Clear existing pin list content
+  while (pinListEl.firstChild) {
+    pinListEl.removeChild(pinListEl.firstChild)
+  }
+
+  // Safely render pins using DOM APIs to avoid XSS from label content
+  combinedPins().forEach((p) => {
+    const rowEl = document.createElement('div')
+    rowEl.className = 'pin-row'
+
+    const pillEl = document.createElement('div')
+    pillEl.className = `pill ${p.source === 'CvServer' ? 'cv' : 'meta'}`
+    pillEl.textContent = String(p.source)
+
+    const infoContainerEl = document.createElement('div')
+
+    const labelEl = document.createElement('div')
+    labelEl.className = 'pin-label'
+    labelEl.textContent = p.semanticLabel || p.label
+
+    const metaEl = document.createElement('div')
+    metaEl.className = 'pin-meta'
+    metaEl.textContent = p.position.map((n) => n.toFixed(2)).join(', ')
+
+    infoContainerEl.appendChild(labelEl)
+    infoContainerEl.appendChild(metaEl)
+
+    rowEl.appendChild(pillEl)
+    rowEl.appendChild(infoContainerEl)
+
+    pinListEl.appendChild(rowEl)
+  })
 }
 
 function updateBadges() {
