@@ -16,12 +16,22 @@ export class ServerConfig {
   retryDelayMs: number;
 
   constructor(opts: Partial<ServerConfig> = {}) {
-    this.baseUrl = opts.baseUrl ?? 'http://localhost:8000';
+    this.baseUrl = opts.baseUrl ?? ServerConfig.getDefaultBaseUrl();
     this.boxThreshold = opts.boxThreshold ?? 0.35;
     this.textThreshold = opts.textThreshold ?? 0.25;
     this.requestTimeoutMs = opts.requestTimeoutMs ?? 6000;
     this.retryCount = opts.retryCount ?? 2;
     this.retryDelayMs = opts.retryDelayMs ?? 500;
+  }
+
+  private static getDefaultBaseUrl(): string {
+    if (typeof window !== 'undefined') {
+      const { origin, protocol } = window.location;
+      if (protocol === 'http:' || protocol === 'https:') {
+        return origin;
+      }
+    }
+    return 'http://localhost:8000';
   }
 
   /** Returns the effective base URL, giving localStorage the highest priority. */
