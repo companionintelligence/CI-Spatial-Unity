@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using CompanionScan.Core;
 using TMPro;
 using UnityEngine;
@@ -15,16 +15,22 @@ namespace CompanionScan.Rendering
         [SerializeField] private Vector3 previewOffset = new Vector3(0f, -0.1f, 0.6f);
         [SerializeField] private Vector3 previewRotation = Vector3.zero;
         [SerializeField] private float previewScale = 0.0004f;
+        [SerializeField] private float minBoxPixels = 1f;
 
         private GameObject _runtimePrefab;
         private RawImage _runtimeImage;
 
         private readonly List<GameObject> _instances = new List<GameObject>();
+        private readonly List<BoundingBoxValidationResult> _lastValidation = new List<BoundingBoxValidationResult>();
+
+        public IReadOnlyList<BoundingBoxValidationResult> LastValidation => _lastValidation;
 
         public void RenderBoxes(DetectionResult result, Texture sourceTexture)
         {
             Clear();
             EnsureDefaults(sourceTexture);
+            _lastValidation.Clear();
+
             if (sourceTexture == null || container == null || bboxPrefab == null)
             {
                 return;
@@ -35,25 +41,28 @@ namespace CompanionScan.Rendering
                 return;
             }
 
+            _lastValidation.AddRange(
+                BoundingBoxUtils.ValidateAll(
+                    result,
+                    sourceTexture.width,
+                    sourceTexture.height,
+                    BoundingBoxValidationOptions.ForRendering(minBoxPixels)));
+
             Rect containerRect = container.rect;
-
-            for (int i = 0; i < result.bboxes.Count; i++)
+            int dropped = 0;
+            for (int i = 0; i < _lastValidation.Count; i++)
             {
-                var bbox = result.bboxes[i];
-                if (bbox == null || bbox.Length < 4)
+                var validation = _lastValidation[i];
+                if (!validation.IsValid)
                 {
+                    dropped++;
                     continue;
                 }
 
-                if (!BoundingBoxUtils.TryNormalize(bbox, sourceTexture.width, sourceTexture.height, out Rect normalized))
-                {
-                    continue;
-                }
-
-                float x1 = normalized.x * containerRect.width;
-                float y1 = normalized.y * containerRect.height;
-                float x2 = (normalized.x + normalized.width) * containerRect.width;
-                float y2 = (normalized.y + normalized.height) * containerRect.height;
+                float x1 = validation.NormalizedRect.x * containerRect.width;
+                float y1 = validation.NormalizedRect.y * containerRect.height;
+                float x2 = (validation.NormalizedRect.x + validation.NormalizedRect.width) * containerRect.width;
+                float y2 = (validation.NormalizedRect.y + validation.NormalizedRect.height) * containerRect.height;
 
                 var boxObj = Instantiate(bboxPrefab, container);
                 var rect = boxObj.GetComponent<RectTransform>();
@@ -61,12 +70,17 @@ namespace CompanionScan.Rendering
                 rect.anchoredPosition = new Vector2(x1, containerRect.height - y2);
 
                 var label = boxObj.GetComponentInChildren<TMP_Text>();
-                if (label != null && i < result.labels.Count)
+                if (label != null)
                 {
-                    label.text = result.labels[i];
+                    label.text = i < result.labels.Count ? result.labels[i] : string.Empty;
                 }
 
                 _instances.Add(boxObj);
+            }
+
+            if (dropped > 0)
+            {
+                Debug.Log($"[BBoxRenderer] Dropped {dropped} invalid bboxes out of {_lastValidation.Count}.");
             }
         }
 
@@ -207,4 +221,3 @@ namespace CompanionScan.Rendering
         }
     }
 }
-

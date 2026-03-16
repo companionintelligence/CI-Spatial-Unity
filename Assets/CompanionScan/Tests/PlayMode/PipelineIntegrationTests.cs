@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.IO;
 using System.Linq;
@@ -10,7 +10,7 @@ using UnityEngine.TestTools;
 namespace CompanionScan.Tests.PlayMode
 {
     /// <summary>
-    /// Integration tests that send realistic 1280Ã—1024 fixture images through each
+    /// Integration tests that send realistic 1280×1024 fixture images through each
     /// cv-server endpoint (Florence2, GroundingDINO, SAM2) and the full sequential
     /// pipeline.  Requires a running cv-server instance.
     /// </summary>
@@ -28,8 +28,9 @@ namespace CompanionScan.Tests.PlayMode
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
-            _config = ScriptableObject.CreateInstance<ServerConfig>();
+            TestRuntimeFlags.RequireLiveIntegrationOrIgnore("Live pipeline integration disabled");
 
+            _config = ScriptableObject.CreateInstance<ServerConfig>();
             var envUrl = Environment.GetEnvironmentVariable(ServerUrlEnv);
             _config.baseUrl = string.IsNullOrWhiteSpace(envUrl)
                 ? _config.ResolveBaseUrl()   // uses default in ServerConfig
@@ -43,9 +44,9 @@ namespace CompanionScan.Tests.PlayMode
             _client = new CVServerClient(_config);
         }
 
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
         //  Helpers
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
 
         /// <summary>Load a fixture JPEG by filename.</summary>
         private static byte[] LoadFixture(string filename)
@@ -80,9 +81,9 @@ namespace CompanionScan.Tests.PlayMode
             return File.ReadAllBytes(file);
         }
 
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        //  Florence2 â€” Caption
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
+        //  Florence2 — Caption
+        // ────────────────────────────────────────────────────────────
 
         [UnityTest]
         public IEnumerator Florence2_Caption_ReturnsNonEmptyText()
@@ -102,9 +103,9 @@ namespace CompanionScan.Tests.PlayMode
             Debug.Log($"[Test] Florence2 caption: {result.text}");
         }
 
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        //  Florence2 â€” Object Detection
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
+        //  Florence2 — Object Detection
+        // ────────────────────────────────────────────────────────────
 
         [UnityTest]
         public IEnumerator Florence2_ObjectDetection_ReturnsBboxesAndLabels()
@@ -126,9 +127,9 @@ namespace CompanionScan.Tests.PlayMode
                 "Florence2 OD should return text or a valid task echo");
         }
 
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        //  GroundingDINO â€” Detect
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
+        //  GroundingDINO — Detect
+        // ────────────────────────────────────────────────────────────
 
         [UnityTest]
         public IEnumerator GroundingDINO_Detect_ReturnsDetections()
@@ -170,23 +171,25 @@ namespace CompanionScan.Tests.PlayMode
             var result = task.Result;
             if (result.bboxes == null || result.bboxes.Count == 0)
             {
-                Assert.Inconclusive("No detections returned â€” cannot validate bbox ranges.");
+                Assert.Inconclusive("No detections returned — cannot validate bbox ranges.");
             }
 
             foreach (var bbox in result.bboxes)
             {
-                Assert.AreEqual(4, bbox.Length, "Each bbox should have 4 values");
-                for (int j = 0; j < 4; j++)
-                {
-                    Assert.IsTrue(bbox[j] >= 0f && bbox[j] <= 1.0f,
-                        $"Bbox value {bbox[j]} at index {j} should be normalized to [0,1]");
-                }
+                var validation = BoundingBoxUtils.Validate(
+                    bbox,
+                    1280,
+                    1024,
+                    BoundingBoxValidationOptions.Default,
+                    0);
+                Assert.IsTrue(validation.IsValid,
+                    $"Bbox should normalize (reason={validation.RejectReason}, msg={validation.DebugMessage})");
             }
-        }
 
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        //  SAM2 â€” Segment
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        }
+        // ────────────────────────────────────────────────────────────
+        //  SAM2 — Segment
+        // ────────────────────────────────────────────────────────────
 
         [UnityTest]
         public IEnumerator SAM2_Segment_ReturnsMasks()
@@ -213,9 +216,9 @@ namespace CompanionScan.Tests.PlayMode
             }
         }
 
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        //  Full Sequential Pipeline (Florence2 â†’ GDino â†’ SAM2)
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
+        //  Full Sequential Pipeline (Florence2 → GDino → SAM2)
+        // ────────────────────────────────────────────────────────────
 
         [UnityTest]
         public IEnumerator FullPipeline_Florence2_GDino_SAM2_Sequential()
@@ -223,7 +226,7 @@ namespace CompanionScan.Tests.PlayMode
             var jpeg = LoadAnyFixture();
 
             // Step 1: Florence2 caption
-            Debug.Log("[Test-Pipeline] Step 1: Florence2 captionâ€¦");
+            Debug.Log("[Test-Pipeline] Step 1: Florence2 caption…");
             var captionTask = _client.FlorenceAsync(jpeg, "<MORE_DETAILED_CAPTION>");
             while (!captionTask.IsCompleted) yield return null;
             if (captionTask.IsFaulted) Assert.Fail($"Caption failed: {captionTask.Exception?.GetBaseException().Message}");
@@ -232,7 +235,7 @@ namespace CompanionScan.Tests.PlayMode
             Debug.Log($"[Test-Pipeline] Caption: {caption}");
 
             // Step 2: Florence2 OD
-            Debug.Log("[Test-Pipeline] Step 2: Florence2 ODâ€¦");
+            Debug.Log("[Test-Pipeline] Step 2: Florence2 OD…");
             var odTask = _client.FlorenceAsync(jpeg, "<OD>");
             while (!odTask.IsCompleted) yield return null;
             if (odTask.IsFaulted) Assert.Fail($"Florence2 OD failed: {odTask.Exception?.GetBaseException().Message}");
@@ -241,7 +244,7 @@ namespace CompanionScan.Tests.PlayMode
             Debug.Log($"[Test-Pipeline] OD text: {odResult.text}");
 
             // Step 3: GroundingDINO using fallback prompt
-            Debug.Log("[Test-Pipeline] Step 3: GroundingDINO detectâ€¦");
+            Debug.Log("[Test-Pipeline] Step 3: GroundingDINO detect…");
             var detectTask = _client.DetectAsync(jpeg, "furniture . object . table . chair .");
             while (!detectTask.IsCompleted) yield return null;
             if (detectTask.IsFaulted) Assert.Fail($"GroundingDINO failed: {detectTask.Exception?.GetBaseException().Message}");
@@ -250,7 +253,7 @@ namespace CompanionScan.Tests.PlayMode
             Debug.Log($"[Test-Pipeline] GDino detections: {detection.labels?.Count ?? 0}");
 
             // Step 4: SAM2 segment
-            Debug.Log("[Test-Pipeline] Step 4: SAM2 segmentâ€¦");
+            Debug.Log("[Test-Pipeline] Step 4: SAM2 segment…");
             string samPrompt = detection.labels != null && detection.labels.Count > 0
                 ? string.Join(" . ", detection.labels.Distinct()) + " ."
                 : "furniture . object .";
@@ -263,13 +266,13 @@ namespace CompanionScan.Tests.PlayMode
 
             // Summary
             Debug.Log(
-                $"[Test-Pipeline] COMPLETE â€” caption=\"{caption?.Substring(0, Math.Min(80, caption?.Length ?? 0))}â€¦\" " +
+                $"[Test-Pipeline] COMPLETE — caption=\"{caption?.Substring(0, Math.Min(80, caption?.Length ?? 0))}…\" " +
                 $"detections={detection.labels?.Count ?? 0} masks={segResult.annotations?.Count ?? 0}");
         }
 
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
         //  Per-fixture tests
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
 
         [UnityTest]
         public IEnumerator LivingRoom_Florence2_Caption()
@@ -305,4 +308,5 @@ namespace CompanionScan.Tests.PlayMode
         }
     }
 }
+
 

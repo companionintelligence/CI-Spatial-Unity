@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -18,11 +18,11 @@ namespace CompanionScan.Mapping
     /// Unified spatial capture orchestrator.  Two independent capture pipelines
     /// feed the same <see cref="SpatialPinManager"/>:
     /// <list type="number">
-    ///   <item><b>CV Server pipeline</b> â€“ passthrough camera frame â†’ Florence2 â†’
-    ///     GroundingDINO â†’ SAM2 â†’ raycasted <see cref="SpatialPin"/>s
+    ///   <item><b>CV Server pipeline</b> – passthrough camera frame → Florence2 →
+    ///     GroundingDINO → SAM2 → raycasted <see cref="SpatialPin"/>s
     ///     (<see cref="PinSource.CvServer"/>).</item>
-    ///   <item><b>Meta Scene Understanding</b> â€“ on-device OVRAnchor query via
-    ///     <see cref="MetaSceneCollector"/> â†’ converted to
+    ///   <item><b>Meta Scene Understanding</b> – on-device OVRAnchor query via
+    ///     <see cref="MetaSceneCollector"/> → converted to
     ///     <see cref="SpatialPin"/>s (<see cref="PinSource.MetaScene"/>).</item>
     /// </list>
     /// Call <see cref="CaptureAndPin"/> for the CV pipeline,
@@ -31,10 +31,10 @@ namespace CompanionScan.Mapping
     /// </summary>
     public class SpatialCapturePipeline : MonoBehaviour
     {
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  Serialised fields â€” ordering preserved for scene compatibility
+        // ═══════════════════════════════════════════════════════════════
+        //  Serialised fields — ordering preserved for scene compatibility
         //  (see [FormerlySerializedAs] on renamed fields)
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
 
         [Header("Server")]
         [SerializeField] private ServerConfig serverConfig;
@@ -78,23 +78,23 @@ namespace CompanionScan.Mapping
         [FormerlySerializedAs("renderMasks")]
         [SerializeField] private bool renderMasks = true;
 
-        [Header("Pipeline Steps â€” CV Server")]
+        [Header("Pipeline Steps — CV Server")]
         [FormerlySerializedAs("runCaption")]
         [SerializeField] private bool runFlorence = true;
         [FormerlySerializedAs("runSegmentation")]
         [SerializeField] private bool runSam2 = true;
         [SerializeField] private bool runGroundingDino = true;
 
-        [Header("Pipeline Steps â€” Meta Scene Understanding")]
+        [Header("Pipeline Steps — Meta Scene Understanding")]
         [SerializeField] private MetaSceneCollector metaSceneCollector;
         [SerializeField] private bool runMetaSceneCapture = true;
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
         //  Runtime state
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
 
         private ICameraProvider _cameraProvider;
-        private CVServerClient _client;
+        private ICvInferenceClient _inferenceClient;
         private bool _isBusy;
         private Texture2D _frameTexture;
         private CaptureFrame _lastCaptureFrame;
@@ -132,9 +132,14 @@ namespace CompanionScan.Mapping
 
         public bool IsBusy => _isBusy;
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        public void SetInferenceClient(ICvInferenceClient inferenceClient)
+        {
+            _inferenceClient = inferenceClient;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
         //  Runtime toggle properties (driven by ControllerMenuUI)
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
 
         /// <summary>Enable / disable the Florence2 caption step at runtime.</summary>
         public bool RunFlorence { get => runFlorence; set => runFlorence = value; }
@@ -158,10 +163,10 @@ namespace CompanionScan.Mapping
         /// Exposed so the UI can update <see cref="ViewportRaycaster.FallbackDistance"/>.</summary>
         public ViewportRaycaster Raycaster => raycaster;
 
-        /// <summary>The spatial pin manager â€” exposed so UI can toggle pin visibility.</summary>
+        /// <summary>The spatial pin manager — exposed so UI can toggle pin visibility.</summary>
         public SpatialPinManager PinManager => pinManager;
 
-        /// <summary>The label renderer â€” exposed so UI can toggle 3D label visibility.</summary>
+        /// <summary>The label renderer — exposed so UI can toggle 3D label visibility.</summary>
         public LabelRenderer LabelRenderer => labelRenderer;
 
         /// <summary>Distance used when capturing a snapshot frustum frame.</summary>
@@ -174,13 +179,13 @@ namespace CompanionScan.Mapping
         /// <summary>Camera used for snapshot frustum calculations.</summary>
         public Camera SnapshotCamera => snapshotCamera != null ? snapshotCamera : Camera.main;
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
         //  Lifecycle
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
 
         private void Awake()
         {
-            _client = new CVServerClient(serverConfig);
+            _inferenceClient ??= new CVServerClient(serverConfig);
             _captureSessionId = Guid.NewGuid().ToString("N");
 #if UNITY_ANDROID
             if (preferArCameraOnQuest)
@@ -235,9 +240,9 @@ namespace CompanionScan.Mapping
             _cameraProvider?.StopCapture();
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
         //  Public API
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
 
         /// <summary>
         /// Run <b>both</b> capture pipelines back-to-back:
@@ -253,7 +258,7 @@ namespace CompanionScan.Mapping
             _isBusy = true;
             try
             {
-                Debug.Log("[Pipeline] â•â•â• CaptureAll: running both pipelines â•â•â•");
+                Debug.Log("[Pipeline] ═══ CaptureAll: running both pipelines ═══");
 
                 // Meta Scene (fast, local, no network)
                 if (runMetaSceneCapture)
@@ -264,7 +269,7 @@ namespace CompanionScan.Mapping
                 // CV Server (network)
                 await RunCvPipelineAsync();
 
-                Debug.Log("[Pipeline] â•â•â• CaptureAll complete â•â•â•");
+                Debug.Log("[Pipeline] ═══ CaptureAll complete ═══");
             }
             finally
             {
@@ -273,7 +278,7 @@ namespace CompanionScan.Mapping
         }
 
         /// <summary>
-        /// Run only the CV Server pipeline: Florence2 â†’ GroundingDINO â†’ SAM2.
+        /// Run only the CV Server pipeline: Florence2 → GroundingDINO → SAM2.
         /// Pins are tagged <see cref="PinSource.CvServer"/>.
         /// </summary>
         public async void CaptureAndPin()
@@ -310,9 +315,9 @@ namespace CompanionScan.Mapping
             }
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  Pipeline A â€” Meta Scene Understanding
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
+        //  Pipeline A — Meta Scene Understanding
+        // ═══════════════════════════════════════════════════════════════
 
         private async Task RunMetaSceneCaptureAsync()
         {
@@ -322,7 +327,7 @@ namespace CompanionScan.Mapping
                 return;
             }
 
-            Debug.Log("[Pipeline-Meta] Querying Meta Scene Understandingâ€¦");
+            Debug.Log("[Pipeline-Meta] Querying Meta Scene Understanding…");
             var snapshot = await metaSceneCollector.CaptureSnapshotAsync();
             LastMetaSnapshot = snapshot;
 
@@ -348,9 +353,9 @@ namespace CompanionScan.Mapping
             }
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  Pipeline B â€” CV Server (Florence2 â†’ GroundingDINO â†’ SAM2)
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
+        //  Pipeline B — CV Server (Florence2 → GroundingDINO → SAM2)
+        // ═══════════════════════════════════════════════════════════════
 
         private async Task RunCvPipelineAsync()
         {
@@ -367,7 +372,7 @@ namespace CompanionScan.Mapping
                 return;
             }
 
-            Debug.Log($"[Pipeline-CV] Captured frame ({frame.Length} bytes). Starting CV pipelineâ€¦");
+            Debug.Log($"[Pipeline-CV] Captured frame ({frame.Length} bytes). Starting CV pipeline…");
             EnsureFrameTexture(frame);
             var capture = BuildCaptureFrame(frame);
             _lastCaptureHadIntrinsics = capture.HasIntrinsics;
@@ -385,14 +390,14 @@ namespace CompanionScan.Mapping
             CaptureSnapshotFrame(capture);
             _captureFrameIndex++;
 
-            // â”€â”€ Step 1: Florence2 caption â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Step 1: Florence2 caption ────────────────────────────
             string caption = null;
             if (runFlorence)
             {
-                Debug.Log($"[Pipeline-CV] Step 1/4 â€“ Florence2 caption ({florenceCaptionTask})â€¦");
+                Debug.Log($"[Pipeline-CV] Step 1/4 – Florence2 caption ({florenceCaptionTask})…");
                 try
                 {
-                    var captionResult = await _client.FlorenceAsync(frame, florenceCaptionTask);
+                    var captionResult = await _inferenceClient.FlorenceAsync(frame, florenceCaptionTask);
                     caption = captionResult?.text;
                     LastCaption = caption;
                     Debug.Log($"[Pipeline-CV] Florence2 caption: {caption}");
@@ -407,14 +412,14 @@ namespace CompanionScan.Mapping
                 }
             }
 
-            // â”€â”€ Step 2: Florence2 object detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Step 2: Florence2 object detection ───────────────────
             List<string> florenceLabels = null;
             if (runFlorence)
             {
-                Debug.Log($"[Pipeline-CV] Step 2/4 â€“ Florence2 detection ({florenceDetectionTask})â€¦");
+                Debug.Log($"[Pipeline-CV] Step 2/4 – Florence2 detection ({florenceDetectionTask})…");
                 try
                 {
-                    var odResult = await _client.FlorenceAsync(frame, florenceDetectionTask);
+                    var odResult = await _inferenceClient.FlorenceAsync(frame, florenceDetectionTask);
                     florenceLabels = ExtractFlorenceLabels(odResult);
                     int boxCount = florenceLabels?.Count ?? 0;
                     Debug.Log($"[Pipeline-CV] Florence2 detected {boxCount} objects: " +
@@ -426,15 +431,15 @@ namespace CompanionScan.Mapping
                 }
             }
 
-            // â”€â”€ Step 3: GroundingDINO detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Step 3: GroundingDINO detection ──────────────────────
             DetectionResult detection = null;
             if (runGroundingDino)
             {
                 string dinoPrompt = BuildDinoPrompt(florenceLabels);
-                Debug.Log($"[Pipeline-CV] Step 3/4 â€“ GroundingDINO detect (\"{dinoPrompt}\")â€¦");
+                Debug.Log($"[Pipeline-CV] Step 3/4 – GroundingDINO detect (\"{dinoPrompt}\")…");
                 try
                 {
-                    detection = await _client.DetectAsync(frame, dinoPrompt);
+                    detection = await _inferenceClient.DetectAsync(frame, dinoPrompt);
                     LastDetection = detection;
                     int detCount = detection?.labels?.Count ?? 0;
                     Debug.Log($"[Pipeline-CV] GroundingDINO returned {detCount} detections.");
@@ -458,14 +463,14 @@ namespace CompanionScan.Mapping
                 }
             }
 
-            // â”€â”€ Step 4: SAM2 segmentation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Step 4: SAM2 segmentation ────────────────────────────
             if (runSam2)
             {
                 string samPrompt = BuildSamPrompt(detection, florenceLabels);
-                Debug.Log($"[Pipeline-CV] Step 4/4 â€“ SAM2 segment (\"{samPrompt}\")â€¦");
+                Debug.Log($"[Pipeline-CV] Step 4/4 – SAM2 segment (\"{samPrompt}\")…");
                 try
                 {
-                    var segmentation = await _client.SegmentAsync(frame, samPrompt);
+                    var segmentation = await _inferenceClient.SegmentAsync(frame, samPrompt);
                     LastSegmentation = segmentation;
                     int maskCount = segmentation?.annotations?.Count ?? 0;
                     Debug.Log($"[Pipeline-CV] SAM2 returned {maskCount} masks.");
@@ -488,7 +493,7 @@ namespace CompanionScan.Mapping
                 }
             }
 
-            // â”€â”€ 3D label rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── 3D label rendering ───────────────────────────────────
             if (labelRenderer != null && pinManager != null)
             {
                 var positions = new List<Vector3>();
@@ -508,9 +513,9 @@ namespace CompanionScan.Mapping
             Debug.Log("[Pipeline-CV] CV pipeline complete.");
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
         //  Helpers
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ═══════════════════════════════════════════════════════════════
 
         /// <summary>
         /// Extract unique labels from a Florence2 OD response.
@@ -1025,4 +1030,6 @@ namespace CompanionScan.Mapping
         }
     }
 }
+
+
 

@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections;
-using System.Text;
 using CompanionScan.Core;
 using NUnit.Framework;
 using UnityEngine;
@@ -15,6 +14,8 @@ namespace CompanionScan.Tests.PlayMode
         [UnityTest]
         public IEnumerator DetectEndpoint_ReturnsResponse()
         {
+            TestRuntimeFlags.RequireLiveIntegrationOrIgnore("Live CV-server test disabled");
+
             var config = ScriptableObject.CreateInstance<ServerConfig>();
             var serverUrl = Environment.GetEnvironmentVariable(ServerUrlEnv);
             if (string.IsNullOrWhiteSpace(serverUrl))
@@ -62,4 +63,3 @@ namespace CompanionScan.Tests.PlayMode
         }
     }
 }
-

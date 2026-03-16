@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,7 +8,7 @@ using UnityEngine.Networking;
 
 namespace CompanionScan.Core
 {
-    public class CVServerClient
+    public class CVServerClient : ICvInferenceClient
     {
         private readonly ServerConfig _config;
 

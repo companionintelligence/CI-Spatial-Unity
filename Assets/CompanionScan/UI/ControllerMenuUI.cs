@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using CompanionScan.Export;
 using CompanionScan.Mapping;
 using CompanionScan.Rendering;
@@ -7,25 +7,8 @@ using UnityEngine;
 
 namespace CompanionScan.UI
 {
-    /// <summary>
-    /// Manages controller-driven state for the Quest XR UI.
-    /// All actions are invoked by <see cref="XRControllerInput"/> via public
-    /// methods â€” no world-space UI buttons.
-    ///
-    /// Button mapping:
-    ///   A  (red)    -> <see cref="DoCapture"/>
-    ///   B  (blue)   -> <see cref="CycleModel"/>
-    ///   Y  (green)  -> <see cref="DoSaveExport"/>
-    ///   X  (yellow) -> <see cref="CyclePreviewDistance"/>
-    ///   Trigger (orange) -> <see cref="CycleDisplayMode"/>
-    ///   Inner trigger -> <see cref="PreviewGltf"/>
-    /// </summary>
     public class ControllerMenuUI : MonoBehaviour
     {
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  External references (auto-discovered or injected by builder)
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
         [Header("Pipeline")]
         [SerializeField] private SpatialCapturePipeline pipeline;
         [SerializeField] private SpatialMapExporter exporter;
@@ -38,10 +21,6 @@ namespace CompanionScan.UI
         [SerializeField] private SpatialPinManager pinManager;
         [SerializeField] private SnapshotFrustumVisualizer frustumVisualizer;
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  HUD labels (set by ControllerMenuBuilder)
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
         [Header("HUD Labels")]
         [SerializeField] private TMP_Text modelLabel;
         [SerializeField] private TMP_Text displayModeLabel;
@@ -49,40 +28,28 @@ namespace CompanionScan.UI
         [SerializeField] private TMP_Text busyLabel;
         [SerializeField] private TMP_Text statusLabel;
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  Model cycle enum
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-        /// <summary>Active model preset cycled by the B button.</summary>
         public enum ModelPreset { Florence, GDino, SAM2 }
-
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  Preview distance enum
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-        /// <summary>Preview distance cycled by the X button.</summary>
         public enum PreviewDistance { Near, Far, Off }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  State
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        [Serializable]
+        public struct UiHealthStatus
+        {
+            public bool HasPipeline;
+            public bool HasExporter;
+            public bool HasHudLabels;
+            public bool HasInputBinding;
+            public int MissingHudLabels;
+
+            public bool IsHealthy => HasPipeline && HasHudLabels && HasInputBinding;
+        }
 
         private ModelPreset _activeModel = ModelPreset.Florence;
         private AnchorDisplayMode _displayMode = AnchorDisplayMode.Both;
         private PreviewDistance _previewDist = PreviewDistance.Near;
 
-        /// <summary>Current model preset.</summary>
         public ModelPreset ActiveModel => _activeModel;
-
-        /// <summary>Current display mode for anchor visualisation.</summary>
         public AnchorDisplayMode DisplayMode => _displayMode;
-
-        /// <summary>Current preview distance setting.</summary>
         public PreviewDistance CurrentPreviewDistance => _previewDist;
-
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  Lifecycle
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
         private void OnEnable()
         {
@@ -90,83 +57,95 @@ namespace CompanionScan.UI
             ApplyModelPreset();
             ApplyDisplayMode();
             RefreshHUD();
+            LogUiHealth();
         }
 
         private void Update()
         {
             if (busyLabel != null && pipeline != null)
-                busyLabel.text = pipeline.IsBusy ? "BUSYâ€¦" : "";
+                busyLabel.text = pipeline.IsBusy ? "BUSY..." : string.Empty;
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  Public API â€” called by XRControllerInput
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        public UiHealthStatus GetUiHealthStatus()
+        {
+            EnsureHudLabels();
 
-        /// <summary>A button â€” take a capture snapshot.</summary>
+            int missingLabels = 0;
+            if (modelLabel == null) missingLabels++;
+            if (displayModeLabel == null) missingLabels++;
+            if (previewDistanceLabel == null) missingLabels++;
+            if (busyLabel == null) missingLabels++;
+            if (statusLabel == null) missingLabels++;
+
+            return new UiHealthStatus
+            {
+                HasPipeline = pipeline != null,
+                HasExporter = exporter != null,
+                HasHudLabels = missingLabels == 0,
+                HasInputBinding = FindAnyObjectByType<XRControllerInput>() != null,
+                MissingHudLabels = missingLabels
+            };
+        }
+
         public void DoCapture()
         {
             if (pipeline == null)
             {
-                Debug.LogWarning("[ControllerMenu] DoCapture â€” pipeline is null, cannot capture.");
+                Debug.LogWarning("[ControllerMenu] DoCapture skipped: pipeline is null.");
                 return;
             }
+
             if (pipeline.IsBusy)
             {
-                Debug.Log("[ControllerMenu] DoCapture â€” pipeline is busy, skipping.");
+                Debug.Log("[ControllerMenu] DoCapture skipped: pipeline is busy.");
                 return;
             }
+
             ApplyModelPreset();
             ApplyPreviewDistance();
-            if (pipeline != null)
-            {
-                pipeline.SnapshotDistance = GetPreviewDistanceMetres();
-            }
-            if (frustumVisualizer != null)
-            {
-                frustumVisualizer.FreezeFrustum(GetPreviewDistanceMetres());
-            }
-            Debug.Log($"[ControllerMenu] Capture â†’ model={_activeModel} display={_displayMode}");
+            pipeline.SnapshotDistance = GetPreviewDistanceMetres();
+            frustumVisualizer?.FreezeFrustum(GetPreviewDistanceMetres());
             pipeline.CaptureAll();
         }
 
-        /// <summary>B button â€” cycle active model preset.</summary>
         public void CycleModel()
         {
             _activeModel = _activeModel switch
             {
                 ModelPreset.Florence => ModelPreset.GDino,
-                ModelPreset.GDino   => ModelPreset.SAM2,
-                ModelPreset.SAM2    => ModelPreset.Florence,
+                ModelPreset.GDino => ModelPreset.SAM2,
+                ModelPreset.SAM2 => ModelPreset.Florence,
                 _ => ModelPreset.Florence
             };
+
             ApplyModelPreset();
             RefreshHUD();
-            Debug.Log($"[ControllerMenu] Model â†’ {_activeModel}");
         }
 
-        /// <summary>X button â€” cycle preview distance (near / far / off).</summary>
         public void CyclePreviewDistance()
         {
             _previewDist = _previewDist switch
             {
                 PreviewDistance.Near => PreviewDistance.Far,
-                PreviewDistance.Far  => PreviewDistance.Off,
-                PreviewDistance.Off  => PreviewDistance.Near,
+                PreviewDistance.Far => PreviewDistance.Off,
+                PreviewDistance.Off => PreviewDistance.Near,
                 _ => PreviewDistance.Near
             };
+
             RefreshHUD();
-            Debug.Log($"[ControllerMenu] Preview distance â†’ {_previewDist}");
         }
 
-        /// <summary>Y button â€” save &amp; export GLTF.</summary>
         public void DoSaveExport()
         {
-            if (exporter == null) return;
-            Debug.Log("[ControllerMenu] Exporting + syncingâ€¦");
+            if (exporter == null)
+            {
+                Debug.LogWarning("[ControllerMenu] DoSaveExport skipped: exporter is null.");
+                return;
+            }
+
             exporter.ExportAndSync();
         }
 
-        /// <summary>Trigger â€” cycle display mode (BBox2D â†’ Label3D â†’ Both).</summary>
         public void CycleDisplayMode()
         {
             _displayMode = _displayMode switch
@@ -176,20 +155,22 @@ namespace CompanionScan.UI
                 AnchorDisplayMode.Both => AnchorDisplayMode.BoundingBox2D,
                 _ => AnchorDisplayMode.Both
             };
+
             ApplyDisplayMode();
             RefreshHUD();
-            Debug.Log($"[ControllerMenu] Display â†’ {_displayMode}");
         }
 
-        /// <summary>Inner trigger â€” export a glTF preview (no upload).</summary>
         public void PreviewGltf()
         {
-            if (exporter == null) return;
-            Debug.Log("[ControllerMenu] Exporting glTF previewâ€¦");
+            if (exporter == null)
+            {
+                Debug.LogWarning("[ControllerMenu] PreviewGltf skipped: exporter is null.");
+                return;
+            }
+
             exporter.Export();
         }
 
-        /// <summary>Set display mode programmatically (e.g. from tests).</summary>
         public void SetDisplayMode(AnchorDisplayMode mode)
         {
             _displayMode = mode;
@@ -197,65 +178,60 @@ namespace CompanionScan.UI
             RefreshHUD();
         }
 
-        /// <summary>Returns the world-space distance used for preview placement.</summary>
         public float GetPreviewDistanceMetres()
         {
             return _previewDist switch
             {
-                PreviewDistance.Near => 1.0f,
-                PreviewDistance.Far  => 3.0f,
-                PreviewDistance.Off  => 0f,
-                _ => 1.0f
+                PreviewDistance.Near => 1f,
+                PreviewDistance.Far => 3f,
+                PreviewDistance.Off => 0f,
+                _ => 1f
             };
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  Internal â€” apply state
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
         private void ApplyModelPreset()
         {
-            if (pipeline == null) return;
+            if (pipeline == null)
+            {
+                return;
+            }
+
             switch (_activeModel)
             {
                 case ModelPreset.Florence:
-                    pipeline.RunFlorence      = true;
-                    pipeline.RunGroundingDino  = false;
-                    pipeline.RunSam2           = false;
+                    pipeline.RunFlorence = true;
+                    pipeline.RunGroundingDino = false;
+                    pipeline.RunSam2 = false;
                     break;
                 case ModelPreset.GDino:
-                    pipeline.RunFlorence      = false;
-                    pipeline.RunGroundingDino  = true;
-                    pipeline.RunSam2           = false;
+                    pipeline.RunFlorence = false;
+                    pipeline.RunGroundingDino = true;
+                    pipeline.RunSam2 = false;
                     break;
                 case ModelPreset.SAM2:
-                    pipeline.RunFlorence      = false;
-                    pipeline.RunGroundingDino  = false;
-                    pipeline.RunSam2           = true;
+                    pipeline.RunFlorence = false;
+                    pipeline.RunGroundingDino = false;
+                    pipeline.RunSam2 = true;
                     break;
                 default:
-                    pipeline.RunFlorence      = true;
-                    pipeline.RunGroundingDino  = false;
-                    pipeline.RunSam2           = false;
+                    pipeline.RunFlorence = true;
+                    pipeline.RunGroundingDino = false;
+                    pipeline.RunSam2 = false;
                     break;
             }
         }
 
         private void ApplyDisplayMode()
         {
-            bool show2D = _displayMode is AnchorDisplayMode.BoundingBox2D
-                       or AnchorDisplayMode.Both;
-            bool show3D = _displayMode is AnchorDisplayMode.SpatialLabel3D
-                       or AnchorDisplayMode.Both;
+            bool show2D = _displayMode == AnchorDisplayMode.BoundingBox2D || _displayMode == AnchorDisplayMode.Both;
+            bool show3D = _displayMode == AnchorDisplayMode.SpatialLabel3D || _displayMode == AnchorDisplayMode.Both;
 
             if (bboxRenderer != null) bboxRenderer.gameObject.SetActive(show2D);
             if (labelRenderer != null) labelRenderer.gameObject.SetActive(show3D);
 
-            // Also control spatial pin visibility from SpatialPinManager
             var pm = pinManager != null ? pinManager : pipeline?.PinManager;
-            if (pm != null && pm.transform != null)
+            if (pm != null)
             {
-                // The pinRoot may be a child or the manager itself
                 pm.gameObject.SetActive(show3D);
             }
 
@@ -268,26 +244,29 @@ namespace CompanionScan.UI
 
         private void ApplyPreviewDistance()
         {
-            if (pipeline == null || pipeline.Raycaster == null) return;
+            if (pipeline == null || pipeline.Raycaster == null)
+            {
+                return;
+            }
+
             float metres = GetPreviewDistanceMetres();
             if (metres > 0f)
+            {
                 pipeline.Raycaster.FallbackDistance = metres;
+            }
         }
-
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  HUD refresh
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
         private void RefreshHUD()
         {
             EnsureHudLabels();
+
             if (modelLabel != null)
             {
                 modelLabel.text = _activeModel switch
                 {
                     ModelPreset.Florence => "Model: Florence",
-                    ModelPreset.GDino   => "Model: DINO",
-                    ModelPreset.SAM2    => "Model: SAM2",
+                    ModelPreset.GDino => "Model: DINO",
+                    ModelPreset.SAM2 => "Model: SAM2",
                     _ => "Model: ?"
                 };
             }
@@ -296,9 +275,9 @@ namespace CompanionScan.UI
             {
                 displayModeLabel.text = _displayMode switch
                 {
-                    AnchorDisplayMode.BoundingBox2D  => "Display: 2D Box",
+                    AnchorDisplayMode.BoundingBox2D => "Display: 2D Box",
                     AnchorDisplayMode.SpatialLabel3D => "Display: 3D Label",
-                    AnchorDisplayMode.Both           => "Display: Both",
+                    AnchorDisplayMode.Both => "Display: Both",
                     _ => "Display: ?"
                 };
             }
@@ -308,24 +287,34 @@ namespace CompanionScan.UI
                 previewDistanceLabel.text = _previewDist switch
                 {
                     PreviewDistance.Near => "Preview: Near (1m)",
-                    PreviewDistance.Far  => "Preview: Far (3m)",
-                    PreviewDistance.Off  => "Preview: Off",
+                    PreviewDistance.Far => "Preview: Far (3m)",
+                    PreviewDistance.Off => "Preview: Off",
                     _ => "Preview: ?"
                 };
             }
 
-            if (statusLabel != null && pipeline != null)
+            if (statusLabel != null)
             {
-                string intrinsics = pipeline.LastCaptureHadIntrinsics ? "Intrinsics" : "PoseOnly";
-                string fallback = pipeline.LastFallbackHitCount > 0
-                    ? $"Fallback: {pipeline.LastFallbackHitCount}"
-                    : "Fallback: 0";
-                var config = pipeline.ServerConfig;
-                string net = config != null
-                    ? $"Net: {Mathf.Max(1, config.requestTimeoutSeconds)}s x{Mathf.Max(0, config.retryCount)}"
-                    : "Net: ?";
-                statusLabel.text = $"Raycast: {intrinsics} | {fallback} | {net}";
+                statusLabel.text = BuildStatusText();
             }
+        }
+
+        private string BuildStatusText()
+        {
+            if (pipeline == null)
+            {
+                return "Raycast: pipeline missing";
+            }
+
+            string intrinsics = pipeline.LastCaptureHadIntrinsics ? "Intrinsics" : "PoseOnly";
+            string fallback = pipeline.LastFallbackHitCount > 0
+                ? $"Fallback: {pipeline.LastFallbackHitCount}"
+                : "Fallback: 0";
+            var config = pipeline.ServerConfig;
+            string net = config != null
+                ? $"Net: {Mathf.Max(1, config.requestTimeoutSeconds)}s x{Mathf.Max(0, config.retryCount)}"
+                : "Net: ?";
+            return $"Raycast: {intrinsics} | {fallback} | {net}";
         }
 
         private void EnsureHudLabels()
@@ -335,6 +324,17 @@ namespace CompanionScan.UI
             if (previewDistanceLabel == null) previewDistanceLabel = FindHudLabel("PreviewLabel");
             if (busyLabel == null) busyLabel = FindHudLabel("BusyLabel");
             if (statusLabel == null) statusLabel = FindHudLabel("StatusLabel");
+        }
+
+        private void LogUiHealth()
+        {
+            var health = GetUiHealthStatus();
+            if (!health.IsHealthy)
+            {
+                Debug.LogWarning(
+                    $"[ControllerMenu] UI health degraded: pipeline={health.HasPipeline}, " +
+                    $"labels={health.HasHudLabels}, input={health.HasInputBinding}, missingLabels={health.MissingHudLabels}");
+            }
         }
 
         private static TMP_Text FindHudLabel(string name)
@@ -357,4 +357,3 @@ namespace CompanionScan.UI
         }
     }
 }
-

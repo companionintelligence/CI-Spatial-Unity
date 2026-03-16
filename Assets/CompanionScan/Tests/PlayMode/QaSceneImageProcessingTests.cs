@@ -29,6 +29,7 @@ namespace CompanionScan.Tests.PlayMode
         [UnityTest]
         public IEnumerator QaScene_ProcessAllImages_Render2DAnd3D()
         {
+            TestRuntimeFlags.RequireLiveIntegrationOrIgnore("Live QA scene processing disabled");
             var config = ScriptableObject.CreateInstance<ServerConfig>();
             var envUrl = Environment.GetEnvironmentVariable(ServerUrlEnv);
             config.baseUrl = string.IsNullOrWhiteSpace(envUrl) ? config.ResolveBaseUrl() : envUrl;
@@ -142,11 +143,12 @@ namespace CompanionScan.Tests.PlayMode
                 for (int i = 0; i < max; i++)
                 {
                     var bbox = detection.bboxes[i];
-                    if (!BoundingBoxUtils.TryNormalize(bbox, tex.width, tex.height, out Rect norm))
+                    var validation = BoundingBoxUtils.Validate(bbox, tex.width, tex.height, BoundingBoxValidationOptions.ForRendering(1f), i);
+                    if (!validation.IsValid)
                     {
                         continue;
                     }
-
+                    Rect norm = validation.NormalizedRect;
                     float u = norm.x + norm.width * 0.5f;
                     float v = 1f - (norm.y + norm.height * 0.5f);
                     if (!raycaster.TryRaycastViewport(new Vector2(u, v), out Vector3 hit, out _))
@@ -197,12 +199,12 @@ namespace CompanionScan.Tests.PlayMode
             int count = 0;
             foreach (var bbox in detection.bboxes)
             {
-                if (BoundingBoxUtils.TryNormalize(bbox, width, height, out _))
+                var validation = BoundingBoxUtils.Validate(bbox, width, height, BoundingBoxValidationOptions.ForRendering(1f), 0);
+                if (validation.IsValid)
                 {
                     count++;
                 }
             }
-
             return count;
         }
 

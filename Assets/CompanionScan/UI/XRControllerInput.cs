@@ -1,32 +1,22 @@
-﻿using UnityEngine;
+using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace CompanionScan.UI
 {
     /// <summary>
     /// Polls OVRInput every frame and dispatches actions based on physical
-    /// Quest controller buttons.  Replaces the old world-space UI button
+    /// Quest controller buttons. Replaces the old world-space UI button
     /// approach with direct hardware input.
-    ///
-    /// Button mapping (right controller):
-    ///   A  (Button.One)   -> Capture snapshot
-    ///   B  (Button.Two)   -> Cycle active model (Florence -> GDino -> SAM2)
-    /// Left controller:
-    ///   X  (Button.Three) -> Cycle preview distance (Near -> Far -> Off)
-    ///   Y  (Button.Four)  -> Save & Export GLTF
-    /// Either index trigger:
-    ///   Primary / Secondary Index Trigger -> Cycle display mode
-    /// Either hand trigger:
-    ///   Primary / Secondary Hand Trigger -> Preview glTF
     /// </summary>
     public class XRControllerInput : MonoBehaviour
     {
         [SerializeField] private ControllerMenuUI menuUI;
-        private bool _loggedNoController;
+        [SerializeField] private float inputCooldownSeconds = 0.12f;
 
-        /// <summary>
-        /// If null, <see cref="menuUI"/> is found at Awake via
-        /// <see cref="Object.FindAnyObjectByType{T}"/>.
-        /// </summary>
+        private bool _loggedNoController;
+        private readonly Dictionary<string, float> _lastActionTime = new Dictionary<string, float>();
+
         private void Awake()
         {
             if (FindAnyObjectByType<OVRManager>() == null)
@@ -39,13 +29,11 @@ namespace CompanionScan.UI
                 menuUI = FindAnyObjectByType<ControllerMenuUI>();
 
             if (menuUI == null)
-                Debug.LogWarning("[XRControllerInput] ControllerMenuUI not found in scene â€” will retry in Update.");
+                Debug.LogWarning("[XRControllerInput] ControllerMenuUI not found in scene - will retry in Update.");
         }
 
         private void Update()
         {
-            // Late-bind: ControllerMenuBuilder creates MenuUI in Start(),
-            // so it may not exist during our Awake().
             if (menuUI == null)
             {
                 menuUI = FindAnyObjectByType<ControllerMenuUI>();
@@ -59,32 +47,57 @@ namespace CompanionScan.UI
                 Debug.LogWarning("[XRControllerInput] No active OVR controller detected.");
             }
 
-            // A â€“ Capture
             if (OVRInput.GetDown(OVRInput.Button.One))
-                menuUI.DoCapture();
+                Dispatch("capture", menuUI.DoCapture);
 
-            // B â€“ Cycle model
             if (OVRInput.GetDown(OVRInput.Button.Two))
-                menuUI.CycleModel();
+                Dispatch("cycle_model", menuUI.CycleModel);
 
-            // X â€“ Cycle preview distance
             if (OVRInput.GetDown(OVRInput.Button.Three))
-                menuUI.CyclePreviewDistance();
+                Dispatch("cycle_preview", menuUI.CyclePreviewDistance);
 
-            // Y â€“ Save & Export
             if (OVRInput.GetDown(OVRInput.Button.Four))
-                menuUI.DoSaveExport();
+                Dispatch("save_export", menuUI.DoSaveExport);
 
-            // Either trigger â€“ Cycle display mode
             if (OVRInput.GetDown(OVRInput.Button.PrimaryIndexTrigger) ||
                 OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger))
-                menuUI.CycleDisplayMode();
+                Dispatch("cycle_display", menuUI.CycleDisplayMode);
 
-            // Either hand trigger â€“ Preview glTF
             if (OVRInput.GetDown(OVRInput.Button.PrimaryHandTrigger) ||
                 OVRInput.GetDown(OVRInput.Button.SecondaryHandTrigger))
-                menuUI.PreviewGltf();
+                Dispatch("preview_gltf", menuUI.PreviewGltf);
+        }
+
+        public bool CanDispatch(string actionKey, float now)
+        {
+            if (inputCooldownSeconds <= 0f)
+            {
+                _lastActionTime[actionKey] = now;
+                return true;
+            }
+
+            if (_lastActionTime.TryGetValue(actionKey, out float previous) && now - previous < inputCooldownSeconds)
+            {
+                return false;
+            }
+
+            _lastActionTime[actionKey] = now;
+            return true;
+        }
+
+        private void Dispatch(string actionKey, Action action)
+        {
+            if (action == null)
+            {
+                return;
+            }
+
+            if (!CanDispatch(actionKey, Time.unscaledTime))
+            {
+                return;
+            }
+
+            action.Invoke();
         }
     }
 }
-

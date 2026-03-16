@@ -27,6 +27,7 @@ namespace CompanionScan.Tests.PlayMode
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
+            TestRuntimeFlags.RequireLiveIntegrationOrIgnore("Live QA suite disabled");
             _config = ScriptableObject.CreateInstance<ServerConfig>();
 
             var envUrl = Environment.GetEnvironmentVariable(ServerUrlEnv);
@@ -141,11 +142,12 @@ namespace CompanionScan.Tests.PlayMode
                 int anchors = 0;
                 foreach (var bbox in detection.bboxes)
                 {
-                    if (!BoundingBoxUtils.TryNormalize(bbox, tex.width, tex.height, out Rect norm))
+                    var validation = BoundingBoxUtils.Validate(bbox, tex.width, tex.height, BoundingBoxValidationOptions.ForRendering(1f), 0);
+                    if (!validation.IsValid)
                     {
                         continue;
                     }
-
+                    Rect norm = validation.NormalizedRect;
                     float u = norm.x + norm.width * 0.5f;
                     float v = 1f - (norm.y + norm.height * 0.5f);
 
@@ -206,7 +208,8 @@ namespace CompanionScan.Tests.PlayMode
             int count = 0;
             foreach (var bbox in detection.bboxes)
             {
-                if (BoundingBoxUtils.TryNormalize(bbox, width, height, out _))
+                var validation = BoundingBoxUtils.Validate(bbox, width, height, BoundingBoxValidationOptions.ForRendering(1f), 0);
+                if (validation.IsValid)
                 {
                     count++;
                 }
@@ -226,3 +229,5 @@ namespace CompanionScan.Tests.PlayMode
         }
     }
 }
+
+

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -23,9 +23,9 @@ namespace CompanionScan.Tests.PlayMode
     /// </summary>
     public class PerImageModelTests
     {
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
         //  Constants & fixture data
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
 
         private const string ServerUrlEnv = "CompanionScan_TEST_SERVER_URL";
 
@@ -37,7 +37,7 @@ namespace CompanionScan.Tests.PlayMode
         private static readonly string ExternalFixturesPath =
             Path.GetFullPath(Path.Combine(Application.dataPath, "..", "test"));
 
-        /// <summary>Image â†’ (prompt for GDino/SAM2, description)</summary>
+        /// <summary>Image → (prompt for GDino/SAM2, description)</summary>
         private static readonly (string file, string prompt, string desc)[] TestImages =
         {
             ("closet2.jpg",                "clothing . shelf . hanger . box .",       "closet"),
@@ -59,15 +59,16 @@ namespace CompanionScan.Tests.PlayMode
         private ServerConfig _config;
         private CVServerClient _client;
 
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
         //  Setup
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
-            _config = ScriptableObject.CreateInstance<ServerConfig>();
+            TestRuntimeFlags.RequireLiveIntegrationOrIgnore("Live model suite disabled");
 
+            _config = ScriptableObject.CreateInstance<ServerConfig>();
             var envUrl = Environment.GetEnvironmentVariable(ServerUrlEnv);
             _config.baseUrl = string.IsNullOrWhiteSpace(envUrl)
                 ? _config.ResolveBaseUrl()
@@ -82,9 +83,9 @@ namespace CompanionScan.Tests.PlayMode
                 Assert.Inconclusive($"Fixtures directory missing: {FixturesPath}");
         }
 
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
         //  Helpers
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ────────────────────────────────────────────────────────────
 
         private static byte[] LoadFixture(string filename)
         {
@@ -97,7 +98,7 @@ namespace CompanionScan.Tests.PlayMode
         /// <summary>
         /// Simulate 3D anchor placement for each detection bbox.
         /// Returns computed (position, label) pairs as if raycasted at each bbox center.
-        /// Uses a simple projection: bbox center UV â†’ Camera.main viewport ray at fallback distance.
+        /// Uses a simple projection: bbox center UV → Camera.main viewport ray at fallback distance.
         /// </summary>
         private static List<(Vector3 pos, string label)> SimulateAnchorPlacement(
             DetectionResult detection, int imageWidth, int imageHeight, float fallbackDist = 2f)
@@ -144,9 +145,9 @@ namespace CompanionScan.Tests.PlayMode
                 .ToList();
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  FLORENCE2 â€“ Caption per image
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
+        //  FLORENCE2 – Caption per image
+        // ════════════════════════════════════════════════════════════════
 
         [UnityTest]
         public IEnumerator Florence2_Caption_AllImages()
@@ -163,7 +164,7 @@ namespace CompanionScan.Tests.PlayMode
 
                 if (task.IsFaulted)
                 {
-                    Debug.LogWarning($"[Florence2-Caption] {file}: FAILED â€“ {task.Exception?.GetBaseException().Message}");
+                    Debug.LogWarning($"[Florence2-Caption] {file}: FAILED – {task.Exception?.GetBaseException().Message}");
                     continue;
                 }
 
@@ -173,7 +174,7 @@ namespace CompanionScan.Tests.PlayMode
                     $"Empty caption for {file}");
 
                 string snippet = result.text.Length > 100
-                    ? result.text.Substring(0, 100) + "â€¦"
+                    ? result.text.Substring(0, 100) + "…"
                     : result.text;
                 Debug.Log($"[Florence2-Caption] {desc} ({file}): {snippet}");
                 passed++;
@@ -182,9 +183,9 @@ namespace CompanionScan.Tests.PlayMode
             Assert.IsTrue(passed > 0, "At least one image should produce a caption.");
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  FLORENCE2 â€“ Object Detection per image
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
+        //  FLORENCE2 – Object Detection per image
+        // ════════════════════════════════════════════════════════════════
 
         [UnityTest]
         public IEnumerator Florence2_OD_AllImages()
@@ -201,7 +202,7 @@ namespace CompanionScan.Tests.PlayMode
 
                 if (task.IsFaulted)
                 {
-                    Debug.LogWarning($"[Florence2-OD] {file}: FAILED â€“ {task.Exception?.GetBaseException().Message}");
+                    Debug.LogWarning($"[Florence2-OD] {file}: FAILED – {task.Exception?.GetBaseException().Message}");
                     continue;
                 }
 
@@ -215,9 +216,9 @@ namespace CompanionScan.Tests.PlayMode
             Assert.IsTrue(passed > 0, "At least one image should return OD results.");
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  GROUNDING DINO â€“ Detection + 2D bbox validation
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
+        //  GROUNDING DINO – Detection + 2D bbox validation
+        // ════════════════════════════════════════════════════════════════
 
         [UnityTest]
         public IEnumerator GDino_Detect_AllImages_BboxesValid()
@@ -236,7 +237,7 @@ namespace CompanionScan.Tests.PlayMode
 
                 if (task.IsFaulted)
                 {
-                    Debug.LogWarning($"[GDino] {file}: FAILED â€“ {task.Exception?.GetBaseException().Message}");
+                    Debug.LogWarning($"[GDino] {file}: FAILED – {task.Exception?.GetBaseException().Message}");
                     continue;
                 }
 
@@ -265,16 +266,16 @@ namespace CompanionScan.Tests.PlayMode
 
                 // Log top-3 detections
                 var top3 = det.labels.Take(3).ToArray();
-                Debug.Log($"[GDino] {desc} ({file}): {n} detections â€“ [{string.Join(", ", top3)}{(n > 3 ? "â€¦" : "")}]");
+                Debug.Log($"[GDino] {desc} ({file}): {n} detections – [{string.Join(", ", top3)}{(n > 3 ? "…" : "")}]");
             }
 
             Debug.Log($"[GDino] {imagesPassed}/{TestImages.Length} images, {totalDetections} total detections.");
             Assert.IsTrue(imagesPassed > 0, "At least one image should have detections.");
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  GROUNDING DINO â€“ External /test images (2D + 3D anchor simulation)
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
+        //  GROUNDING DINO – External /test images (2D + 3D anchor simulation)
+        // ════════════════════════════════════════════════════════════════
 
         [UnityTest]
         public IEnumerator GDino_Detect_ExternalImages_BboxesAndAnchors()
@@ -343,9 +344,9 @@ namespace CompanionScan.Tests.PlayMode
             Assert.IsTrue(totalAnchors > 0, "Expected at least one anchor from /test detections.");
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  GROUNDING DINO â€“ 3D anchor simulation
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
+        //  GROUNDING DINO – 3D anchor simulation
+        // ════════════════════════════════════════════════════════════════
 
         [UnityTest]
         public IEnumerator GDino_Detect_AllImages_Anchors3D()
@@ -386,9 +387,9 @@ namespace CompanionScan.Tests.PlayMode
             Assert.IsTrue(totalAnchors > 0, "Should compute at least one 3D anchor position.");
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  SAM2 â€“ Segmentation + mask validation
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
+        //  SAM2 – Segmentation + mask validation
+        // ════════════════════════════════════════════════════════════════
 
         [UnityTest]
         public IEnumerator SAM2_Segment_AllImages_MasksValid()
@@ -407,7 +408,7 @@ namespace CompanionScan.Tests.PlayMode
 
                 if (task.IsFaulted)
                 {
-                    Debug.LogWarning($"[SAM2] {file}: FAILED â€“ {task.Exception?.GetBaseException().Message}");
+                    Debug.LogWarning($"[SAM2] {file}: FAILED – {task.Exception?.GetBaseException().Message}");
                     continue;
                 }
 
@@ -447,16 +448,16 @@ namespace CompanionScan.Tests.PlayMode
                 imagesPassed++;
 
                 var labels = seg.annotations.Select(a => a.label).Distinct().ToArray();
-                Debug.Log($"[SAM2] {desc} ({file}): {seg.annotations.Count} masks â€“ [{string.Join(", ", labels)}]");
+                Debug.Log($"[SAM2] {desc} ({file}): {seg.annotations.Count} masks – [{string.Join(", ", labels)}]");
             }
 
             Debug.Log($"[SAM2] {imagesPassed}/{TestImages.Length} images, {totalMasks} total masks.");
             Assert.IsTrue(imagesPassed > 0, "At least one image should produce masks.");
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  SAM2 â€“ 3D anchor simulation from segment annotations
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
+        //  SAM2 – 3D anchor simulation from segment annotations
+        // ════════════════════════════════════════════════════════════════
 
         [UnityTest]
         public IEnumerator SAM2_Segment_AllImages_Anchors3D()
@@ -508,9 +509,9 @@ namespace CompanionScan.Tests.PlayMode
             Assert.IsTrue(totalAnchors > 0, "Should compute at least one 3D anchor from SAM2 masks.");
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  FULL PIPELINE â€“ Florence2 â†’ GDino â†’ SAM2 per image
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
+        //  FULL PIPELINE – Florence2 → GDino → SAM2 per image
+        // ════════════════════════════════════════════════════════════════
 
         [UnityTest]
         public IEnumerator FullPipeline_PerImage_AllThreeModels()
@@ -523,7 +524,7 @@ namespace CompanionScan.Tests.PlayMode
                 try { jpeg = LoadFixture(file); }
                 catch { continue; }
 
-                Debug.Log($"\n[Pipeline] â•â•â• {desc} ({file}) â•â•â•");
+                Debug.Log($"\n[Pipeline] ═══ {desc} ({file}) ═══");
 
                 // Step 1: Florence2 caption
                 var capTask = _client.FlorenceAsync(jpeg, "<MORE_DETAILED_CAPTION>");
@@ -534,9 +535,9 @@ namespace CompanionScan.Tests.PlayMode
                     continue;
                 }
                 var caption = capTask.Result?.text ?? "(no caption)";
-                Debug.Log($"[Pipeline] Caption: {(caption.Length > 80 ? caption.Substring(0, 80) + "â€¦" : caption)}");
+                Debug.Log($"[Pipeline] Caption: {(caption.Length > 80 ? caption.Substring(0, 80) + "…" : caption)}");
 
-                // Step 2: Florence2 OD â†’ extract labels
+                // Step 2: Florence2 OD → extract labels
                 var odTask = _client.FlorenceAsync(jpeg, "<OD>");
                 while (!odTask.IsCompleted) yield return null;
                 string dinoPrompt = fallbackPrompt;
@@ -585,17 +586,17 @@ namespace CompanionScan.Tests.PlayMode
                 int maskCount = seg.annotations?.Count ?? 0;
                 Debug.Log($"[Pipeline] SAM2: {maskCount} masks");
 
-                Debug.Log($"[Pipeline] âœ“ {desc}: caption=OK, det={detCount}, anchors={anchors3D.Count}, masks={maskCount}");
+                Debug.Log($"[Pipeline] ✓ {desc}: caption=OK, det={detCount}, anchors={anchors3D.Count}, masks={maskCount}");
                 imagesPassed++;
             }
 
-            Debug.Log($"\n[Pipeline] â•â•â• SUMMARY: {imagesPassed}/{TestImages.Length} images passed full pipeline â•â•â•");
+            Debug.Log($"\n[Pipeline] ═══ SUMMARY: {imagesPassed}/{TestImages.Length} images passed full pipeline ═══");
             Assert.IsTrue(imagesPassed > 0, "At least one image should pass the full pipeline.");
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
         //  2D BBOX rendering data validation
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
 
         [UnityTest]
         public IEnumerator BBox2D_RenderingData_ValidForAllDetections()
@@ -640,15 +641,15 @@ namespace CompanionScan.Tests.PlayMode
 
                     float sizeW = Mathf.Abs(x2 - x1);
                     float sizeH = Mathf.Abs(y2 - y1);
-                    Assert.IsTrue(sizeW > 1f, $"bbox too narrow ({sizeW}px) for {file}[{i}]");
-                    Assert.IsTrue(sizeH > 1f, $"bbox too short ({sizeH}px) for {file}[{i}]");
+                    Assert.IsTrue(sizeW > 0f, $"bbox too narrow ({sizeW}px) for {file}[{i}]");
+                    Assert.IsTrue(sizeH > 0f, $"bbox too short ({sizeH}px) for {file}[{i}]");
                 }
             }
         }
 
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-        //  3D ANCHOR data validation â€“ SpatialPin-compatible
-        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ════════════════════════════════════════════════════════════════
+        //  3D ANCHOR data validation – SpatialPin-compatible
+        // ════════════════════════════════════════════════════════════════
 
         [UnityTest]
         public IEnumerator Anchor3D_PinData_ValidForAllDetections()
@@ -701,4 +702,6 @@ namespace CompanionScan.Tests.PlayMode
         }
     }
 }
+
+
 

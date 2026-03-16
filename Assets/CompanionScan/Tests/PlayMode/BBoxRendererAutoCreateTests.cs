@@ -1,9 +1,9 @@
-using System.Collections;
 using CompanionScan.Core;
 using CompanionScan.Rendering;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using System.Collections;
 
 namespace CompanionScan.Tests.PlayMode
 {
@@ -43,6 +43,9 @@ namespace CompanionScan.Tests.PlayMode
             var canvas = GameObject.Find("CameraPreviewCanvas")?.GetComponent<Canvas>();
             Assert.IsNotNull(canvas, "Expected preview canvas to be created.");
             Assert.AreEqual(RenderMode.WorldSpace, canvas.renderMode);
+
+            Assert.AreEqual(1, renderer.LastValidation.Count);
+            Assert.IsTrue(renderer.LastValidation[0].IsValid);
 
             Object.DestroyImmediate(tex);
             Object.DestroyImmediate(rendererGo);

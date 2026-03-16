@@ -1,4 +1,4 @@
-﻿using CompanionScan.Core;
+using CompanionScan.Core;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -72,6 +72,21 @@ namespace CompanionScan.Tests
             Assert.IsFalse(ok);
             Assert.AreEqual(Rect.zero, rect);
         }
+
+        [Test]
+        public void Validate_TinyBoxRejected_WhenMinPixelsConfigured()
+        {
+            float[] bbox = { 0.1f, 0.1f, 0.1002f, 0.1002f };
+
+            var result = BoundingBoxUtils.Validate(
+                bbox,
+                1280,
+                1024,
+                BoundingBoxValidationOptions.ForRendering(1f),
+                0);
+
+            Assert.IsFalse(result.IsValid);
+            Assert.AreEqual(BoundingBoxRejectReason.BelowMinPixelSize, result.RejectReason);
+        }
     }
 }
-
