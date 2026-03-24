@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>World Map Viewer / Editor — Companion Scan</title>
+    <style>
+      /* ── Reset ──────────────────────────────────────────────────────────── */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0d0d1a;
+        color: #e0e0f0;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 13px;
+      }
+
+      /* ── Layout ─────────────────────────────────────────────────────────── */
+      #viewer-app {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        height: 100%;
+      }
+
+      /* ── Toolbar ────────────────────────────────────────────────────────── */
+      #toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: #111122;
+        border-bottom: 1px solid #2a2a4a;
+        flex-wrap: wrap;
+      }
+
+      #toolbar h1 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #99aaff;
+        margin-right: 0.5rem;
+        white-space: nowrap;
+      }
+
+      .toolbar-sep {
+        width: 1px;
+        height: 1.4rem;
+        background: #2a2a4a;
+        margin: 0 0.25rem;
+      }
+
+      .btn {
+        padding: 0.35rem 0.85rem;
+        border: 1px solid #3a3a5a;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: #1e1e3a;
+        color: #ccd;
+        transition: background 0.15s, border-color 0.15s;
+        white-space: nowrap;
+      }
+
+      .btn:hover {
+        background: #2a2a4e;
+        border-color: #5555aa;
+      }
+
+      .btn-primary {
+        background: #1a4a9a;
+        border-color: #3366cc;
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        background: #1e55b5;
+      }
+
+      .btn-danger {
+        background: #6a1a1a;
+        border-color: #cc3333;
+        color: #fcc;
+      }
+
+      .btn-danger:hover {
+        background: #7a2222;
+      }
+
+      /* ── Status bar ─────────────────────────────────────────────────────── */
+      #viewer-status {
+        font-size: 0.78rem;
+        color: #aab;
+        margin-left: auto;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 360px;
+      }
+
+      .viewer-status--ok {
+        color: #88ee88;
+      }
+
+      .viewer-status--error {
+        color: #ff6666;
+      }
+
+      .viewer-status--info {
+        color: #aabbff;
+      }
+
+      /* ── Main area ──────────────────────────────────────────────────────── */
+      #main-area {
+        display: grid;
+        grid-template-columns: 220px 1fr 240px;
+        overflow: hidden;
+      }
+
+      /* ── Scene panel (left sidebar) ─────────────────────────────────────── */
+      #scene-panel {
+        display: flex;
+        flex-direction: column;
+        background: #0f0f20;
+        border-right: 1px solid #2a2a4a;
+        overflow: hidden;
+      }
+
+      .panel-header {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #6677aa;
+        border-bottom: 1px solid #1a1a30;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .panel-header .badge {
+        background: #2a2a4a;
+        color: #8899cc;
+        border-radius: 10px;
+        padding: 0.1rem 0.4rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+      }
+
+      #session-info {
+        padding: 0.35rem 0.75rem;
+        font-size: 0.7rem;
+        color: #556;
+        border-bottom: 1px solid #1a1a30;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      #pin-list {
+        overflow-y: auto;
+        flex: 1;
+      }
+
+      /* ── Pin list items ─────────────────────────────────────────────────── */
+      .pin-item {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.35rem 0.75rem;
+        cursor: pointer;
+        border-bottom: 1px solid #14142a;
+        transition: background 0.1s;
+      }
+
+      .pin-item:hover {
+        background: #1a1a35;
+      }
+
+      .pin-item.selected {
+        background: #1a2a4a;
+        border-left: 2px solid #4466cc;
+      }
+
+      .pin-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .pin-label {
+        flex: 1;
+        font-size: 0.78rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #ccd;
+      }
+
+      .pin-score {
+        font-size: 0.7rem;
+        color: #667;
+        flex-shrink: 0;
+      }
+
+      /* ── Legend ─────────────────────────────────────────────────────────── */
+      .legend {
+        padding: 0.5rem 0.75rem;
+        border-top: 1px solid #1a1a30;
+        font-size: 0.7rem;
+        color: #667;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      /* ── Canvas container (center) ──────────────────────────────────────── */
+      #canvas-container {
+        position: relative;
+        overflow: hidden;
+        background: #1a1a2e;
+      }
+
+      #canvas-container.drag-over::after {
+        content: 'Drop .gltf / .glb here';
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #8899ff;
+        background: rgba(20, 20, 60, 0.7);
+        border: 2px dashed #5566bb;
+        border-radius: 6px;
+        pointer-events: none;
+      }
+
+      #viewer-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        outline: none;
+      }
+
+      /* ── Inspector panel (right sidebar) ────────────────────────────────── */
+      #inspector-panel {
+        background: #0f0f20;
+        border-left: 1px solid #2a2a4a;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #pin-inspector {
+        padding: 0.75rem;
+        flex: 1;
+      }
+
+      .inspector-empty {
+        color: #445;
+        font-size: 0.78rem;
+        text-align: center;
+        margin-top: 2rem;
+        line-height: 1.5;
+      }
+
+      /* ── Inspector form ─────────────────────────────────────────────────── */
+      .inspector-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+      }
+
+      .field label {
+        font-size: 0.7rem;
+        color: #667;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .field input {
+        padding: 0.3rem 0.5rem;
+        background: #1a1a30;
+        border: 1px solid #2a2a4a;
+        border-radius: 4px;
+        color: #ccd;
+        font-size: 0.8rem;
+        width: 100%;
+      }
+
+      .field input:focus {
+        outline: none;
+        border-color: #4466cc;
+      }
+
+      .field input:disabled {
+        color: #556;
+        background: #141420;
+        cursor: default;
+      }
+
+      .inspector-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+      }
+
+      /* ── Drop hint ──────────────────────────────────────────────────────── */
+      #drop-hint {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        gap: 0.5rem;
+        opacity: 0.35;
+      }
+
+      #drop-hint svg {
+        width: 48px;
+        height: 48px;
+        fill: #8899ff;
+      }
+
+      #drop-hint p {
+        font-size: 0.85rem;
+        color: #8899ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="viewer-app">
+      <!-- Toolbar -->
+      <div id="toolbar">
+        <h1>🗺 World Map Editor</h1>
+        <div class="toolbar-sep"></div>
+        <button class="btn btn-primary" id="btn-load">📂 Load GLTF</button>
+        <button class="btn" id="btn-export">💾 Export GLTF</button>
+        <div class="toolbar-sep"></div>
+        <button class="btn" id="btn-undo" title="Ctrl+Z">↩ Undo</button>
+        <button class="btn" id="btn-redo" title="Ctrl+Y">↪ Redo</button>
+        <div class="toolbar-sep"></div>
+        <button class="btn" id="btn-frame" title="Frame all objects">⊡ Frame</button>
+        <button class="btn" id="btn-clear" title="Clear scene">✕ Clear</button>
+        <span id="viewer-status" class="viewer-status">Drop a .gltf or .glb file to get started.</span>
+      </div>
+
+      <!-- Main area: scene panel | canvas | inspector panel -->
+      <div id="main-area">
+        <!-- Left: pin list -->
+        <div id="scene-panel">
+          <div class="panel-header">
+            Spatial Pins
+            <span class="badge" id="pin-count">0</span>
+          </div>
+          <div id="session-info"></div>
+          <div id="pin-list"></div>
+          <div class="legend">
+            <div class="legend-item">
+              <span class="legend-dot" style="background:#ffd700"></span>
+              CV Server
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:#00d4ff"></span>
+              Meta Scene
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:#ff3333"></span>
+              Selected
+            </div>
+          </div>
+        </div>
+
+        <!-- Center: Three.js canvas -->
+        <div id="canvas-container">
+          <canvas id="viewer-canvas" tabindex="0"></canvas>
+          <div id="drop-hint">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            <p>Drag &amp; drop a .gltf or .glb world map here</p>
+          </div>
+        </div>
+
+        <!-- Right: pin inspector -->
+        <div id="inspector-panel">
+          <div class="panel-header">Pin Inspector</div>
+          <div id="pin-inspector">
+            <p class="inspector-empty">Select a pin to inspect and edit it.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input
+      type="file"
+      id="input-gltf-file"
+      accept=".gltf,.glb,model/gltf+json,model/gltf-binary"
+      hidden
+    />
+
+    <script type="module" src="/src/viewer/main.ts"></script>
+  </body>
+</html>

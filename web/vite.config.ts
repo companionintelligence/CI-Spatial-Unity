@@ -43,6 +43,12 @@ export default defineConfig({
     target: 'es2022',
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        viewer: path.resolve(__dirname, 'viewer.html'),
+      },
+    },
   },
   server: {
     host: '0.0.0.0',
