@@ -226,8 +226,8 @@ MonoBehaviour:
     - line: '|     tvOS: 0'
     - line: '|   overrideDefaultApplicationIdentifier: 0'
     - line: '|   AndroidBundleVersionCode: 1'
-    - line: '|   AndroidMinSdkVersion: 29'
-    - line: '|   AndroidTargetSdkVersion: 32'
+    - line: '|   AndroidMinSdkVersion: 32'
+    - line: '|   AndroidTargetSdkVersion: 34'
     - line: '|   AndroidPreferredInstallLocation: 0'
     - line: '|   AndroidPreferredDataLocation: 1'
     - line: '|   aotOptions: '
@@ -894,8 +894,8 @@ MonoBehaviour:
     - line: '|   webWasm2023: 0'
     - line: '|   webEnableSubmoduleStrippingCompatibility: 0'
     - line: '|   scriptingDefineSymbols:'
-    - line: '|     Android: ISDK_OPENXR_HAND;USE_INPUT_SYSTEM_POSE_CONTROL;USE_STICK_CONTROL_THUMBSTICKS'
-    - line: '|     Standalone: ISDK_OPENXR_HAND;USE_INPUT_SYSTEM_POSE_CONTROL;USE_STICK_CONTROL_THUMBSTICKS'
+    - line: '|     Android: ISDK_OPENXR_HAND;USE_INPUT_SYSTEM_POSE_CONTROL;USE_STICK_CONTROL_THUMBSTICKS;OVR_DISABLE_HAND_PINCH_BUTTON_MAPPING'
+    - line: '|     Standalone: ISDK_OPENXR_HAND;USE_INPUT_SYSTEM_POSE_CONTROL;USE_STICK_CONTROL_THUMBSTICKS;OVR_DISABLE_HAND_PINCH_BUTTON_MAPPING'
     - line: '|   additionalCompilerArguments: {}'
     - line: '|   platformArchitecture: {}'
     - line: '|   scriptingBackend:'
@@ -1038,7 +1038,7 @@ MonoBehaviour:
         m_ExportAsGoogleAndroidProject: 0
         m_DebugSymbolLevel: 1
         m_DebugSymbolFormat: 5
-        m_CurrentDeploymentTargetId: 2G0YC1ZF8G02NG
+        m_CurrentDeploymentTargetId: __builtin__target_default
         m_BuildType: 2
         m_LinkTimeOptimization: 0
         m_BuildAppBundle: 0

@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ApkPath,
 
-    [string]$PackageName = "com.PresentFutures.UnityXRAIFlorence",
+    [string]$PackageName = "com.CompanionIntelligence.CompanionCapture",
     [string]$ActivityName = "com.unity3d.player.UnityPlayerActivity",
 
     [string]$ScreenshotPath = "quest_screenshot.png",

@@ -1,0 +1,11 @@
+﻿<Solution>
+  <Project Path="NaughtyAttributes.Test.csproj" />
+  <Project Path="NaughtyAttributes.Core.csproj" />
+  <Project Path="NaughtyAttributes.Editor.csproj" />
+  <Project Path="CompanionScan.Editor.csproj" />
+  <Project Path="CompanionScan.csproj" />
+  <Project Path="CompanionScan.Tests.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="CompanionScan.Tests.Editor.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+</Solution>

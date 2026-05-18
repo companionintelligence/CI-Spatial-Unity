@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!29 &1
 OcclusionCullingSettings:
@@ -1646,9 +1646,12 @@ MonoBehaviour:
   pinManager: {fileID: 0}
   boundaryProvider: {fileID: 0}
   metaSceneCollector: {fileID: 0}
+  snapshotStore: {fileID: 0}
   includeFloorMesh: 1
   floorMaterial: {fileID: 0}
   floorY: 0
+  includeSceneMeshes: 1
+  sceneMeshMaterial: {fileID: 0}
   fileName: spatial-map
   writeExtras: 1
   captureMetaScene: 1
@@ -1713,6 +1716,10 @@ MonoBehaviour:
   container: {fileID: 0}
   resultImage: {fileID: 0}
   bboxPrefab: {fileID: 0}
+  previewAnchor: {fileID: 0}
+  previewOffset: {x: 0, y: -0.1, z: 0.6}
+  previewRotation: {x: 0, y: 0, z: 0}
+  previewScale: 0.0004
 --- !u!114 &319536160
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1728,6 +1735,11 @@ MonoBehaviour:
   pinRoot: {fileID: 0}
   pinPrefab: {fileID: 7011814298867290955, guid: 6b375e879b1134b4d8f73e698cb23513, type: 3}
   pinScale: {x: 1, y: 1, z: 1}
+  enableDeduplication: 1
+  dedupDistance: 0.15
+  enablePinLifecycle: 1
+  pinMaxAgeSeconds: 6
+  preferTrackIds: 1
 --- !u!114 &319536161
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1746,7 +1758,6 @@ MonoBehaviour:
   raycastMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  arRaycastManager: {fileID: 0}
 --- !u!114 &319536162
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1759,6 +1770,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e487f71e6cf31dc4f87a23b56f76bf9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: CompanionScan::CompanionScan.Platform.QuestCameraProvider
+  requestedWidth: 1280
+  requestedHeight: 960
+  requestedFps: 30
 --- !u!114 &319536163
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1774,8 +1788,18 @@ MonoBehaviour:
   serverConfig: {fileID: 11400000, guid: f63d1cdc48b21de40b9c0a6c37000799, type: 2}
   cameraProviderSource: {fileID: 319536162}
   jpegQuality: 75
+  preferArCameraOnQuest: 1
+  enableTemporalSmoothing: 1
+  smoothingAlpha: 0.5
+  preferSemanticPlanes: 1
+  semanticPlaneMaxDistance: 6
+  trackDistanceThreshold: 0.4
+  trackMaxAgeSeconds: 2.5
   raycaster: {fileID: 319536161}
   pinManager: {fileID: 319536160}
+  snapshotStore: {fileID: 0}
+  snapshotCamera: {fileID: 0}
+  snapshotDistance: 1
   minScore: 0.3
   maxPinsPerCapture: 20
   groundingDinoFallbackPrompt: furniture . object .
@@ -4323,78 +4347,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1995111798}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_text: Result
-  m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_fontSharedMaterials: []
-  m_fontMaterial: {fileID: 0}
-  m_fontMaterials: []
-  m_fontColor32:
-    serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
-  m_enableVertexGradient: 0
-  m_colorMode: 3
-  m_fontColorGradient:
-    topLeft: {r: 1, g: 1, b: 1, a: 1}
-    topRight: {r: 1, g: 1, b: 1, a: 1}
-    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
-    bottomRight: {r: 1, g: 1, b: 1, a: 1}
-  m_fontColorGradientPreset: {fileID: 0}
-  m_spriteAsset: {fileID: 0}
-  m_tintAllSprites: 0
-  m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: -1183493901
-  m_overrideHtmlColors: 0
-  m_faceColor:
-    serializedVersion: 2
-    rgba: 4294967295
-  m_fontSize: 12
-  m_fontSizeBase: 12
-  m_fontWeight: 400
-  m_enableAutoSizing: 0
-  m_fontSizeMin: 18
-  m_fontSizeMax: 72
-  m_fontStyle: 0
-  m_HorizontalAlignment: 1
-  m_VerticalAlignment: 256
-  m_textAlignment: 65535
-  m_characterSpacing: 0
-  m_characterHorizontalScale: 1
-  m_wordSpacing: 0
-  m_lineSpacing: 0
-  m_lineSpacingMax: 0
-  m_paragraphSpacing: 0
-  m_charWidthMaxAdj: 0
-  m_TextWrappingMode: 1
-  m_wordWrappingRatios: 0.4
-  m_overflowMode: 0
-  m_linkedTextComponent: {fileID: 0}
-  parentLinkedComponent: {fileID: 0}
-  m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
-  m_enableExtraPadding: 0
-  checkPaddingRequired: 0
-  m_isRichText: 1
-  m_EmojiFallbackSupport: 1
-  m_parseCtrlCharacters: 1
-  m_isOrthographic: 1
-  m_isCullingEnabled: 0
-  m_horizontalMapping: 0
-  m_verticalMapping: 0
-  m_uvLineOffset: 0
-  m_geometrySortingOrder: 0
-  m_IsTextObjectScaleStatic: 0
-  m_VertexBufferAutoSizeReduction: 0
-  m_useMaxVisibleDescender: 1
-  m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
-  m_isUsingLegacyAnimationComponent: 0
-  m_isVolumetricText: 0
-  m_hasFontAssetChanged: 0
-  m_baseMaterial: {fileID: 0}
-  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!1 &685208797
 GameObject:
   m_ObjectHideFlags: 0
@@ -11585,6 +11537,7 @@ MonoBehaviour:
   labelRenderer: {fileID: 319536157}
   captionPanel: {fileID: 319536156}
   pinManager: {fileID: 319536160}
+  frustumVisualizer: {fileID: 0}
   modelLabel: {fileID: 0}
   displayModeLabel: {fileID: 0}
   previewDistanceLabel: {fileID: 0}
@@ -11612,6 +11565,7 @@ MonoBehaviour:
   circleRadius: 0.006
   labelFontSize: 0.15
   labelOffset: 0.000375
+  labelSideOffset: 0.008
 --- !u!1 &2110092656
 GameObject:
   m_ObjectHideFlags: 0
@@ -11957,4 +11911,3 @@ SceneRoots:
   - {fileID: 1309603984}
   - {fileID: 251001463}
   - {fileID: 319536164}
-
