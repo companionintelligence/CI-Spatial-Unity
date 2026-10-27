@@ -249,3 +249,26 @@ pytest
 ## Legacy Sample (Cloud API)
 
 The original NVIDIA cloud API sample lives under `Assets/CompanionScanLegacy/Scripts/` and is not the primary path anymore. The project now runs locally via the CV server from both the Unity and web clients.
+
+<!-- companion-hub-readme-deep-review -->
+
+## Editor and capture reference
+
+| Area | Current project setting |
+|---|---|
+| Unity editor | Unity `6000.3.10f1` (see `ProjectSettings/ProjectVersion.txt`) |
+| Primary runtime | Native Quest runtime |
+| Alternate route | Web client for browser-based use |
+| Capture handoff | glTF export and sync path |
+
+```mermaid
+flowchart LR
+  Quest[Quest camera and controllers] --> Unity[Unity capture runtime]
+  Unity --> Preview[Preview and scene controls]
+  Unity --> Export[glTF export]
+  Export --> Sync[Configured sync destination]
+  Web[Web client] --> Export
+```
+
+Open the Unity project with the pinned editor version before running the play-mode integration tests. The controller mapping and the Unity, web, and export workflows are documented above; camera previews and exported scene data may contain information about the physical environment.
+
