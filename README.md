@@ -1,6 +1,9 @@
-# Companion Scan
+<h1 align="center">Companion Scan</h1>
 
-Companion Scan includes both a native Quest 3 Unity runtime and a WebXR web client.
+<p align="center"><strong>Companion Scan includes both a native Quest 3 Unity runtime and a WebXR web client.</strong></p>
+
+<p align="center"><a href="https://xr.ci.computer">Website</a> · <a href="#documentation">Documentation</a> · <a href="#quick-start">Get started</a></p>
+
 Both clients combine scene understanding with a local CV server (Grounding DINO,
 SAM 2, Florence-2) to produce a glTF export with rich spatial metadata and sync
 it back to the server.
