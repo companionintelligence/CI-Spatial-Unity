@@ -2,7 +2,7 @@
 
 <p align="center"><strong>Companion Scan includes both a native Quest 3 Unity runtime and a WebXR web client.</strong></p>
 
-<p align="center"><a href="https://xr.ci.computer">Website</a> · <a href="#documentation">Documentation</a> · <a href="#quick-start">Get started</a></p>
+<p align="center"><a href="https://xr.ci.computer">Website</a> · <a href="#documentation">Documentation</a> · <a href="#quick-start">Get started</a> · <a href="https://docs.ci.computer/docs/reference/open-source-systems">Systems map</a></p>
 
 Both clients combine scene understanding with a local CV server (Grounding DINO,
 SAM 2, Florence-2) to produce a glTF export with rich spatial metadata and sync
