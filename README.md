@@ -1,11 +1,34 @@
-# Companion Scan
+<h1 align="center">Companion Scan</h1>
 
-Companion Scan includes both a native Quest 3 Unity runtime and a WebXR web client.
+<p align="center"><strong>Companion Scan includes both a native Quest 3 Unity runtime and a WebXR web client.</strong></p>
+
+[![release](https://img.shields.io/badge/release-not%20published-757575?style=flat-square)](https://github.com/companionintelligence/CI-Spatial-Unity/releases)
+[![platform](https://img.shields.io/badge/platform-Quest%203%20%C2%B7%20Unity%20%C2%B7%20WebXR-0a6358?style=flat-square)](https://github.com/companionintelligence/CI-Spatial-Unity)
+[![License](https://img.shields.io/badge/license-Commercial%20Standard-8a5a00?style=flat-square)](LICENSE.md)
+[![Discord](https://img.shields.io/badge/chat-Discord-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/invite/yQp9hwpzAa)
+
+<p align="center"><a href="https://xr.ci.computer">Website</a> · <a href="#documentation">Documentation</a> · <a href="#quick-start">Get started</a> · <a href="https://docs.ci.computer/docs/reference/open-source-systems">Systems map</a></p>
+
+<p align="center">
+  <a href="#quick-start"><img src="https://img.shields.io/badge/Quick%20start-Quick%20start-0a6358?style=for-the-badge&logo=unity&logoColor=white" alt="Quick start" height="30"></a>
+</p>
+
 Both clients combine scene understanding with a local CV server (Grounding DINO,
 SAM 2, Florence-2) to produce a glTF export with rich spatial metadata and sync
 it back to the server.
 
 ![florence-xr-Trim-Trim-ezgif com-optimize](https://github.com/user-attachments/assets/429c9837-574e-4857-8843-1727167f73c3)
+
+
+## Features
+
+| Feature | What it provides |
+|---|---|
+| **On-device scene query** | Read Meta Scene Understanding planes, volumes and labels on Quest. |
+| **Local CV pipeline** | Send passthrough frames to a separately hosted detector and segmenter. |
+| **Shared spatial pins** | Merge detections with provenance in one spatial pin store. |
+| **Portable output** | Export pins and metadata to glTF for review and sync. |
+
 
 ## Overview
 
@@ -32,6 +55,20 @@ Both pipelines write `SpatialPin` objects (tagged `CvServer` or `MetaScene`) to 
 - Controller UI: `Assets/CompanionScan/UI/`
 - CV server: `cv-server/`
 - Web client: `web/`
+
+
+## How it fits together
+
+Two capture pipelines converge on one SpatialPin manager: Meta Scene Understanding runs on-device, while optional CV analysis runs on a local server; both feed the glTF exporter.
+
+```mermaid
+flowchart LR
+  Scene[Quest scene understanding] --> Pins[SpatialPin manager]
+  Camera[Passthrough frames] --> CV[Local CV server]
+  CV --> Pins
+  Pins --> Export[glTF and spatial metadata]
+  Export --> Sync[Optional server sync]
+```
 
 ## Architecture (Unity Quest Runtime)
 
@@ -246,3 +283,26 @@ pytest
 ## Legacy Sample (Cloud API)
 
 The original NVIDIA cloud API sample lives under `Assets/CompanionScanLegacy/Scripts/` and is not the primary path anymore. The project now runs locally via the CV server from both the Unity and web clients.
+
+<!-- companion-hub-readme-deep-review -->
+
+## Editor and capture reference
+
+| Area | Current project setting |
+|---|---|
+| Unity editor | Unity `6000.3.10f1` (see `ProjectSettings/ProjectVersion.txt`) |
+| Primary runtime | Native Quest runtime |
+| Alternate route | Web client for browser-based use |
+| Capture handoff | glTF export and sync path |
+
+```mermaid
+flowchart LR
+  Quest[Quest camera and controllers] --> Unity[Unity capture runtime]
+  Unity --> Preview[Preview and scene controls]
+  Unity --> Export[glTF export]
+  Export --> Sync[Configured sync destination]
+  Web[Web client] --> Export
+```
+
+Open the Unity project with the pinned editor version before running the play-mode integration tests. The controller mapping and the Unity, web, and export workflows are documented above; camera previews and exported scene data may contain information about the physical environment.
+
