@@ -4,7 +4,7 @@
 
 [![release](https://img.shields.io/badge/release-not%20published-757575?style=flat-square)](https://github.com/companionintelligence/CI-Spatial-Unity/releases)
 [![platform](https://img.shields.io/badge/platform-Quest%203%20%C2%B7%20Unity%20%C2%B7%20WebXR-0a6358?style=flat-square)](https://github.com/companionintelligence/CI-Spatial-Unity)
-[![License](https://img.shields.io/badge/license-Commercial%20Standard-8a5a00?style=flat-square)](LICENSE.md)
+[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-0a6358?style=flat-square)](LICENSE)
 [![Discord](https://img.shields.io/badge/chat-Discord-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/invite/yQp9hwpzAa)
 
 <p align="center"><a href="https://xr.ci.computer">Website</a> · <a href="#documentation">Documentation</a> · <a href="#quick-start">Get started</a> · <a href="https://docs.ci.computer/docs/reference/open-source-systems">Systems map</a></p>
@@ -306,3 +306,8 @@ flowchart LR
 
 Open the Unity project with the pinned editor version before running the play-mode integration tests. The controller mapping and the Unity, web, and export workflows are documented above; camera previews and exported scene data may contain information about the physical environment.
 
+## License
+
+Companion Scan is free and public under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0). The full text is in [LICENSE](LICENSE); common questions are answered in the [License FAQ](docs/License-FAQ.md).
+
+Required Notice: Copyright LifeScope INC, DBA Companion Intelligence (https://ci.computer)

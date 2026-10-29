@@ -85,3 +85,11 @@ crashlytics-build.properties
 /web/dist/
 /web/playwright-report/
 /web/test-results/
+
+# Secrets and local TLS material (never commit)
+.env
+.env.*
+!.env.example
+*.crt
+*.key
+*.pem
