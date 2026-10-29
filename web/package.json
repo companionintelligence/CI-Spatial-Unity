@@ -1,6 +1,7 @@
 {
   "name": "companion-scan-web",
   "version": "0.1.0",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "description": "Web version of Companion Scan using Meta Immersive Web SDK",
   "private": true,
   "type": "module",
