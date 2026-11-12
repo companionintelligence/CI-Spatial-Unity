@@ -406,6 +406,9 @@ up in `ProjectSettings/ProjectSettings.asset`.
 - `-release` makes the build fail unless all four are set and `KEYSTORE_PATH`
   points to an existing file. Use it for every build meant for a store or for
   testers who update in place.
+- `-aab` builds an Android App Bundle (`Builds/Android/CompanionCapture.aab`)
+  instead of an APK, for stores that take bundles (Google Play requires them for
+  new apps). Meta Horizon Store uploads and sideloading use the APK.
 - versionCode is `VERSION_CODE` when set, otherwise
   MAJOR × 1000000 + MINOR × 1000 + PATCH of the version name, the same rule the
   CI builds use: `0.1.0` is 1000 and `1.2.3` is 1002003. Every upload to a store
@@ -427,6 +430,8 @@ $env:KEY_PASS = '<key password>'
   -projectPath . -buildTarget Android `
   -executeMethod CommandLineBuild.BuildAndroidQuest -release -logFile build-release.log
 ```
+
+Add `-aab` to the same command for an App Bundle.
 
 The build also fails when Player Settings > Android > Target API Level is not
 exactly 34, when a build callback throws while Unity creates it, or when the

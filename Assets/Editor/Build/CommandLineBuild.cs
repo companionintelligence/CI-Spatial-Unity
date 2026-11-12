@@ -14,6 +14,7 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item>-release: the build must be signed with the release key; fails unless KEYSTORE_PATH,
 /// KEYSTORE_PASS, KEY_ALIAS and KEY_PASS are all set.</item>
+/// <item>-aab: build an Android App Bundle (Builds/Android/&lt;product&gt;.aab) instead of an APK.</item>
 /// <item>KEYSTORE_PATH, KEYSTORE_PASS, KEY_ALIAS, KEY_PASS: when all four are set the build is signed
 /// with that key, otherwise with Unity's debug key.</item>
 /// <item>VERSION_CODE: versionCode; default MAJOR*1000000 + MINOR*1000 + PATCH of the version name.</item>
@@ -25,16 +26,20 @@ public static class CommandLineBuild
 {
     private const string DefaultOutputDir = "Builds/Android";
 
+    /// <summary>Command-line argument that builds an Android App Bundle instead of an APK.</summary>
+    public const string AppBundleArgument = "-aab";
+
     [MenuItem("Build/Android/Build Quest APK")]
     public static void BuildAndroidQuestMenu()
     {
         BuildAndroidQuest();
     }
 
-    // Execute via command line: -executeMethod CommandLineBuild.BuildAndroidQuest [-release]
+    // Execute via command line: -executeMethod CommandLineBuild.BuildAndroidQuest [-release] [-aab]
     public static void BuildAndroidQuest()
     {
         var release = HasArgument(AndroidReleaseSettings.ReleaseArgument);
+        var appBundle = HasArgument(AppBundleArgument);
         var signing = AndroidReleaseSettings.ReadSigning(Environment.GetEnvironmentVariable);
         AndroidReleaseSettings.Validate(signing, release);
         var versionName = AndroidReleaseSettings.ResolveVersionName(Environment.GetEnvironmentVariable, PlayerSettings.bundleVersion);
@@ -46,7 +51,8 @@ public static class CommandLineBuild
         var productName = string.IsNullOrWhiteSpace(PlayerSettings.productName)
             ? "Unity-Android-Player"
             : SanitizeFileName(PlayerSettings.productName);
-        var outputPath = Path.Combine(outputDir, $"{productName}.apk");
+        var packageKind = appBundle ? "AAB" : "APK";
+        var outputPath = Path.Combine(outputDir, $"{productName}.{(appBundle ? "aab" : "apk")}");
 
         var scenes = EditorBuildSettings.scenes
             .Where(scene => scene.enabled)
@@ -99,11 +105,20 @@ public static class CommandLineBuild
             Debug.Log("CommandLineBuild: Signing with the debug key (no release signing variables set).");
         }
 
-        Debug.Log($"CommandLineBuild: Building APK {versionName} (versionCode {versionCode}) to {outputPath}");
+        Debug.Log($"CommandLineBuild: Building {packageKind} {versionName} (versionCode {versionCode}) to {outputPath}");
         BuildReport report;
-        using (AndroidReleaseSettings.Apply(versionName, versionCode, signing))
+        var previousBuildAppBundle = EditorUserBuildSettings.buildAppBundle;
+        try
         {
-            report = BuildPipeline.BuildPlayer(options);
+            EditorUserBuildSettings.buildAppBundle = appBundle;
+            using (AndroidReleaseSettings.Apply(versionName, versionCode, signing))
+            {
+                report = BuildPipeline.BuildPlayer(options);
+            }
+        }
+        finally
+        {
+            EditorUserBuildSettings.buildAppBundle = previousBuildAppBundle;
         }
 
         if (report.summary.result != BuildResult.Succeeded)
