@@ -66,6 +66,7 @@ COPY app/ /app/app/
 EXPOSE 8000 443
 
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# A Windows checkout can give the script CRLF endings, which break its #! line.
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 CMD ["/app/entrypoint.sh"]
