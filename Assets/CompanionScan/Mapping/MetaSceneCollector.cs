@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CompanionScan.Core;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -71,15 +72,14 @@ namespace CompanionScan.Mapping
                 supportedLabels = new List<string>(SemanticLabelMapper.SupportedMetaLabels)
             };
 
-#if UNITY_ANDROID
-            const string permission = "com.oculus.permission.USE_SCENE";
-            if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(permission))
+            // Scene data needs the spatial data permission (USE_SCENE): ask the
+            // first time it is needed and degrade gracefully when denied.
+            if (!await SpatialDataPermission.RequestAsync())
             {
-                snapshot.error = "Spatial Data permission not granted (com.oculus.permission.USE_SCENE).";
+                snapshot.error = SpatialDataPermission.DeniedMessage;
                 LastSnapshot = snapshot;
                 return snapshot;
             }
-#endif
 
             var rooms = new List<OVRAnchor>();
             await OVRAnchor.FetchAnchorsAsync(rooms, new OVRAnchor.FetchOptions

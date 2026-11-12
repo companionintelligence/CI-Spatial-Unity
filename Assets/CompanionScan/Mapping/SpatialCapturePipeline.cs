@@ -373,6 +373,11 @@ namespace CompanionScan.Mapping
                 return;
             }
 
+            // Pin placement prefers environment raycasts, which need the spatial
+            // data permission: ask before the first capture (no-op once answered;
+            // when denied the raycaster falls back to physics/fixed-distance hits).
+            await SpatialDataPermission.RequestAsync();
+
             var frame = _cameraProvider.GetCurrentFrameJpeg(jpegQuality);
             if (frame == null || frame.Length == 0)
             {
