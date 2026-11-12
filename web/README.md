@@ -81,7 +81,11 @@ npm run dev
 Open `http://localhost:5173` in your browser.
 
 The dev server proxies `/v1/*` requests to `http://localhost:8000`, so you
-don't need CORS configuration during development.
+don't need CORS configuration during development. The cv-server requires a
+bearer token on every route: start the dev server with `CV_SERVER_API_TOKEN`
+set to the server's token and the proxy adds the `Authorization` header
+(the token stays in the Node process, not in the browser). A CV server URL set
+in the Settings panel bypasses the proxy, and those requests carry no token.
 
 If you are not on a WebXR-capable browser, click **Start Desktop** to run the
 scanner with the webcam and the DOM control bar.

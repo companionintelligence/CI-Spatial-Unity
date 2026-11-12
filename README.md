@@ -277,7 +277,9 @@ Ensure:
 - The runner is GitHub Actions runner 2.327.1 or newer (the pinned actions run
   on Node.js 24).
 - cv-server is running as a stable local service on this machine.
-- Health check is available at `http://localhost:8000/v1/health`.
+- Health check is available at `http://localhost:8000/v1/health`; like every
+  cv-server route it needs `Authorization: Bearer <CV_SERVER_API_TOKEN>` (the
+  `CV_SERVER_API_TOKEN` repository secret).
 
 Pull requests run the unit tests; the cv-server integration tests run when the
 workflow is started by hand. See

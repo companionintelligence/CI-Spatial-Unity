@@ -3,7 +3,7 @@ set -e
 
 # Fail before downloading anything: the API refuses to start without a token.
 if [ -z "${CV_SERVER_API_TOKEN:-}" ]; then
-    echo "CV_SERVER_API_TOKEN is not set. Every endpoint except /v1/health requires a bearer token." >&2
+    echo "CV_SERVER_API_TOKEN is not set. Every endpoint, /v1/health included, requires a bearer token." >&2
     exit 1
 fi
 

@@ -11,7 +11,7 @@ from app.routers.gltf import router as gltf_router
 from app.model_manager import ModelManager
 
 app = FastAPI(title="CV Server", version="0.1.0")
-# Every route except /v1/health needs "Authorization: Bearer <CV_SERVER_API_TOKEN>".
+# Every route, /v1/health included, needs "Authorization: Bearer <CV_SERVER_API_TOKEN>".
 app.add_middleware(BearerTokenMiddleware)
 
 app.include_router(health_router, prefix="/v1")

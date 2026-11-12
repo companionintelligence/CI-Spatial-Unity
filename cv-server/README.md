@@ -19,10 +19,10 @@ docker compose up --build
    SHA-256 (about 850 MB; later starts only re-verify). See
    [Model Files](#model-files).
 
-3) Health check:
+3) Health check (it needs the token too):
 
 ```bash
-curl http://localhost:8000/v1/health
+curl -H "Authorization: Bearer $CV_SERVER_API_TOKEN" http://localhost:8000/v1/health
 ```
 
 ## Image
@@ -54,7 +54,8 @@ alone and reported unless `--force` is given. Florence-2 is downloaded by
 
 ## Authentication
 
-Every endpoint except `GET /v1/health` requires a bearer token:
+Every endpoint, `GET /v1/health` included, requires a bearer token (the health
+response names the GPU, its memory use, the loaded models and the uptime):
 
 ```
 Authorization: Bearer <token>
@@ -69,7 +70,7 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 Requests without a valid token get `401` (`503` if the server has no token
-configured). `WS /v1/stream` takes the same `Authorization` header; browsers,
+configured). Liveness probes send the token like any other client. `WS /v1/stream` takes the same `Authorization` header; browsers,
 which cannot set headers on a WebSocket, offer the token as a subprotocol pair
 instead: `new WebSocket(url, ["bearer", token])`. Tokens in query strings are
 not accepted.

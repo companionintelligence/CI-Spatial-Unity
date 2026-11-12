@@ -40,6 +40,11 @@ function resolveHttpsConfig() {
 
 const https = resolveHttpsConfig();
 
+// Every cv-server route needs "Authorization: Bearer <token>". The dev server's proxy adds it
+// from CV_SERVER_API_TOKEN (first token when several are listed), on the Node side, so the
+// token never reaches the browser bundle.
+const cvServerToken = (process.env.CV_SERVER_API_TOKEN ?? '').split(',')[0].trim();
+
 export default defineConfig({
   base: './',
   build: {
@@ -63,6 +68,7 @@ export default defineConfig({
       '/v1': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        ...(cvServerToken ? { headers: { Authorization: `Bearer ${cvServerToken}` } } : {}),
       },
     },
   },

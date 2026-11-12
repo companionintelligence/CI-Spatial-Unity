@@ -63,8 +63,10 @@ Triggers, runners and repository secrets are summarised in the README under
   - Manual runs while the push and nightly triggers stay gated (see
     [CI.md](CI.md)); planned for `main` and nightly runs
   - Expects cv-server to run as a service on the runner host and waits for
-    `http://localhost:8000/v1/health`
-  - Sets CompanionScan_TEST_SERVER_URL to the local server
+    `http://localhost:8000/v1/health`, sending the `CV_SERVER_API_TOKEN`
+    secret as a bearer token (every cv-server route requires one)
+  - Sets CompanionScan_TEST_SERVER_URL to the local server and
+    CompanionScan_API_TOKEN to the same token
 
 - Job C: Web client browser tests (`web-tests.yml`)
   - Manual runs
@@ -80,6 +82,7 @@ Triggers, runners and repository secrets are summarised in the README under
 ## Environment Variables
 
 - CompanionScan_TEST_SERVER_URL
+- CompanionScan_API_TOKEN (the cv-server's bearer token)
 - CompanionScan_TEST_ARTIFACTS
 
 ## Manual QA Scene

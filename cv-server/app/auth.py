@@ -1,10 +1,11 @@
 """Bearer-token authentication for the CV server.
 
-Every HTTP and WebSocket route requires ``Authorization: Bearer <token>``, except
-the paths in ``PUBLIC_PATHS`` (the health check). Accepted tokens come from the
-``CV_SERVER_API_TOKEN`` environment variable, comma-separated so a token can be
-rotated without downtime. With no token configured the server fails closed: the
-startup hook refuses to start and protected routes answer 503.
+Every HTTP and WebSocket route requires ``Authorization: Bearer <token>``,
+including the health check, which reports the GPU model, VRAM use, loaded models
+and uptime. Accepted tokens come from the ``CV_SERVER_API_TOKEN`` environment
+variable, comma-separated so a token can be rotated without downtime. With no
+token configured the server fails closed: the startup hook refuses to start and
+every route answers 503.
 
 Browsers cannot set headers on a WebSocket handshake, so ``/v1/stream`` also
 accepts the token as a subprotocol pair: ``new WebSocket(url, ["bearer", token])``.
@@ -25,8 +26,9 @@ from starlette.websockets import WebSocketClose
 
 from app.config import settings
 
-#: Paths reachable without a token. Keep this to health/liveness probes.
-PUBLIC_PATHS = frozenset({"/v1/health"})
+#: Paths reachable without a token: none. Probes send the token like any client
+#: (curl -H "Authorization: Bearer $CV_SERVER_API_TOKEN" .../v1/health).
+PUBLIC_PATHS: frozenset = frozenset()
 
 #: WebSocket subprotocol that carries the token in the next offered subprotocol.
 WS_BEARER_SUBPROTOCOL = "bearer"
@@ -45,7 +47,7 @@ def require_configured_token() -> None:
     if not configured_tokens():
         raise RuntimeError(
             f"{TOKEN_ENV_VAR} is not set. Set it to a bearer token (or several, "
-            "comma-separated); every endpoint except /v1/health requires one."
+            "comma-separated); every endpoint requires one."
         )
 
 

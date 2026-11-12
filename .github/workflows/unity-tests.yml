@@ -114,11 +114,16 @@ jobs:
 
       - name: Wait for cv-server health
         shell: pwsh
+        env:
+          # Every cv-server route, the health check included, needs the bearer token.
+          CV_SERVER_API_TOKEN: ${{ secrets.CV_SERVER_API_TOKEN }}
         run: |
+          if (-not $env:CV_SERVER_API_TOKEN) { throw "Set the CV_SERVER_API_TOKEN repository secret (README.md, Repository secrets)." }
           $healthUrl = "http://localhost:8000/v1/health"
+          $headers = @{ Authorization = "Bearer $env:CV_SERVER_API_TOKEN" }
           for ($i = 0; $i -lt 30; $i++) {
             try {
-              $resp = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 5
+              $resp = Invoke-WebRequest -Uri $healthUrl -Headers $headers -UseBasicParsing -TimeoutSec 5
               if ($resp.StatusCode -eq 200) { exit 0 }
             } catch {}
             Start-Sleep -Seconds 10

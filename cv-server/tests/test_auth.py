@@ -12,8 +12,12 @@ from app.main import app, startup
 client = TestClient(app)
 
 
-def test_health_is_public() -> None:
+def test_health_requires_token(auth_headers: dict) -> None:
+    # The health payload names the GPU and the loaded models, so it is protected too.
     response = client.get("/v1/health")
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"].startswith("Bearer")
+    response = client.get("/v1/health", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
@@ -29,6 +33,7 @@ def test_health_is_public() -> None:
         ("get", "/openapi.json"),
         ("get", "/docs"),
         ("get", "/v1/does-not-exist"),
+        ("get", "/v1/health"),
     ],
 )
 def test_protected_routes_reject_missing_token(method: str, path: str) -> None:
@@ -81,7 +86,7 @@ def test_gltf_upload_with_token(auth_headers: dict, monkeypatch: pytest.MonkeyPa
 
 def test_unconfigured_server_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "api_token", SecretStr(""))
-    assert client.get("/v1/health").status_code == 200
+    assert client.get("/v1/health").status_code == 503
     response = client.post("/v1/detect", json={}, headers={"Authorization": "Bearer "})
     assert response.status_code == 503
     with pytest.raises(RuntimeError, match="CV_SERVER_API_TOKEN"):

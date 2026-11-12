@@ -7,7 +7,7 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      # Required: bearer token(s) for every endpoint except /v1/health.
+      # Required: bearer token(s) for every endpoint, /v1/health included.
       - CV_SERVER_API_TOKEN=${CV_SERVER_API_TOKEN:-}
       - CV_SERVER_DEVICE=cuda
       - CV_SERVER_LOAD_ALL=true
