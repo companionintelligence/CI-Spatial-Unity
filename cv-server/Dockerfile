@@ -14,19 +14,29 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ENV FORCE_CUDA=1
 ENV TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"
 
+# Python 3.11 from Ubuntu 22.04's own archive (python3.11 in jammy-updates), in a
+# virtualenv that comes first on PATH, so python3/pip/uvicorn below are 3.11.
+# requirements.txt needs 3.11: pillow 13.0.0 declares Requires-Python >=3.11, and
+# jammy's default python3 is 3.10. Every other pin, and torch 2.5.1+cu121 from the
+# cu121 index, also resolves for 3.11.
 RUN apt-get update && apt-get install -y \
-    python3.10 python3-pip git build-essential ninja-build cmake libgl1 libglib2.0-0 \
+    python3.11 python3.11-dev python3.11-venv git build-essential ninja-build cmake libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
+RUN python3.11 -m venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH=/opt/venv/bin:$PATH
 
 WORKDIR /app
 
-RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-RUN pip3 install packaging
-RUN pip3 install --no-build-isolation flash-attn
+# flash-attn builds without isolation, so its build requirements must already be here
+# (the system pip used to bring wheel along; a fresh virtualenv does not).
+RUN pip install packaging wheel
+RUN pip install --no-build-isolation flash-attn
 
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 RUN python3 - <<'PY'
 import pathlib

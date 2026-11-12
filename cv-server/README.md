@@ -25,6 +25,14 @@ docker compose up --build
 curl http://localhost:8000/v1/health
 ```
 
+## Image
+
+The image is `nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04` with Python 3.11 from
+Ubuntu 22.04's own archive, installed in a virtualenv at `/opt/venv` that comes
+first on `PATH`. Ubuntu 22.04's default Python is 3.10, but `requirements.txt`
+pins `pillow==13.0.0`, which needs Python 3.11 or later; every other pin and
+PyTorch 2.5.1 from the cu121 index also install on 3.11.
+
 ## Model Files
 
 `scripts/fetch_weights.py` fetches the files the server loads from pinned URLs
