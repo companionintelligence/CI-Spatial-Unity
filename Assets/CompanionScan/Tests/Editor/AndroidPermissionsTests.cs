@@ -27,6 +27,33 @@ namespace CompanionScan.Tests.Editor
             Assert.IsEmpty(toolsNode, "USE_SCENE must be declared, not removed");
         }
 
+        [TestCase("com.oculus.permission.EYE_TRACKING")]
+        [TestCase("com.oculus.permission.IMPORT_EXPORT_IOT_MAP_DATA")]
+        [TestCase("com.oculus.permission.USE_COLOCATION_DISCOVERY_API")]
+        [TestCase("com.oculus.permission.BOUNDARY_VISIBILITY")]
+        public void Manifest_RemovesUnusedMetaPermissions(string permission)
+        {
+            Assert.IsNotNull(FindUsesPermission(LoadManifest(), permission, out var toolsNode), permission + " has no removal entry");
+            Assert.AreEqual("remove", toolsNode);
+        }
+
+        [Test]
+        public void Manifest_RemovesTheEyeTrackingFeature()
+        {
+            var manifest = LoadManifest();
+            XmlElement feature = null;
+            foreach (XmlElement element in manifest.SelectNodes("/manifest/uses-feature"))
+            {
+                if (element.GetAttribute("name", AndroidNamespace) == "oculus.software.eye_tracking")
+                {
+                    feature = element;
+                }
+            }
+
+            Assert.IsNotNull(feature);
+            Assert.AreEqual("remove", feature.GetAttribute("node", "http://schemas.android.com/tools"));
+        }
+
         private static XmlDocument LoadManifest()
         {
             var document = new XmlDocument();
