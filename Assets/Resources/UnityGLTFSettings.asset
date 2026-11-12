@@ -26,6 +26,19 @@ MonoBehaviour:
   m_Name: ExrImport
   m_EditorClassIdentifier: UnityGLTFScripts::UnityGLTF.Plugins.ExrImport
   enabled: 1
+--- !u!114 &-7915780430093405058
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de1f726221454139bfcce49d994d9d05, type: 3}
+  m_Name: ExrImport
+  m_EditorClassIdentifier: UnityGLTFScripts::UnityGLTF.Plugins.ExrImport
+  enabled: 1
 --- !u!114 &-5119327533425177874
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -217,6 +230,8 @@ MonoBehaviour:
   - {fileID: 7797131212789414163}
   - {fileID: 1647330330305939790}
   - {fileID: -1003220511524455729}
+  - {fileID: 2245291059106162031}
+  - {fileID: -7915780430093405058}
   ExportPlugins:
   - {fileID: 2967777689298571210}
   - {fileID: -573809376024374682}
@@ -314,6 +329,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3579a4c311b8427f81a0c1a29e9acfe8, type: 3}
   m_Name: LightsPunctualExport
   m_EditorClassIdentifier: UnityGLTFScripts::UnityGLTF.Plugins.LightsPunctualExport
+  enabled: 1
+--- !u!114 &2245291059106162031
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5d73111d7b6493da937accca1adfe6a, type: 3}
+  m_Name: WebpImport
+  m_EditorClassIdentifier: UnityGLTFScripts::UnityGLTF.Plugins.WebpImport
   enabled: 1
 --- !u!114 &2967777689298571210
 MonoBehaviour:
