@@ -51,18 +51,31 @@
 
 ## CI/CD Pipeline (GitHub Actions)
 
-- Job A: EditMode + PlayMode unit tests
-  - Runs on every PR
+Triggers, runners and repository secrets are summarised in the README under
+[Continuous integration and releases](../README.md#continuous-integration-and-releases).
+
+- Job A: EditMode + PlayMode unit tests (`unity-tests.yml`, self-hosted GPU runner)
+  - Runs on pull requests to `main` that change the Unity project or `test/`,
+    and on manual runs; pull requests from forks are skipped
   - No external services required
 
-- Job B: Integration tests with cv-server
-  - Runs on main or scheduled (nightly)
-  - Starts cv-server via docker compose
+- Job B: Integration tests with cv-server (`unity-tests.yml`)
+  - Manual runs while the push and nightly triggers stay gated (see
+    [CI.md](CI.md)); planned for `main` and nightly runs
+  - Expects cv-server to run as a service on the runner host and waits for
+    `http://localhost:8000/v1/health`
   - Sets CompanionScan_TEST_SERVER_URL to the local server
 
-- Job C: Web client browser tests
+- Job C: Web client browser tests (`web-tests.yml`)
+  - Manual runs
   - Builds the Vite app in `web/`
   - Runs Playwright coverage for the browser client workflows
+
+- Job D: Quest APK build (`quest-build.yml`, GitHub-hosted runner)
+  - Manual runs and `v*` tags; a tag also creates a draft GitHub Release
+  - Builds the Android APK with GameCI, using the editor version from
+    `ProjectSettings/ProjectVersion.txt`
+  - Installing the APK on a headset: [SIDELOAD.md](SIDELOAD.md)
 
 ## Environment Variables
 
