@@ -222,7 +222,11 @@ namespace CompanionScan.UI
             }
         }
 
-        /// <summary>Normalize, validate and persist <paramref name="input"/> as the server URL override.</summary>
+        /// <summary>
+        /// Normalize <paramref name="input"/>, check it against this build's transport
+        /// policy (see <see cref="ServerConfig.IsUrlAllowed"/>) and persist it as the
+        /// server URL override.
+        /// </summary>
         public bool TrySaveUrl(string input, out string message)
         {
             if (config == null)
@@ -231,7 +235,8 @@ namespace CompanionScan.UI
                 return false;
             }
 
-            if (!ServerConfig.TryNormalizeBaseUrl(input, out var normalized, out var error))
+            if (!ServerConfig.TryNormalizeBaseUrl(input, out var normalized, out var error) ||
+                !config.IsUrlAllowed(normalized, out error))
             {
                 message = error;
                 return false;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace CompanionScan.Core
@@ -38,6 +39,10 @@ namespace CompanionScan.Core
         public int requestTimeoutSeconds = 6;
         public int retryCount = 2;
         public float retryDelaySeconds = 0.5f;
+
+        [Tooltip("LAN hosts (IP address or LAN host name, without scheme or port) that DEVELOPMENT builds may reach over plain http. " +
+                 "Release builds are HTTPS-only. Applied to the Android network security config at build time.")]
+        public List<string> developmentCleartextHosts = new List<string>();
 
         /// <summary>
         /// Effective server URL: PlayerPrefs override, then (Editor only) the
@@ -100,6 +105,22 @@ namespace CompanionScan.Core
         }
 
         /// <summary>
+        /// Checks <paramref name="url"/> against this build's transport policy:
+        /// https always; plain http only in development builds and, on Android,
+        /// only to hosts in <see cref="developmentCleartextHosts"/> (the same list
+        /// the build writes into the network security config).
+        /// </summary>
+        public bool IsUrlAllowed(string url, out string error)
+        {
+            return CheckUrlPolicy(
+                url,
+                Debug.isDebugBuild,
+                Application.platform == RuntimePlatform.Android,
+                developmentCleartextHosts,
+                out error);
+        }
+
+        /// <summary>
         /// Normalizes user input into a base URL: trims, defaults to https:// when no
         /// scheme is given, and drops a trailing slash. Rejects credentials, query
         /// strings and fragments.
@@ -140,6 +161,48 @@ namespace CompanionScan.Core
             }
 
             normalized = uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
+            return true;
+        }
+
+        /// <summary>Pure form of <see cref="IsUrlAllowed"/> for tests and tools.</summary>
+        public static bool CheckUrlPolicy(
+            string url,
+            bool developmentBuild,
+            bool enforceCleartextAllowList,
+            IEnumerable<string> cleartextHosts,
+            out string error)
+        {
+            error = null;
+            if (!Uri.TryCreate((url ?? string.Empty).Trim(), UriKind.Absolute, out var uri) || string.IsNullOrEmpty(uri.Host))
+            {
+                error = "CV server URL is not a valid absolute URL.";
+                return false;
+            }
+
+            if (uri.Scheme == Uri.UriSchemeHttps)
+            {
+                return true;
+            }
+
+            if (uri.Scheme != Uri.UriSchemeHttp)
+            {
+                error = $"Unsupported scheme \"{uri.Scheme}\". Use https://.";
+                return false;
+            }
+
+            if (!developmentBuild)
+            {
+                error = "Plain http:// is blocked in release builds. Use https://.";
+                return false;
+            }
+
+            if (enforceCleartextAllowList && !CleartextHostPolicy.Contains(cleartextHosts, uri.Host))
+            {
+                error = $"Plain http:// to {uri.Host} is not allowed in this build. Use https://, or add the host to " +
+                        "ServerConfig > Development Cleartext Hosts and make a new development build.";
+                return false;
+            }
+
             return true;
         }
     }

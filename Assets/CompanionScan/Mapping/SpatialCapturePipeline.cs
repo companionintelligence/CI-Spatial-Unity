@@ -367,6 +367,12 @@ namespace CompanionScan.Mapping
                 return;
             }
 
+            if (!serverConfig.IsUrlAllowed(serverConfig.ResolveBaseUrl(), out var policyError))
+            {
+                Debug.LogWarning($"[Pipeline-CV] {policyError}");
+                return;
+            }
+
             var frame = _cameraProvider.GetCurrentFrameJpeg(jpegQuality);
             if (frame == null || frame.Length == 0)
             {

@@ -12,9 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6e070af6054e3674ab6d810cf77f74d6, type: 3}
   m_Name: ServerConfig
   m_EditorClassIdentifier: CompanionScan::CompanionScan.Core.ServerConfig
-  baseUrl:
+  baseUrl: 
   boxThreshold: 0.35
   textThreshold: 0.25
   requestTimeoutSeconds: 6
   retryCount: 2
   retryDelaySeconds: 0.5
+  developmentCleartextHosts: []

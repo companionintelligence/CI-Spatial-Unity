@@ -23,6 +23,12 @@ namespace CompanionScan.Export
                 return false;
             }
 
+            if (!serverConfig.IsUrlAllowed(baseUrl, out var policyError))
+            {
+                Debug.LogError($"GltfSyncClient: {policyError}");
+                return false;
+            }
+
             if (!File.Exists(gltfPath))
             {
                 Debug.LogError($"GltfSyncClient: glTF not found: {gltfPath}");

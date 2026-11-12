@@ -63,6 +63,11 @@ namespace CompanionScan.Core
                 throw new Exception("CV server base URL is not set. Press the left Menu button to enter it.");
             }
 
+            if (!_config.IsUrlAllowed(baseUrl, out var policyError))
+            {
+                throw new Exception(policyError);
+            }
+
             var url = baseUrl.TrimEnd('/') + endpoint;
             var json = JsonConvert.SerializeObject(payload);
             int retries = Mathf.Max(0, _config != null ? _config.retryCount : 0);
