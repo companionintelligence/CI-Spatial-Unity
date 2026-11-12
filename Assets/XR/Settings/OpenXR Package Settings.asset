@@ -1808,7 +1808,7 @@ MonoBehaviour:
   targetOpenXRApiVersion: 
   required: 0
   customRuntimeLoaderName: 
-  m_CameraImageSupport: 0
+  m_CameraImageSupport: 1
   m_PassthroughPreSplashScreen: 0
 --- !u!114 &3220532568101813600
 MonoBehaviour:
