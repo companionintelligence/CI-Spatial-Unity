@@ -242,7 +242,8 @@ unclear, so they were removed.
 3. CV-server image: publishing a built image redistributes NVIDIA CUDA and
    cuDNN (NVIDIA Deep Learning Container License) and LGPL FFmpeg and Qt
    (`opencv-python`). Publishing the Dockerfile alone does not. Switching to
-   `opencv-python-headless` drops Qt and `libgl1`.
+   `opencv-python-headless` drops Qt (and the need for `libgl1`); FFmpeg
+   stays.
 4. Reproducibility: GroundingDINO and SAM 2 are installed from unpinned git
    branches, `torch`/`flash-attn` are unpinned, and Florence-2 is loaded with
    `trust_remote_code=True` without a pinned `revision`. Pin each to a commit
@@ -250,3 +251,10 @@ unclear, so they were removed.
    you.
 5. The npm/PyPI attribution generator must not overwrite this file or
    [NOTICE.md](NOTICE.md); it cannot see Unity packages, assets or weights.
+   [CREDITS.md](CREDITS.md) is still its output and credits only the npm and
+   PyPI dependencies.
+6. Hardware statistics: `submitAnalytics` is now 0 in
+   `ProjectSettings/ProjectSettings.asset`, and the Unity Connect services
+   are off. Older Unity versions honoured this switch only on paid plans, so
+   check a release build under your Unity plan to confirm that no hardware
+   statistics are sent.
