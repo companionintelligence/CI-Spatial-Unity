@@ -1,12 +1,18 @@
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
+# GPU architectures the GroundingDINO and SAM 2 CUDA extensions are compiled for:
+# Ampere (8.0 A100/A30, 8.6 RTX 30xx/A10/A40), Ada (8.9 RTX 40xx/L4/L40S) and
+# Hopper (9.0 H100/H200), plus PTX so newer GPUs can JIT-compile the kernels.
+# Narrow it to speed up a local build, e.g. --build-arg TORCH_CUDA_ARCH_LIST=8.9
+ARG TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0+PTX"
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=/usr/local/cuda/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ENV FORCE_CUDA=1
-ENV TORCH_CUDA_ARCH_LIST=8.9
+ENV TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"
 
 RUN apt-get update && apt-get install -y \
     python3.10 python3-pip git build-essential ninja-build cmake libgl1 libglib2.0-0 \
