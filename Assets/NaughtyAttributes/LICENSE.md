@@ -26,7 +26,7 @@ This file covers the `Assets/NaughtyAttributes/` directory only: the
 NaughtyAttributes Unity Inspector extension, vendored into this repository as
 source (`com.dbrizov.naughtyattributes`, see `package.json` in this
 directory). It does not apply to the rest of this repository, which remains
-covered by this repository's top-level `LICENSE.md`.
+covered by this repository's top-level `LICENSE`.
 
 Upstream project: https://github.com/dbrizov/NaughtyAttributes
 Retrieved: 2026-09-15
