@@ -115,6 +115,7 @@ to the controller model at runtime.
 |--------|--------|--------|---------|
 | **X** | Yellow | **Preview Distance** | Cycles the raycaster fallback distance: Near (1 m) → Far (3 m) → Off → Near … |
 | **Y** | Green | **Save & Export** | Exports glTF and uploads to the CV server via `GltfSyncClient`. |
+| **Menu** | — | **Server settings** | Opens or closes the CV server settings panel (it also opens on first run). While it is open, **A** edits the server URL, **X** the server's API token (secure keyboard; stored on the headset only, never shown) and **B** saves; the other controls pause. |
 
 ### Either Controller
 
@@ -257,7 +258,10 @@ integration tests that run all three models against 14 fixture images:
 | BBox2D_RenderingData_ValidForAllDetections | 2D rendering data is valid |
 | Anchor3D_PinData_ValidForAllDetections | 3D pin data is valid |
 
-Run via Unity Test Runner (Play Mode) or CI.
+Run via Unity Test Runner (Play Mode) or CI. They need a running CV server:
+set `CompanionScan_TEST_SERVER_URL` to its URL and `CompanionScan_API_TOKEN` to
+its API token (`CV_SERVER_API_TOKEN`) in the environment of the Unity editor.
+Without a server URL the server tests are skipped or fail.
 
 ### QA XR Scene Asset
 
@@ -321,6 +325,7 @@ secrets**. Workflows started from forks do not receive them.
 | `ANDROID_KEYSTORE_PASS` | Only with a keystore | Keystore password |
 | `ANDROID_KEYALIAS_NAME` | Only with a keystore | Key alias |
 | `ANDROID_KEYALIAS_PASS` | Only with a keystore | Key password |
+| `CV_SERVER_API_TOKEN` | Unity Tests integration job | API token of the cv-server on the runner host (sent by the health check and the Play Mode tests) |
 
 For a Personal licence, activate Unity once in Unity Hub and use the licence
 file it writes: `C:\ProgramData\Unity\Unity_lic.ulf` (Windows),

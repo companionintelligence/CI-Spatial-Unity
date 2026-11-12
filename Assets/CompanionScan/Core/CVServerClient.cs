@@ -81,6 +81,7 @@ namespace CompanionScan.Core
                 request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
+                _config.ApplyAuthorization(request);
                 request.timeout = timeout;
 
                 var operation = request.SendWebRequest();
@@ -96,7 +97,11 @@ namespace CompanionScan.Core
 
                 string error = request.error;
                 long status = request.responseCode;
-                lastError = new Exception($"CV server error ({status}): {error}");
+                lastError = new Exception(ServerConfig.DescribeServerError(status, error));
+                if (status == 401 || status == 403 || status == 413 || status == 503)
+                {
+                    break; // retrying cannot help
+                }
 
                 if (attempt < retries)
                 {

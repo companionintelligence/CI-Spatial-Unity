@@ -133,6 +133,8 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           CompanionScan_TEST_SERVER_URL: http://localhost:8000
+          # Bearer token the app sends; the cv-server requires it on every route.
+          CompanionScan_API_TOKEN: ${{ secrets.CV_SERVER_API_TOKEN }}
           CompanionScan_TEST_ARTIFACTS: ${{ github.workspace }}/artifacts
         with:
           unityVersion: ${{ needs.unit-tests.outputs.unity-version }}

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace CompanionScan.Core
 {
@@ -22,6 +23,15 @@ namespace CompanionScan.Core
         public const string PlayerPrefsBaseUrlKey = "CompanionScan.ServerBaseUrl";
         public const string PlayerPrefsBoxThresholdKey = "CompanionScan.BoxThreshold";
         public const string PlayerPrefsTextThresholdKey = "CompanionScan.TextThreshold";
+
+        /// <summary>
+        /// PlayerPrefs key of the CV server's API token (sent as "Authorization: Bearer").
+        /// The token is entered in-headset and never stored in this asset, so no build ships one.
+        /// </summary>
+        public const string PlayerPrefsApiTokenKey = "CompanionScan.ServerApiToken";
+
+        /// <summary>Editor-only API token, e.g. for Play Mode tests against a local server.</summary>
+        public const string EditorApiTokenEnvVar = "CompanionScan_API_TOKEN";
 
         /// <summary>
         /// Editor-only URL override. Environment variables cannot be set for an
@@ -70,6 +80,84 @@ namespace CompanionScan.Core
 
         /// <summary>True when a server URL is configured from any source.</summary>
         public bool HasBaseUrl => !string.IsNullOrWhiteSpace(ResolveBaseUrl());
+
+        /// <summary>
+        /// API token for the CV server: the PlayerPrefs override, then (Editor only) the
+        /// <see cref="EditorApiTokenEnvVar"/> environment variable. Empty when none is set.
+        /// </summary>
+        public string ResolveApiToken()
+        {
+            var stored = PlayerPrefs.GetString(PlayerPrefsApiTokenKey, string.Empty);
+            if (!string.IsNullOrWhiteSpace(stored))
+            {
+                return stored.Trim();
+            }
+
+#if UNITY_EDITOR
+            var envToken = Environment.GetEnvironmentVariable(EditorApiTokenEnvVar);
+            if (!string.IsNullOrWhiteSpace(envToken))
+            {
+                return envToken.Trim();
+            }
+#endif
+
+            return string.Empty;
+        }
+
+        /// <summary>True when an API token is configured from any source.</summary>
+        public bool HasApiToken => !string.IsNullOrWhiteSpace(ResolveApiToken());
+
+        /// <summary>Persist the API token entered in-headset; an empty value removes it.</summary>
+        public void SaveApiTokenOverride(string token)
+        {
+            var trimmed = (token ?? string.Empty).Trim();
+            if (trimmed.Length == 0)
+            {
+                PlayerPrefs.DeleteKey(PlayerPrefsApiTokenKey);
+            }
+            else
+            {
+                PlayerPrefs.SetString(PlayerPrefsApiTokenKey, trimmed);
+            }
+
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>Remove the stored API token.</summary>
+        public void ClearApiTokenOverride()
+        {
+            PlayerPrefs.DeleteKey(PlayerPrefsApiTokenKey);
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>
+        /// Adds "Authorization: Bearer &lt;token&gt;" to <paramref name="request"/> when a token is
+        /// configured. The CV server requires it on every route (cv-server/app/auth.py).
+        /// </summary>
+        public void ApplyAuthorization(UnityWebRequest request)
+        {
+            var token = ResolveApiToken();
+            if (request != null && token.Length > 0)
+            {
+                request.SetRequestHeader("Authorization", "Bearer " + token);
+            }
+        }
+
+        /// <summary>Error text for an HTTP status from the CV server, with a hint for auth failures.</summary>
+        public static string DescribeServerError(long status, string error)
+        {
+            switch (status)
+            {
+                case 401:
+                    return "CV server rejected the request (401): set the server's API token in the settings panel (Menu, then X).";
+                case 503:
+                    return "CV server has no API token configured (503): set CV_SERVER_API_TOKEN on the server.";
+                case 413:
+                    return "CV server refused the upload as too large (413).";
+                default:
+                    return $"CV server error ({status}): {error}";
+            }
+        }
 
         public float ResolveBoxThreshold() => PlayerPrefs.GetFloat(PlayerPrefsBoxThresholdKey, boxThreshold);
 

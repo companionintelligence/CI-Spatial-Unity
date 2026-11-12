@@ -18,8 +18,8 @@ namespace CompanionScan.UI
     /// Either hand trigger:
     ///   Primary / Secondary Hand Trigger -> Preview glTF
     /// Left Menu button (Button.Start) -> open / close CV server settings.
-    ///   While the settings panel is open, A edits the server URL and B saves it;
-    ///   the capture controls above are suspended.
+    ///   While the settings panel is open, A edits the server URL, X the server's
+    ///   API token, and B saves; the capture controls above are suspended.
     /// </summary>
     public class XRControllerInput : MonoBehaviour
     {
@@ -95,8 +95,8 @@ namespace CompanionScan.UI
         }
 
         /// <summary>
-        /// Menu toggles the server settings panel; while it is open, A edits the URL
-        /// and B saves it. Returns true when the panel consumed this frame's input.
+        /// Menu toggles the server settings panel; while it is open, A edits the URL,
+        /// X the API token, and B saves. Returns true when the panel consumed this frame's input.
         /// </summary>
         private bool HandleSettingsInput()
         {
@@ -113,6 +113,9 @@ namespace CompanionScan.UI
 
             if (OVRInput.GetDown(OVRInput.Button.One))
                 settingsPanel.EditUrl();
+
+            if (OVRInput.GetDown(OVRInput.Button.Three))
+                settingsPanel.EditToken();
 
             if (OVRInput.GetDown(OVRInput.Button.Two))
                 settingsPanel.Apply();

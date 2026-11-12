@@ -11,8 +11,13 @@ namespace CompanionScan.UI
     ///
     /// Opens automatically on first run (no server URL configured) and with the
     /// left controller Menu button. While it is open, <see cref="XRControllerInput"/>
-    /// routes A to <see cref="EditUrl"/> (Horizon OS system keyboard) and B to
-    /// <see cref="Apply"/>; capture controls are suspended.
+    /// routes A to <see cref="EditUrl"/> (Horizon OS system keyboard), X to
+    /// <see cref="EditToken"/> and B to <see cref="Apply"/>; capture controls are suspended.
+    ///
+    /// The CV server requires a bearer token on every route. The token is typed with the
+    /// system keyboard in secure mode, stored only as a PlayerPrefs override (see
+    /// <see cref="ServerConfig.ResolveApiToken"/>) and never shown: the panel only says
+    /// whether one is set.
     ///
     /// The URL is stored as a PlayerPrefs override (see
     /// <see cref="ServerConfig.ResolveBaseUrl"/>); the ServerConfig asset is never
@@ -36,14 +41,16 @@ namespace CompanionScan.UI
         [SerializeField] private Color errorColor = new(1f, 0.45f, 0.4f, 1f);
 
         private const float PanelWidth = 640f;
-        private const float PanelHeight = 300f;
+        private const float PanelHeight = 350f;
         private const float RecenterAngleDegrees = 35f;
-        private const string Hint = "A  edit URL      B  save      Menu  close";
+        private const string Hint = "A  URL     X  API token     B  save     Menu  close";
 
         private GameObject _panelRoot;
         private TMP_Text _urlText;
+        private TMP_Text _tokenText;
         private TMP_Text _statusText;
         private TouchScreenKeyboard _keyboard;
+        private bool _keyboardEditsToken;
         private string _draftUrl = string.Empty;
         private bool _statusIsError;
         private bool _isOpen;
@@ -173,6 +180,39 @@ namespace CompanionScan.UI
             }
         }
 
+        /// <summary>X button: enter the CV server's API token with the system keyboard (secure input).</summary>
+        public void EditToken()
+        {
+            if (!_isOpen)
+            {
+                Open();
+            }
+
+            if (!TouchScreenKeyboard.isSupported)
+            {
+                SetStatus($"No system keyboard here. In the Editor set {ServerConfig.EditorApiTokenEnvVar}.", true);
+                return;
+            }
+
+            CloseKeyboard();
+            _keyboardEditsToken = true;
+            _keyboard = TouchScreenKeyboard.Open(string.Empty, TouchScreenKeyboardType.Default,
+                false, false, true, false, "API token");
+            SetStatus("Type the server's API token, then press Done (empty removes it).", false);
+        }
+
+        /// <summary>Store <paramref name="token"/> as the API token; an empty value removes it.</summary>
+        public void SaveToken(string token)
+        {
+            if (config == null)
+            {
+                return;
+            }
+
+            config.SaveApiTokenOverride(token);
+            SetStatus(config.HasApiToken ? "API token saved." : "API token removed.", false);
+        }
+
         /// <summary>A button: edit the URL with the system keyboard.</summary>
         public void EditUrl()
         {
@@ -188,6 +228,7 @@ namespace CompanionScan.UI
             }
 
             CloseKeyboard();
+            _keyboardEditsToken = false;
             _keyboard = TouchScreenKeyboard.Open(_draftUrl ?? string.Empty, TouchScreenKeyboardType.URL,
                 false, false, false, false, ServerConfig.ExampleUrl);
             SetStatus("Type the server URL, then press Done.", false);
@@ -278,6 +319,12 @@ namespace CompanionScan.UI
                 return;
             }
 
+            if (_keyboardEditsToken)
+            {
+                PollTokenKeyboard();
+                return;
+            }
+
             switch (_keyboard.status)
             {
                 case TouchScreenKeyboard.Status.Visible:
@@ -296,6 +343,25 @@ namespace CompanionScan.UI
                 case TouchScreenKeyboard.Status.LostFocus:
                     _keyboard = null;
                     _draftUrl = config != null ? config.ResolveBaseUrl() : string.Empty;
+                    SetStatus("Edit cancelled.", false);
+                    break;
+            }
+        }
+
+        private void PollTokenKeyboard()
+        {
+            switch (_keyboard.status)
+            {
+                case TouchScreenKeyboard.Status.Done:
+                    var token = _keyboard.text ?? string.Empty;
+                    _keyboard = null;
+                    _keyboardEditsToken = false;
+                    SaveToken(token);
+                    break;
+                case TouchScreenKeyboard.Status.Canceled:
+                case TouchScreenKeyboard.Status.LostFocus:
+                    _keyboard = null;
+                    _keyboardEditsToken = false;
                     SetStatus("Edit cancelled.", false);
                     break;
             }
@@ -333,6 +399,13 @@ namespace CompanionScan.UI
                 _urlText.text = string.IsNullOrWhiteSpace(_draftUrl)
                     ? $"<color=#9AA0B4>{ServerConfig.ExampleUrl}</color>"
                     : _draftUrl;
+            }
+
+            if (_tokenText != null)
+            {
+                _tokenText.text = config != null && config.HasApiToken
+                    ? "API token: set"
+                    : "<color=#9AA0B4>API token: not set (X)</color>";
             }
 
             if (_statusText != null)
@@ -379,6 +452,7 @@ namespace CompanionScan.UI
 
             MakeText(layout.transform, "Title", "CV server", 40f, 52f, FontStyles.Bold);
             _urlText = MakeText(layout.transform, "Url", string.Empty, 32f, 44f, FontStyles.Normal);
+            _tokenText = MakeText(layout.transform, "Token", string.Empty, 28f, 40f, FontStyles.Normal);
             _statusText = MakeText(layout.transform, "Status", string.Empty, 24f, 64f, FontStyles.Normal);
             _statusText.textWrappingMode = TextWrappingModes.Normal;
             MakeText(layout.transform, "Hint", Hint, 24f, 34f, FontStyles.Normal);

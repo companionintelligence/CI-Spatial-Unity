@@ -61,6 +61,7 @@ namespace CompanionScan.Export
             }
 
             using var request = UnityWebRequest.Post(url, form);
+            serverConfig.ApplyAuthorization(request);
             var operation = request.SendWebRequest();
             while (!operation.isDone)
             {
@@ -69,7 +70,7 @@ namespace CompanionScan.Export
 
             if (request.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"GltfSyncClient: upload failed: {request.error}");
+                Debug.LogError($"GltfSyncClient: upload failed: {ServerConfig.DescribeServerError(request.responseCode, request.error)}");
                 return false;
             }
 
