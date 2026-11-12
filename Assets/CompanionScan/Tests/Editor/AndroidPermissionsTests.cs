@@ -1,5 +1,7 @@
+using System.Linq;
 using System.Xml;
 using CompanionScan.Core;
+using CompanionScan.Platform;
 using NUnit.Framework;
 
 namespace CompanionScan.Tests.Editor
@@ -25,6 +27,27 @@ namespace CompanionScan.Tests.Editor
         {
             Assert.IsNotNull(FindUsesPermission(LoadManifest(), SpatialDataPermission.PermissionId, out var toolsNode));
             Assert.IsEmpty(toolsNode, "USE_SCENE must be declared, not removed");
+        }
+
+        [Test]
+        public void QuestCameraProvider_RequestsTheHeadsetCameraPermission()
+        {
+            Assert.AreEqual("horizonos.permission.HEADSET_CAMERA", QuestCameraProvider.HeadsetCameraPermission);
+            Assert.AreEqual(QuestCameraProvider.HeadsetCameraPermission, QuestCameraProvider.RequiredPermissions.First(),
+                "HEADSET_CAMERA gates the Quest passthrough cameras and must be requested");
+            // Kept until capture is verified on a headset without it: WebCamTexture checks it.
+            CollectionAssert.Contains(QuestCameraProvider.RequiredPermissions.ToList(), "android.permission.CAMERA");
+        }
+
+        [Test]
+        public void Manifest_DeclaresEveryCameraPermissionTheProviderRequests()
+        {
+            var manifest = LoadManifest();
+            foreach (var permission in QuestCameraProvider.RequiredPermissions)
+            {
+                Assert.IsNotNull(FindUsesPermission(manifest, permission, out var toolsNode), permission + " is not declared");
+                Assert.IsEmpty(toolsNode, permission + " must be declared, not removed");
+            }
         }
 
         [TestCase("com.oculus.permission.EYE_TRACKING")]
