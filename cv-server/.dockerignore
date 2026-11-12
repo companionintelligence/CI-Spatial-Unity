@@ -1,0 +1,14 @@
+# Keep the build context small and free of local state. Model files are fetched by
+# scripts/fetch_weights.py; TLS material and .env are mounted or passed at run time.
+.venv/
+**/__pycache__/
+.pytest_cache/
+.env
+certs/
+checkpoints/
+configs/
+uploads/
+load/
+tests/
+tools/
+package-lock.json

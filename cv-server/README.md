@@ -4,18 +4,42 @@ FastAPI server hosting Grounding DINO, SAM 2, and Florence-2 behind a single RES
 
 ## Quick Start
 
-1) Place model checkpoints under `cv-server/checkpoints/` and configs under `cv-server/configs/`.
+1) Set `CV_SERVER_API_TOKEN` (see [Authentication](#authentication)).
 2) Build and run the container:
 
 ```bash
 docker compose up --build
 ```
 
+   On first start the container downloads the GroundingDINO and SAM 2 files
+   into `cv-server/configs/` and `cv-server/checkpoints/` and verifies their
+   SHA-256 (about 850 MB; later starts only re-verify). See
+   [Model Files](#model-files).
+
 3) Health check:
 
 ```bash
 curl http://localhost:8000/v1/health
 ```
+
+## Model Files
+
+`scripts/fetch_weights.py` fetches the files the server loads from pinned URLs
+(Hugging Face URLs pinned to a commit, with the upstream GitHub release or
+download as fallback) and checks size and SHA-256 before moving each file into
+place. It runs:
+
+- on container start, from `entrypoint.sh` (set `CV_SERVER_FETCH_WEIGHTS=0` to skip);
+- at build time with `docker build --build-arg FETCH_WEIGHTS_AT_BUILD=1 .`, which
+  bakes the files into the image;
+- by hand: `python scripts/fetch_weights.py` (writes under `cv-server/`; `--check`
+  only verifies, `--force` replaces files that do not match).
+
+Files go where the server reads them (`GDINO_CONFIG_PATH`, `GDINO_WEIGHTS_PATH`,
+`SAM2_WEIGHTS_PATH`). A file already there with a different checksum is left
+alone and reported unless `--force` is given. Florence-2 is downloaded by
+`transformers` from the Hugging Face hub on first use and cached in the
+`huggingface_cache` volume.
 
 ## Authentication
 
@@ -40,12 +64,16 @@ instead: `new WebSocket(url, ["bearer", token])`. Tokens in query strings are
 not accepted.
 
 ```bash
-curl -H "Authorization: Bearer $CV_SERVER_API_TOKEN"   -H "Content-Type: application/json"   -d '{"image": "<BASE64_JPEG>", "prompt": "chair ."}'   http://localhost:8000/v1/detect
+curl -H "Authorization: Bearer $CV_SERVER_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"image": "<BASE64_JPEG>", "prompt": "chair ."}' \
+  http://localhost:8000/v1/detect
 ```
 
 ## Environment Variables
 
 - `CV_SERVER_API_TOKEN` (required): accepted bearer token(s), comma-separated
+- `CV_SERVER_FETCH_WEIGHTS` (default: `1`): fetch/verify model files on container start
 - `CV_SERVER_DEVICE` (default: `cuda`)
 - `GDINO_CONFIG_PATH`
 - `GDINO_WEIGHTS_PATH`

@@ -52,9 +52,16 @@ for so_file in (repo_dir / "groundingdino").glob("_C*.so"):
     shutil.copy2(so_file, site_pkg / so_file.name)
 PY
 
+# The model files are not in the build context (configs/ and checkpoints/ are
+# gitignored). The entrypoint downloads them from pinned URLs and verifies their
+# SHA-256 on first start; mount volumes on /app/configs and /app/checkpoints to keep
+# them. Build with --build-arg FETCH_WEIGHTS_AT_BUILD=1 to bake them in instead.
+COPY scripts/fetch_weights.py /app/scripts/fetch_weights.py
+ARG FETCH_WEIGHTS_AT_BUILD=0
+RUN mkdir -p /app/configs /app/checkpoints \
+    && if [ "$FETCH_WEIGHTS_AT_BUILD" = "1" ]; then python3 /app/scripts/fetch_weights.py --root /app; fi
+
 COPY app/ /app/app/
-COPY configs/ /app/configs/
-COPY checkpoints/ /app/checkpoints/
 
 EXPOSE 8000 443
 
