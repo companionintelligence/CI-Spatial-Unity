@@ -15,6 +15,10 @@
 /[Uu]ser[Ss]ettings/
 /Assets/XR-AI-Florence2/Data/ApiConfig.asset
 /Assets/XR-AI-Florence2/Data/ApiConfig.asset.meta
+# Meta XR SDK 209 recreates this on every editor load with the machine's LAN IP and
+# AgentBridge access token; CompanionScan.Editor.DevAgentSettingsBuildFilter keeps it out of builds.
+/Assets/Resources/DevAgentSettings.asset
+/Assets/Resources/DevAgentSettings.asset.meta
 
 *.log
 

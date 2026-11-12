@@ -55,6 +55,9 @@ public static class CommandLineBuild
             options = BuildOptions.None
         };
 
+        // Keep the machine-specific Meta DevAgentSettings out of the APK even if Unity skips build callbacks.
+        CompanionScan.Editor.DevAgentSettingsBuildFilter.RemoveFromProject();
+
         Debug.Log($"CommandLineBuild: Building APK to {outputPath}");
         var report = BuildPipeline.BuildPlayer(options);
 

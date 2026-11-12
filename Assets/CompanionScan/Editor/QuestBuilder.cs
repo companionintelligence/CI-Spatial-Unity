@@ -47,6 +47,8 @@ namespace CompanionScan.Editor
                 options = BuildOptions.None
             };
 
+            DevAgentSettingsBuildFilter.RemoveFromProject();
+
             BuildReport report = BuildPipeline.BuildPlayer(options);
             BuildSummary summary = report.summary;
 
@@ -87,6 +89,8 @@ namespace CompanionScan.Editor
                 target = BuildTarget.Android,
                 options = BuildOptions.AutoRunPlayer
             };
+
+            DevAgentSettingsBuildFilter.RemoveFromProject();
 
             BuildReport report = BuildPipeline.BuildPlayer(options);
             BuildSummary summary = report.summary;
