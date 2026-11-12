@@ -2,7 +2,8 @@
   "name": "CompanionScan.Tests.Editor",
   "rootNamespace": "CompanionScan.Tests.Editor",
   "references": [
-    "CompanionScan"
+    "CompanionScan",
+    "CompanionScan.Editor"
   ],
   "includePlatforms": [
     "Editor"
