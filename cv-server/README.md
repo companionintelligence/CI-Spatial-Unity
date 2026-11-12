@@ -4,7 +4,10 @@ FastAPI server hosting Grounding DINO, SAM 2, and Florence-2 behind a single RES
 
 ## Quick Start
 
-1) Set `CV_SERVER_API_TOKEN` (see [Authentication](#authentication)).
+1) Copy `.env.example` to `.env` and set `CV_SERVER_API_TOKEN` (see
+   [Authentication](#authentication)). For HTTPS, also put a certificate and key
+   in `cv-server/certs/` and point `CV_SERVER_SSL_CERTFILE` /
+   `CV_SERVER_SSL_KEYFILE` at them (see [TLS](#tls)).
 2) Build and run the container:
 
 ```bash
@@ -70,9 +73,26 @@ curl -H "Authorization: Bearer $CV_SERVER_API_TOKEN" \
   http://localhost:8000/v1/detect
 ```
 
+## TLS
+
+The container serves HTTPS on `:443` (and HTTP on `:8000`) when both
+`SSL_CERTFILE` and `SSL_KEYFILE` point at existing files; otherwise it serves
+HTTP on `:8000` only. With `docker compose`, put the files in `cv-server/certs/`
+(mounted read-only at `/app/certs`) and set their container paths in `.env`:
+
+```bash
+CV_SERVER_SSL_CERTFILE=/app/certs/<your-host>.crt
+CV_SERVER_SSL_KEYFILE=/app/certs/<your-host>.key
+```
+
+They default to `/app/certs/server.crt` and `/app/certs/server.key`. Keep host
+names and key material out of the repository; `certs/` and `.env` are gitignored.
+
 ## Environment Variables
 
 - `CV_SERVER_API_TOKEN` (required): accepted bearer token(s), comma-separated
+- `SSL_CERTFILE`, `SSL_KEYFILE`: TLS certificate and key paths in the container
+  (compose sets them from `CV_SERVER_SSL_CERTFILE` / `CV_SERVER_SSL_KEYFILE`)
 - `CV_SERVER_FETCH_WEIGHTS` (default: `1`): fetch/verify model files on container start
 - `CV_SERVER_DEVICE` (default: `cuda`)
 - `GDINO_CONFIG_PATH`
