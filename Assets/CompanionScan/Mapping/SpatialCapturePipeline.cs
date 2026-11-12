@@ -360,6 +360,24 @@ namespace CompanionScan.Mapping
                 return;
             }
 
+            if (!serverConfig.HasBaseUrl)
+            {
+                Debug.LogWarning("[Pipeline-CV] CV server URL is not set; skipping server detection. " +
+                                 "Press the left Menu button to enter it.");
+                return;
+            }
+
+            if (!serverConfig.IsUrlAllowed(serverConfig.ResolveBaseUrl(), out var policyError))
+            {
+                Debug.LogWarning($"[Pipeline-CV] {policyError}");
+                return;
+            }
+
+            // Pin placement prefers environment raycasts, which need the spatial
+            // data permission: ask before the first capture (no-op once answered;
+            // when denied the raycaster falls back to physics/fixed-distance hits).
+            await SpatialDataPermission.RequestAsync();
+
             var frame = _cameraProvider.GetCurrentFrameJpeg(jpegQuality);
             if (frame == null || frame.Length == 0)
             {

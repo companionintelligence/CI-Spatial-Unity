@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using CompanionScan.Core;
 using UnityEngine;
 
 #if UNITY_IOS || UNITY_ANDROID
@@ -263,18 +264,18 @@ namespace CompanionScan.Mapping
                 }
             }
 
-#if UNITY_ANDROID
-            const string permission = "com.oculus.permission.USE_SCENE";
-            if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(permission))
+            if (!SpatialDataPermission.IsGranted)
             {
+                // First need: ask without blocking this raycast (no-op after a denial).
+                SpatialDataPermission.RequestInBackground();
                 if (!_loggedEnvironmentPermission)
                 {
                     _loggedEnvironmentPermission = true;
-                    Debug.LogWarning("[Raycaster] Environment raycast permission not granted (USE_SCENE).");
+                    Debug.LogWarning("[Raycaster] Environment raycast needs the spatial data permission (USE_SCENE); " +
+                                     "using fallback hits until it is granted.");
                 }
                 return false;
             }
-#endif
 
             return true;
         }

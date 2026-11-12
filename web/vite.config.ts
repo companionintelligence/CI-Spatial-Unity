@@ -8,17 +8,20 @@ import { defineConfig } from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
+// Default TLS files: cv-server/certs/<VITE_SSL_HOSTNAME>.crt and .key (for example the
+// dev machine's MagicDNS name). VITE_SSL_CERT_PATH / VITE_SSL_KEY_PATH override the paths.
+const sslHostname = process.env.VITE_SSL_HOSTNAME ?? 'localhost';
 const defaultCertPath = path.join(
   repoRoot,
   'cv-server',
   'certs',
-  'liam-razer.capybara-ulmer.ts.net.crt'
+  `${sslHostname}.crt`
 );
 const defaultKeyPath = path.join(
   repoRoot,
   'cv-server',
   'certs',
-  'liam-razer.capybara-ulmer.ts.net.key'
+  `${sslHostname}.key`
 );
 
 function resolveHttpsConfig() {

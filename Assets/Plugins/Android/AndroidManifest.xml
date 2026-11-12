@@ -1,6 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" android:installLocation="auto">
-  <application android:label="@string/app_name" android:icon="@mipmap/app_icon" android:allowBackup="false">
+  <!-- networkSecurityConfig: generated per build by CompanionScan.Editor.AndroidNetworkSecurityConfig
+       (HTTPS only; development builds also allow http to ServerConfig's development cleartext hosts). -->
+  <application android:label="@string/app_name" android:icon="@mipmap/app_icon" android:allowBackup="false" android:networkSecurityConfig="@xml/companion_network_security_config">
     <activity android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" android:configChanges="locale|fontScale|keyboard|keyboardHidden|mcc|mnc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode" android:launchMode="singleTask" android:name="com.unity3d.player.UnityPlayerGameActivity" android:excludeFromRecents="true" android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
@@ -17,10 +19,21 @@
   </application>
   <uses-feature android:name="android.hardware.vr.headtracking" android:version="1" android:required="true" />
   <uses-feature android:name="oculus.software.handtracking" android:required="false" />
+  <!-- Horizon OS system keyboard, used to enter the CV server URL in-headset (SettingsPanel). -->
+  <uses-feature android:name="oculus.software.overlay_keyboard" android:required="false" />
   <uses-permission android:name="com.oculus.permission.HAND_TRACKING" />
   <uses-permission android:name="com.oculus.permission.USE_ANCHOR_API" />
   <uses-feature android:name="com.oculus.feature.PASSTHROUGH" android:required="true" />
   <uses-permission android:name="com.oculus.permission.USE_SCENE" />
   <uses-permission android:name="horizonos.permission.HEADSET_CAMERA" />
   <uses-permission android:name="android.permission.CAMERA" />
+  <!-- Added at build time by enabled Unity OpenXR / Meta OpenXR features (Foveated Rendering with a
+       Quest Pro target, AR Anchors, Colocation Discovery, Boundary Visibility) but unused by this app:
+       it calls no eye gaze, eye-tracked foveation, anchor sharing, colocation or boundary visibility APIs.
+       tools:node="remove" drops them from the merged manifest. -->
+  <uses-permission android:name="com.oculus.permission.EYE_TRACKING" tools:node="remove" />
+  <uses-feature android:name="oculus.software.eye_tracking" tools:node="remove" />
+  <uses-permission android:name="com.oculus.permission.IMPORT_EXPORT_IOT_MAP_DATA" tools:node="remove" />
+  <uses-permission android:name="com.oculus.permission.USE_COLOCATION_DISCOVERY_API" tools:node="remove" />
+  <uses-permission android:name="com.oculus.permission.BOUNDARY_VISIBILITY" tools:node="remove" />
 </manifest>

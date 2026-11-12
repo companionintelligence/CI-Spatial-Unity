@@ -11483,6 +11483,7 @@ GameObject:
   - component: {fileID: 2096995381}
   - component: {fileID: 2096995380}
   - component: {fileID: 2096995379}
+  - component: {fileID: 2096995382}
   m_Layer: 0
   m_Name: ControllerUI
   m_TagString: Untagged
@@ -11518,6 +11519,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CompanionScan::CompanionScan.UI.XRControllerInput
   menuUI: {fileID: 0}
+  settingsPanel: {fileID: 2096995382}
 --- !u!114 &2096995380
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11566,6 +11568,28 @@ MonoBehaviour:
   labelFontSize: 0.15
   labelOffset: 0.000375
   labelSideOffset: 0.008
+--- !u!114 &2096995382
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2096995377}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0de573b84e797e54ca17e43daa5beadc, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: CompanionScan::CompanionScan.UI.SettingsPanel
+  config: {fileID: 11400000, guid: f63d1cdc48b21de40b9c0a6c37000799, type: 2}
+  urlField: {fileID: 0}
+  boxThresholdField: {fileID: 0}
+  textThresholdField: {fileID: 0}
+  openOnFirstRun: 1
+  panelDistance: 1
+  panelScale: 0.001
+  backgroundColor: {r: 0.05, g: 0.05, b: 0.1, a: 0.92}
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  errorColor: {r: 1, g: 0.45, b: 0.4, a: 1}
 --- !u!1 &2110092656
 GameObject:
   m_ObjectHideFlags: 0
