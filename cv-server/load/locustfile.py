@@ -1,8 +1,17 @@
+import os
+
 from locust import HttpUser, task, between
 
 
 class CvServerUser(HttpUser):
     wait_time = between(0.2, 0.8)
+
+    def on_start(self):
+        # The server requires a bearer token on everything except /v1/health.
+        token = os.environ.get("CV_SERVER_API_TOKEN", "").split(",")[0].strip()
+        if not token:
+            raise RuntimeError("Set CV_SERVER_API_TOKEN to the server's API token.")
+        self.client.headers["Authorization"] = f"Bearer {token}"
 
     @task(3)
     def detect(self):

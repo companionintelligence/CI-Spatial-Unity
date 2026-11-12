@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.auth import BearerTokenMiddleware, require_configured_token
 from app.config import settings
 from app.routers.detect import router as detect_router
 from app.routers.health import router as health_router
@@ -10,6 +11,8 @@ from app.routers.gltf import router as gltf_router
 from app.model_manager import ModelManager
 
 app = FastAPI(title="CV Server", version="0.1.0")
+# Every route except /v1/health needs "Authorization: Bearer <CV_SERVER_API_TOKEN>".
+app.add_middleware(BearerTokenMiddleware)
 
 app.include_router(health_router, prefix="/v1")
 app.include_router(detect_router, prefix="/v1")
@@ -21,6 +24,7 @@ app.include_router(gltf_router, prefix="/v1")
 
 @app.on_event("startup")
 def startup() -> None:
+    require_configured_token()
     mm = ModelManager.get_instance()
     if settings.load_all_models:
         mm.load_grounding_dino()

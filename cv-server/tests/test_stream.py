@@ -21,9 +21,9 @@ def _build_test_image_b64() -> str:
     not Path(settings.gdino_weights_path).exists(),
     reason="GroundingDINO weights not found",
 )
-def test_stream_detect() -> None:
+def test_stream_detect(auth_headers: dict) -> None:
     client = TestClient(app)
-    with client.websocket_connect("/v1/stream") as websocket:
+    with client.websocket_connect("/v1/stream", headers=auth_headers) as websocket:
         websocket.send_json(
             {
                 "mode": "detect",

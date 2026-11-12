@@ -16,12 +16,12 @@ def _build_test_image_b64() -> str:
 
 
 @pytest.mark.skip(reason="Requires Florence-2 weights")
-def test_florence_endpoint_smoke() -> None:
+def test_florence_endpoint_smoke(auth_headers: dict) -> None:
     client = TestClient(app)
     payload = {
         "image": _build_test_image_b64(),
         "task": "<CAPTION>",
         "text_input": "",
     }
-    response = client.post("/v1/florence", json=payload)
+    response = client.post("/v1/florence", json=payload, headers=auth_headers)
     assert response.status_code == 200

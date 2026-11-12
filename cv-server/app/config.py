@@ -1,9 +1,15 @@
 import os
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # Bearer token(s) required on every route except /v1/health. Read only from
+    # CV_SERVER_API_TOKEN; comma-separate several tokens to rotate without downtime.
+    api_token: SecretStr = Field(
+        default=SecretStr(""), validation_alias="CV_SERVER_API_TOKEN"
+    )
     device: str = os.getenv("CV_SERVER_DEVICE", "cuda")
     gdino_config_path: str = os.getenv(
         "GDINO_CONFIG_PATH", "configs/GroundingDINO_SwinT_OGC.py"

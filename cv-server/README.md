@@ -17,8 +17,35 @@ docker compose up --build
 curl http://localhost:8000/v1/health
 ```
 
+## Authentication
+
+Every endpoint except `GET /v1/health` requires a bearer token:
+
+```
+Authorization: Bearer <token>
+```
+
+The server reads accepted tokens from `CV_SERVER_API_TOKEN` and refuses to start
+without one. To rotate, set two comma-separated tokens, move clients to the new
+one, then drop the old one. Generate a token with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Requests without a valid token get `401` (`503` if the server has no token
+configured). `WS /v1/stream` takes the same `Authorization` header; browsers,
+which cannot set headers on a WebSocket, offer the token as a subprotocol pair
+instead: `new WebSocket(url, ["bearer", token])`. Tokens in query strings are
+not accepted.
+
+```bash
+curl -H "Authorization: Bearer $CV_SERVER_API_TOKEN"   -H "Content-Type: application/json"   -d '{"image": "<BASE64_JPEG>", "prompt": "chair ."}'   http://localhost:8000/v1/detect
+```
+
 ## Environment Variables
 
+- `CV_SERVER_API_TOKEN` (required): accepted bearer token(s), comma-separated
 - `CV_SERVER_DEVICE` (default: `cuda`)
 - `GDINO_CONFIG_PATH`
 - `GDINO_WEIGHTS_PATH`
@@ -67,5 +94,6 @@ The smoke tests skip automatically if model weights are not present.
 
 ```bash
 pip install -r load/requirements.txt
+export CV_SERVER_API_TOKEN=<token>   # sent as the bearer token
 locust -f load/locustfile.py --host http://localhost:8000 --image-b64 <BASE64_JPEG>
 ```
