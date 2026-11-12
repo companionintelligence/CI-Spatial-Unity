@@ -18,8 +18,9 @@ services:
       - SAM2_WEIGHTS_PATH=/app/checkpoints/sam2.1_hiera_tiny.pt
       - FLORENCE_MODEL_ID=microsoft/Florence-2-large
       # Optional TLS: put a certificate and key in ./certs and name them here
-      # (container paths, e.g. in .env). Without both files the server serves
-      # plain HTTP on :8000 only.
+      # (container paths, e.g. in .env). With both files the server serves HTTPS
+      # on :443 only; without them, plain HTTP on :8000 only.
+      - CV_SERVER_REQUIRE_TLS=${CV_SERVER_REQUIRE_TLS:-0}
       - SSL_CERTFILE=${CV_SERVER_SSL_CERTFILE:-/app/certs/server.crt}
       - SSL_KEYFILE=${CV_SERVER_SSL_KEYFILE:-/app/certs/server.key}
     deploy:

@@ -84,10 +84,16 @@ curl -H "Authorization: Bearer $CV_SERVER_API_TOKEN" \
 
 ## TLS
 
-The container serves HTTPS on `:443` (and HTTP on `:8000`) when both
-`SSL_CERTFILE` and `SSL_KEYFILE` point at existing files; otherwise it serves
-HTTP on `:8000` only. With `docker compose`, put the files in `cv-server/certs/`
-(mounted read-only at `/app/certs`) and set their container paths in `.env`:
+TLS is on when both `SSL_CERTFILE` and `SSL_KEYFILE` point at existing files.
+The container then serves HTTPS only, on `:443`, and starts no plain-HTTP
+listener, so tokens and images never cross the network unencrypted. TLS is off
+when neither file exists; only then does it serve plain HTTP, on `:8000` (use
+that only on a trusted network or behind a TLS-terminating proxy). If only one
+of the two files exists the container refuses to start, and with
+`CV_SERVER_REQUIRE_TLS=1` it also refuses to start without TLS.
+
+With `docker compose`, put the files in `cv-server/certs/` (mounted read-only at
+`/app/certs`) and set their container paths in `.env`:
 
 ```bash
 CV_SERVER_SSL_CERTFILE=/app/certs/<your-host>.crt
@@ -102,6 +108,7 @@ names and key material out of the repository; `certs/` and `.env` are gitignored
 - `CV_SERVER_API_TOKEN` (required): accepted bearer token(s), comma-separated
 - `SSL_CERTFILE`, `SSL_KEYFILE`: TLS certificate and key paths in the container
   (compose sets them from `CV_SERVER_SSL_CERTFILE` / `CV_SERVER_SSL_KEYFILE`)
+- `CV_SERVER_REQUIRE_TLS` (default: `0`): `1` refuses to start without a certificate and key
 - `CV_SERVER_FETCH_WEIGHTS` (default: `1`): fetch/verify model files on container start
 - `CV_SERVER_DEVICE` (default: `cuda`)
 - `GDINO_CONFIG_PATH`
