@@ -145,3 +145,20 @@ pip install -r load/requirements.txt
 export CV_SERVER_API_TOKEN=<token>   # sent as the bearer token
 locust -f load/locustfile.py --host http://localhost:8000 --image-b64 <BASE64_JPEG>
 ```
+
+## Publishing
+
+`.github/workflows/cv-server-publish.yml` builds this directory and pushes
+`ghcr.io/<owner>/ci-xr-scan-cv-server:<number>`, authenticating with the
+workflow's `GITHUB_TOKEN` only. Run it from the default branch:
+
+```bash
+gh workflow run cv-server-publish.yml            # tag = the workflow run number
+gh workflow run cv-server-publish.yml -f tag=12  # or a numeric tag of your choice
+```
+
+An existing tag is never overwritten. The run prints the image digest and the
+`<image>:<number>@sha256:<digest>` reference to pin in CI-Marketplace. The image
+contains neither model files nor a token: give the container
+`CV_SERVER_API_TOKEN`, and volumes on `/app/configs` and `/app/checkpoints` so
+the model files are downloaded only once.
