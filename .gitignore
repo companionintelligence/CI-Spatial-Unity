@@ -97,6 +97,11 @@ crashlytics-build.properties
 *.crt
 *.key
 *.pem
+# Android signing material: keystores and their properties files
+*.jks
+*.keystore
+*.p12
+keystore.properties
 
 # com.unity.test-framework.performance writes these into Resources at the start
 # of every player build (Assets/CompanionScan/Editor/PerformanceTestRunFileStripper.cs

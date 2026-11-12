@@ -383,6 +383,55 @@ speeds up the release build.
 
 To install a build on a headset, see [docs/SIDELOAD.md](docs/SIDELOAD.md).
 
+### Release builds from the command line
+
+`CommandLineBuild.BuildAndroidQuest` builds the Quest APK in batch mode
+(`Builds/Android/CompanionCapture.apk`). It reads release signing and version
+settings from the environment only, applies them to that one build and puts
+Player Settings back afterwards, so no keystore path, alias or password ends
+up in `ProjectSettings/ProjectSettings.asset`.
+
+| Environment variable | Meaning |
+|---|---|
+| `KEYSTORE_PATH` | Path of the release keystore file (keep it outside the repository) |
+| `KEYSTORE_PASS` | Keystore password |
+| `KEY_ALIAS` | Alias of the release key in the keystore |
+| `KEY_PASS` | Password of that key |
+| `VERSION_CODE` | Optional Android versionCode, 1 to 2100000000 |
+| `VERSION_NAME` | Optional version name; default: Player Settings > Version (`bundleVersion`) |
+
+- The build is signed with the release key only when all four signing
+  variables are set. Otherwise Unity signs it with its debug key, and a warning
+  names any signing variables that are missing (names only, never values).
+- `-release` makes the build fail unless all four are set and `KEYSTORE_PATH`
+  points to an existing file. Use it for every build meant for a store or for
+  testers who update in place.
+- versionCode is `VERSION_CODE` when set, otherwise
+  MAJOR × 1000000 + MINOR × 1000 + PATCH of the version name, the same rule the
+  CI builds use: `0.1.0` is 1000 and `1.2.3` is 1002003. Every upload to a store
+  needs a higher versionCode than the last one.
+- The build never creates a keystore. Create the release keystore yourself (for
+  example with `keytool`, as above), back it up, and keep it and its passwords
+  out of the repository; `*.jks`, `*.keystore`, `*.p12` and
+  `keystore.properties` are gitignored. Every update of the app must be signed
+  with the same key.
+
+```powershell
+# Fill these from your password manager or CI secret store rather than typing
+# the passwords into a shell history.
+$env:KEYSTORE_PATH = 'D:\signing\companion-scan-release.p12'
+$env:KEYSTORE_PASS = '<keystore password>'
+$env:KEY_ALIAS = 'companion-scan'
+$env:KEY_PASS = '<key password>'
+& 'C:\Program Files\Unity\Hub\Editor\6000.6.9f1\Editor\Unity.exe' -batchmode -nographics -quit `
+  -projectPath . -buildTarget Android `
+  -executeMethod CommandLineBuild.BuildAndroidQuest -release -logFile build-release.log
+```
+
+The build also fails when Player Settings > Android > Target API Level is not
+exactly 34, when a build callback throws while Unity creates it, or when the
+APK has no Burst-compiled code (`lib_burst_generated.so`).
+
 ## Documentation
 
 - Web client guide: [web/README.md](web/README.md)
