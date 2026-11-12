@@ -175,6 +175,10 @@ semantic plane, or physics surface is hit:
 
 ### Unity Quest Runtime
 
+Use Unity `6000.3.10f1`, the editor version pinned in
+`ProjectSettings/ProjectVersion.txt`, with the Android Build Support module
+(including OpenJDK and Android SDK & NDK Tools).
+
 1. **Run the CV server**
    - See [cv-server/README.md](cv-server/README.md) for local Docker setup.
 
@@ -192,7 +196,10 @@ semantic plane, or physics surface is hit:
        controller indicators + HUD at runtime.
 
 5. **Build to Quest 3**
-   - Menu → Companion Scan → Build Quest APK (or Build and Run).
+   - Menu → CompanionScan → Build Quest APK (writes `Builds/Quest/CompanionScan.apk`),
+     or Build and Run Quest APK to install it on the connected headset.
+   - CI builds come from the [Quest APK Build](#continuous-integration-and-releases)
+     workflow. To install either APK, see [docs/SIDELOAD.md](docs/SIDELOAD.md).
    - Run Space Setup on the headset and grant `com.oculus.permission.USE_SCENE`.
 
 6. **Use the controller**
@@ -259,11 +266,18 @@ scene that focuses on button-driven UX validation (controller indicators + HUD).
 
 ### CI (Self-hosted GPU Runner)
 
-The CI workflow targets a Windows self-hosted runner with GPU support. Ensure:
+The Unity Tests workflow targets a Windows self-hosted runner with GPU support.
+Ensure:
 
 - Runner labels include `self-hosted`, `windows`, `x64`, `gpu`.
+- The runner is GitHub Actions runner 2.327.1 or newer (the pinned actions run
+  on Node.js 24).
 - cv-server is running as a stable local service on this machine.
 - Health check is available at `http://localhost:8000/v1/health`.
+
+Pull requests run the unit tests; the cv-server integration tests run when the
+workflow is started by hand. See
+[Continuous integration and releases](#continuous-integration-and-releases).
 
 ### CV Server Tests
 
@@ -272,12 +286,112 @@ cd cv-server
 pytest
 ```
 
+## Continuous integration and releases
+
+| Workflow | Runner | Starts on | Output |
+|---|---|---|---|
+| [Unity Tests](.github/workflows/unity-tests.yml) | Self-hosted Windows GPU | Pull requests to `main` that change `Assets/`, `Packages/`, `ProjectSettings/` or `test/` (unit tests); manual runs (unit and cv-server integration tests) | Test results and screenshots |
+| [Web Tests](.github/workflows/web-tests.yml) | GitHub-hosted Ubuntu | Manual runs | Playwright report |
+| [Quest APK Build](.github/workflows/quest-build.yml) | GitHub-hosted Ubuntu | Manual runs and `v*` tags | `CompanionScan-<version>.apk` and its `.sha256`, kept for 7 days; a draft GitHub Release for `v*` tags |
+
+Pull requests from forks skip the Unity tests, so code from outside the
+repository never runs on the self-hosted runner. The actions in these
+workflows are pinned to full commit SHAs, with the release noted in a trailing
+comment.
+
+Both Unity workflows read the editor version from
+`ProjectSettings/ProjectVersion.txt`. When the editor is upgraded, update the
+version in [Quick Start](#unity-quest-runtime) and
+[Editor and capture reference](#editor-and-capture-reference) in the same
+change: the Unity Tests run warns about any Unity version in `README.md` or
+`docs/` that no longer matches.
+
+### Repository secrets
+
+Add these under **Settings → Secrets and variables → Actions → Repository
+secrets**. Workflows started from forks do not receive them.
+
+| Secret | Needed for | Value |
+|---|---|---|
+| `UNITY_EMAIL` | Unity Tests, Quest APK Build | Email address of the Unity ID that holds the licence |
+| `UNITY_PASSWORD` | Unity Tests, Quest APK Build | Password of that Unity ID |
+| `UNITY_LICENSE` | Unity Personal licence | Full contents of the activated `Unity_lic.ulf` file |
+| `UNITY_SERIAL` | Serial-based licence (Pro and up), instead of `UNITY_LICENSE` | The serial key |
+| `ANDROID_KEYSTORE_BASE64` | Optional, Quest APK Build | Release keystore, base64-encoded |
+| `ANDROID_KEYSTORE_PASS` | Only with a keystore | Keystore password |
+| `ANDROID_KEYALIAS_NAME` | Only with a keystore | Key alias |
+| `ANDROID_KEYALIAS_PASS` | Only with a keystore | Key password |
+
+For a Personal licence, activate Unity once in Unity Hub and use the licence
+file it writes: `C:\ProgramData\Unity\Unity_lic.ulf` (Windows),
+`/Library/Application Support/Unity/Unity_lic.ulf` (macOS) or
+`~/.local/share/unity3d/Unity/Unity_lic.ulf` (Linux). The Quest APK Build stops
+early and names any Unity secret that is missing.
+
+With the `gh` CLI, values come from a prompt or a file and stay out of your
+shell history:
+
+```bash
+gh secret set UNITY_EMAIL        # prompts for the value
+gh secret set UNITY_PASSWORD
+gh secret set UNITY_LICENSE < path/to/Unity_lic.ulf
+base64 -w0 release.keystore | gh secret set ANDROID_KEYSTORE_BASE64   # macOS: base64 -i release.keystore
+```
+
+```powershell
+Get-Content -Raw 'C:\ProgramData\Unity\Unity_lic.ulf' | gh secret set UNITY_LICENSE
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('release.keystore')) | gh secret set ANDROID_KEYSTORE_BASE64
+```
+
+Without the keystore secrets, each CI build is signed with a debug key created
+for that run, so one CI build cannot be installed over another without
+uninstalling it first. A release keystore (for example from
+`keytool -genkeypair -keystore release.keystore -alias companionscan -keyalg RSA -keysize 2048 -validity 10000`)
+keeps updates in place. Keep the keystore and its passwords out of the
+repository.
+
+### Building and releasing the Quest APK
+
+```bash
+gh workflow run quest-build.yml --ref main
+gh run list --workflow quest-build.yml --limit 3
+gh run download <run-id> --dir quest-apk
+```
+
+Build versions come from git tags (GameCI semantic versioning): the latest
+`vMAJOR.MINOR` tag sets the major and minor version and the number of commits
+since that tag sets the patch, so tag `v0.2` builds as `0.2.0` and a build five
+commits later as `0.2.5`. Before the first tag, builds are
+`0.0.<commit count>`. The Android version code follows the version
+(major × 1000000 + minor × 1000 + patch), so later commits get higher version
+codes. A three-part tag such as `v0.2.1` also works for its own build, but
+later untagged builds then keep that version.
+
+To publish a release, push a tag:
+
+```bash
+git tag v0.2
+git push origin v0.2
+```
+
+The tag build attaches the APK and its checksum to a draft GitHub Release with
+generated notes. Review the draft on GitHub, then publish it.
+
+The Unity `Library` folder is cached per editor version. Tag builds can reuse
+the cache saved by builds on `main`, so dispatching a build on `main` first
+speeds up the release build.
+
+To install a build on a headset, see [docs/SIDELOAD.md](docs/SIDELOAD.md).
+
 ## Documentation
 
 - Web client guide: [web/README.md](web/README.md)
 - World mapper pipeline + glTF schema: [docs/quest-capture-gltf.md](docs/quest-capture-gltf.md)
 - Spatial capture architecture: [docs/spatial-capture-architecture.md](docs/spatial-capture-architecture.md)
 - Scan/export pipeline details: [docs/scan-export-pipeline.md](docs/scan-export-pipeline.md)
+- Installing the APK on a Quest 3: [docs/SIDELOAD.md](docs/SIDELOAD.md)
+- Starting CI workflows by hand: [docs/CI.md](docs/CI.md)
+- Test tiers and CI plan: [docs/qa-ci.md](docs/qa-ci.md)
 - Current build plan: [docs/plan.md](docs/plan.md)
 
 ## Legacy Sample (Cloud API)
