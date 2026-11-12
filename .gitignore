@@ -94,7 +94,8 @@ crashlytics-build.properties
 *.key
 *.pem
 
-# Performance Testing writes these into Resources during player test runs.
-# They list the project dependencies and would ship in every player build.
+# com.unity.test-framework.performance writes these into Resources at the start
+# of every player build (Assets/CompanionScan/Editor/PerformanceTestRunFileStripper.cs
+# removes them before they are packed). Never commit stray copies.
 /[Aa]ssets/[Rr]esources/PerformanceTestRun*.json
 /[Aa]ssets/[Rr]esources/PerformanceTestRun*.json.meta
