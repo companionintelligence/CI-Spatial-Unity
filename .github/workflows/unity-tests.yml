@@ -20,9 +20,24 @@ jobs:
   unit-tests:
     name: EditMode and PlayMode (unit)
     runs-on: [self-hosted, windows, x64, gpu]
+    outputs:
+      unity-version: ${{ steps.unity.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read Unity version from ProjectVersion.txt
+        id: unity
+        shell: pwsh
+        run: |
+          $match = Select-String -Path ProjectSettings/ProjectVersion.txt -Pattern '^m_EditorVersion:\s*(\S+)' | Select-Object -First 1
+          if (-not $match) { throw 'm_EditorVersion not found in ProjectSettings/ProjectVersion.txt' }
+          $version = $match.Matches[0].Groups[1].Value
+          Write-Host "Unity editor version: $version"
+          if (-not (Select-String -Path README.md -Pattern $version -SimpleMatch -Quiet)) {
+            Write-Host "::warning file=README.md::README.md does not mention Unity $version from ProjectSettings/ProjectVersion.txt"
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Unity Test Runner
         uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
@@ -32,7 +47,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           CompanionScan_TEST_ARTIFACTS: ${{ github.workspace }}/artifacts
         with:
-          unityVersion: 6000.3.9f1
+          unityVersion: ${{ steps.unity.outputs.version }}
           projectPath: .
           testMode: all
           artifactsPath: artifacts
@@ -75,7 +90,7 @@ jobs:
           CompanionScan_TEST_SERVER_URL: http://localhost:8000
           CompanionScan_TEST_ARTIFACTS: ${{ github.workspace }}/artifacts
         with:
-          unityVersion: 6000.3.9f1
+          unityVersion: ${{ needs.unit-tests.outputs.unity-version }}
           projectPath: .
           testMode: playmode
           artifactsPath: artifacts
