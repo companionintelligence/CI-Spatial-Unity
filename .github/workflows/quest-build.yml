@@ -116,6 +116,8 @@ jobs:
           projectPath: .
           targetPlatform: Android
           androidExportType: androidPackage
+          # Meta requires API level 34 exactly; QuestTargetSdkRequirement fails any other value.
+          androidTargetSdkVersion: AndroidApiLevel34
           buildName: CompanionScan
           buildsPath: build
           versioning: Semantic
