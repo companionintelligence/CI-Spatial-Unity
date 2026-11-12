@@ -93,3 +93,8 @@ crashlytics-build.properties
 *.crt
 *.key
 *.pem
+
+# Performance Testing writes these into Resources during player test runs.
+# They list the project dependencies and would ship in every player build.
+/[Aa]ssets/[Rr]esources/PerformanceTestRun*.json
+/[Aa]ssets/[Rr]esources/PerformanceTestRun*.json.meta
