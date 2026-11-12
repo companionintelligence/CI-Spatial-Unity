@@ -176,7 +176,7 @@ semantic plane, or physics surface is hit:
 
 ### Unity Quest Runtime
 
-Use Unity `6000.3.10f1`, the editor version pinned in
+Use Unity `6000.6.9f1`, the editor version pinned in
 `ProjectSettings/ProjectVersion.txt`, with the Android Build Support module
 (including OpenJDK and Android SDK & NDK Tools).
 
@@ -465,7 +465,7 @@ The original NVIDIA cloud API sample lives under `Assets/CompanionScanLegacy/Scr
 
 | Area | Current project setting |
 |---|---|
-| Unity editor | Unity `6000.3.10f1` (see `ProjectSettings/ProjectVersion.txt`) |
+| Unity editor | Unity `6000.6.9f1` (see `ProjectSettings/ProjectVersion.txt`) |
 | Primary runtime | Native Quest runtime |
 | Alternate route | Web client for browser-based use |
 | Capture handoff | glTF export and sync path |

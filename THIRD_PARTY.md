@@ -46,46 +46,49 @@ ship with the Unity Editor. The licence column quotes each package's
 
 | Package | Version | Source | Licence | Ends up in | Third-party notices in the package |
 | --- | --- | --- | --- | --- | --- |
-| `com.meta.xr.sdk.core` | 85.0.0 | registry | Oculus SDK License Agreement (now the Meta Platform Technologies SDK License Agreement) | APK | `NOTICE.txt`: OpenVR (BSD-3-Clause), SimpleJSON (MIT), glTF loader (MIT, AltspaceVR). Not in `NOTICE.txt`, and shipped in every player because they sit in `Resources` folders of the Immersive Debugger: capsule ray-intersection shader code by Inigo Quilez (MIT, header of `Scripts/ImmersiveDebugger/Gizmos/DebugGizmos/Resources/CapsuleRayIntersect.cginc`) and the Roboto Mono font (Apache-2.0, name table of `Scripts/ImmersiveDebugger/UserInterface/Resources/Fonts/RobotoMono-VariableFont_wght.ttf`). Also not in `NOTICE.txt`: `Plugins/AndroidOpenXR/OVRPlugin.aar` puts `libdouble-conversion.so` (Google double-conversion, BSD-3-Clause) and a Zstandard build (BSD-3-Clause, Meta) into the APK, next to Meta's own libraries |
-| `com.meta.xr.mrutilitykit` | 85.0.0 | registry | Oculus SDK License Agreement | APK | `NOTICE.txt`: Boost (BSL-1.0), earcut.hpp (ISC), Unity built-in shaders (MIT), an unnamed MPL-2.0 component, JSON for Modern C++ (MIT), folly (Apache-2.0), Protocol Buffers (BSD-3-Clause) |
-| `com.meta.xr.sdk.platform` | 85.0.0 | registry | Meta Platform Technologies SDK License Agreement | APK | |
-| `com.meta.xr.sdk.audio` | 85.0.0 | registry | Oculus SDK License Agreement | APK | `THIRD_PARTY_NOTICES.txt`: Kiss FFT, libjpeg, OOURA FFT, PFFFT, sfft, TinyThread++, zlib |
-| `com.meta.xr.sdk.haptics` | 85.0.0 | registry | Oculus SDK License Agreement | APK | `THIRD_PARTY_NOTICES.txt`: Rust crates under Apache-2.0, MIT, ISC, BSL-1.0, Unlicense. The haptic packs under `Samples~` (CC-BY-4.0) are not imported |
-| `org.khronos.unitygltf` (UnityGLTF) | 2.18.8 | git `KhronosGroup/UnityGLTF`, tag `release/2.18.8` = `84a8eb1` | MIT | APK | |
+| `com.meta.xr.sdk.core` | 209.0.0 | registry | Oculus SDK License Agreement (now the Meta Platform Technologies SDK License Agreement) | APK | `NOTICE.txt`: OpenVR (BSD-3-Clause), SimpleJSON (MIT), glTF loader (MIT, AltspaceVR). Not in `NOTICE.txt`, and shipped in every player because they sit in `Resources` folders of the Immersive Debugger: capsule ray-intersection shader code by Inigo Quilez (MIT, header of `Scripts/ImmersiveDebugger/Gizmos/DebugGizmos/Resources/CapsuleRayIntersect.cginc`) and the Roboto Mono font (Apache-2.0, name table of `Scripts/ImmersiveDebugger/UserInterface/Resources/Fonts/RobotoMono-VariableFont_wght.ttf`). Also not in `NOTICE.txt`: `Plugins/AndroidOpenXR/OVRPlugin.aar` puts `libdouble-conversion.so` (Google double-conversion, BSD-3-Clause) and a Zstandard build (BSD-3-Clause, Meta) into the APK, next to Meta's own libraries |
+| `com.meta.xr.mrutilitykit` | 209.0.0 | registry | Oculus SDK License Agreement | APK | `NOTICE.txt`: Boost (BSL-1.0), earcut.hpp (ISC), Unity built-in shaders (MIT), an unnamed MPL-2.0 component, JSON for Modern C++ (MIT), folly (Apache-2.0), Protocol Buffers (BSD-3-Clause) |
+| `com.meta.xr.sdk.platform` | 209.0.0 | registry | Meta Platform Technologies SDK License Agreement | APK | |
+| `com.meta.xr.sdk.audio` | 209.0.0 | registry | Oculus SDK License Agreement | APK | `THIRD_PARTY_NOTICES.txt`: Kiss FFT, libjpeg, OOURA FFT, PFFFT, sfft, TinyThread++, zlib |
+| `com.meta.xr.sdk.haptics` | 209.0.0 | registry | Oculus SDK License Agreement | APK | `THIRD_PARTY_NOTICES.txt`: Rust crates under Apache-2.0, MIT, ISC, zlib, Unlicense. The haptic packs under `Samples~` (CC-BY-4.0) are not imported |
+| `org.khronos.unitygltf` (UnityGLTF) | 2.20.0 | git `KhronosGroup/UnityGLTF`, tag `release/2.20.0` = `74d7064` | MIT | APK | |
 | `com.coplaydev.unity-mcp` (MCP for Unity) | 10.3.0 | git `CoplayDev/unity-mcp`, commit `aa5fc63` (tag `v10.3.0`) | MIT (repository `LICENSE`; the package has no licence file of its own and links to it from `package.json`) | Editor (see note 1) | `Editor/External/Tommy.cs` (MIT, Denis Zhidkikh) |
 | `com.github-glitchenzo.nugetforunity` (NuGetForUnity) | 4.4.0 | git `GlitchEnzo/NuGetForUnity`, commit `a22299e` | MIT | Editor | |
-| `com.unity.render-pipelines.universal` | 17.3.0 | built-in | Unity Companion License | APK | `Third Party Notices.md`: FXAA 3.11 (NVIDIA licence). Not listed there: SMAA (MIT; Jorge Jimenez, Jose I. Echevarria, Belen Masia, Fernando Navarro, Diego Gutierrez; `Shaders/PostProcessing/SubpixelMorphologicalAntialiasing.hlsl`) and Clipper (BSL-1.0, Angus Johnson; `Runtime/2D/Clipper.cs`) |
-| `com.unity.render-pipelines.core` | 17.3.0 | built-in | Unity Companion License | APK | `THIRD PARTY NOTICES.md`: RadeonRays 4.1 (MIT), Bullet Physics (zlib), Sobol sampler (MIT). Not listed there: ACES reference code (A.M.P.A.S. licence, `ShaderLibrary/ACES.hlsl`), AMD FidelityFX shader code (MIT, `Runtime/PostProcessing/Shaders/ffx/`), coverage code by Kleber Garcia (MIT, `ShaderLibrary/Coverage.hlsl`), and the Rendering Debugger font `Runtime/Debugging/Prefabs/Fonts/PerfectDOSVGA437.ttf` (Perfect DOS VGA 437 by Zeh Fernando, 2003), whose name table states no licence; it ships in every player because `DebugUICanvas.prefab` sits in a `Resources` folder (open item 8) |
-| `com.unity.render-pipelines.universal-config` | 17.0.3 | built-in | Unity Companion License | APK | |
-| `com.unity.shadergraph` | 17.3.0 | built-in | Unity Companion License | APK (generated shaders) | |
-| `com.unity.ugui` (includes TextMesh Pro) | 2.0.0 | built-in | Unity Companion License | APK | |
+| `com.unity.render-pipelines.universal` | 17.6.0 | built-in | Unity Companion License | APK | `Third Party Notices.md`: FXAA 3.11 (NVIDIA licence). Not listed there: SMAA (MIT; Jorge Jimenez, Jose I. Echevarria, Belen Masia, Fernando Navarro, Diego Gutierrez; `Shaders/PostProcessing/SubpixelMorphologicalAntialiasing.hlsl`) and Clipper (BSL-1.0, Angus Johnson; `Runtime/2D/Clipper.cs`) |
+| `com.unity.render-pipelines.core` | 17.6.0 | built-in | Unity Companion License | APK | `THIRD PARTY NOTICES.md`: RadeonRays 4.1 (MIT), Bullet Physics (zlib), Sobol sampler (MIT). Not listed there: ACES reference code (A.M.P.A.S. licence, `ShaderLibrary/ACES.hlsl`), AMD FidelityFX shader code (MIT, `Runtime/PostProcessing/Shaders/ffx/`), coverage code by Kleber Garcia (MIT, `ShaderLibrary/Coverage.hlsl`), and the Rendering Debugger font `Runtime/Debugging/Prefabs/Fonts/PerfectDOSVGA437.ttf` (Perfect DOS VGA 437 by Zeh Fernando, 2003), whose name table states no licence; it ships in every player because `DebugUICanvas.prefab` sits in a `Resources` folder (open item 8) |
+| `com.unity.render-pipelines.universal-config` | 17.6.0 | built-in | Unity Companion License | APK | |
+| `com.unity.shadergraph` | 17.6.0 | built-in | Unity Companion License | APK (generated shaders) | |
+| `com.unity.ugui` (includes TextMesh Pro) | 2.6.0 | built-in | Unity Companion License | APK | |
 | `com.unity.textmeshpro` | 5.0.0 | built-in (empty; merged into uGUI) | none | none | |
-| `com.unity.inputsystem` | 1.18.0 | registry | Unity Companion License | APK | |
-| `com.unity.xr.management` | 4.5.4 | registry | Unity Companion License | APK | |
-| `com.unity.xr.openxr` | 1.16.1 | registry | Unity Companion License (source), Unity Package Distribution License (binaries) | APK | OpenXR-SDK-Source (Apache-2.0); Oculus OpenXR Mobile SDK (Oculus SDK License Agreement) |
-| `com.unity.xr.meta-openxr` | 2.4.0 | registry | Unity Companion License (source), Unity Package Distribution License (binaries) | APK | OpenXR-SDK-Source (Apache-2.0); Oculus OpenXR Mobile SDK and AudioPluginOculusSpatializer (Oculus SDK License Agreement) |
-| `com.unity.xr.arfoundation` | 6.4.0 | registry | Unity Companion License | APK | |
-| `com.unity.xr.core-utils` | 2.5.3 | registry | Unity Companion License | APK | |
-| `com.unity.xr.compositionlayers` | 2.3.0 | registry | Unity Companion License (source), Unity Package Distribution License (binaries) | APK | |
-| `com.unity.xr.legacyinputhelpers` | 2.1.13 | registry | Unity Companion License | APK | Arm models (Apache-2.0, Google) |
-| `com.unity.ai.navigation` | 2.0.11 | registry | Unity Companion License | APK | |
-| `com.unity.burst` | 1.8.28 | registry | Unity Companion License (source), Unity Package Distribution License (binaries) | APK (Burst-compiled code, `Unity.Burst` runtime); compiler Editor only | `Third Party Notices.md`: LLVM (Apache-2.0 with LLVM exception), legacy LLVM licence (NCSA), Mono.Cecil (MIT), Smash and xxHash (BSD-2-Clause), musl (MIT), SLEEF (BSL-1.0), gRPC for .NET (Apache-2.0), Google.Protobuf (BSD-3-Clause), mimalloc (MIT). Not listed there: float formatting code by Ryan Juckett (zlib, `Runtime/BurstString.Float.cs`) |
-| `com.unity.collections` | 2.6.2 | registry | Unity Companion License | APK | |
-| `com.unity.mathematics` | 1.3.3 | registry | Unity Companion License | APK | Noise functions by Ashima Arts and Stefan Gustavson (MIT, `Unity.Mathematics/Noise/LICENSE`) |
+| `com.unity.inputsystem` | 1.20.1 | registry | Unity Companion License | APK | |
+| `com.unity.xr.management` | 4.7.0 | registry | Unity Companion License | APK | |
+| `com.unity.xr.openxr` | 1.18.0 | registry | Unity Companion License (source), Unity Package Distribution License (binaries) | APK | OpenXR-SDK-Source (Apache-2.0); Oculus OpenXR Mobile SDK (Oculus SDK License Agreement) |
+| `com.unity.xr.meta-openxr` | 2.6.1 | registry | Unity Companion License (source), Unity Package Distribution License (binaries) | APK | OpenXR-SDK-Source (Apache-2.0); Oculus OpenXR Mobile SDK and AudioPluginOculusSpatializer (Oculus SDK License Agreement) |
+| `com.unity.xr.arfoundation` | 6.6.2 | registry | Unity Companion License | APK | |
+| `com.unity.xr.core-utils` | 2.6.0 | registry | Unity Companion License | APK | |
+| `com.unity.xr.compositionlayers` | 2.6.1 | registry | Unity Companion License (source), Unity Package Distribution License (binaries) | APK | |
+| `com.unity.xr.hands` | 1.9.0 | registry (dependency of `com.meta.xr.sdk.core` 209) | Unity Package Distribution License | APK (`libUnityOpenXRHands.so`) | `Third Party Notices.md` |
+| `com.unity.xr.legacyinputhelpers` | 3.0.1 | registry | Unity Companion License | APK | Arm models (Apache-2.0, Google) |
+| `com.unity.ai.navigation` | 2.0.16 | registry | Unity Companion License | APK | |
+| `com.unity.burst` | 2.0.0 | built-in | No licence file: since Unity 6000.6 the package is a runtime stub and the Burst compiler ships with the editor (`Editor/Data/Tools/Burst/`, with its own `LICENSE.md` and `Third Party Notices.md`) | APK (Burst-compiled code, `lib_burst_generated.so`); compiler Editor only | Editor install `Tools/Burst/Third Party Notices.md`: LLVM (Apache-2.0 with LLVM exception) and the other components 1.8.28 listed |
+| `com.unity.collections` | 6.6.0 | built-in | Unity Companion License | APK | |
+| `com.unity.mathematics` | 1.4.0 | built-in | Unity Companion License | APK | Noise functions by Ashima Arts and Stefan Gustavson (MIT, `Unity.Mathematics/Noise/LICENSE`) |
 | `com.unity.nuget.newtonsoft-json` | 3.2.2 | registry | Unity Companion License | APK | Newtonsoft.Json and its Unity forks (MIT) |
-| `com.unity.timeline` | 1.8.10 | registry | Unity Companion License | APK | |
-| `com.unity.visualscripting` | 1.9.9 | registry | Unity Package Distribution License | APK (runtime), Editor | AQN Parser and DotNetZip (MS-PL), Deep Copy, Full Serializer, MD4, Reorderable List, SQLite .NET, YamlDotNet, Ensure.That, NCalc (MIT), FatCow icons (CC-BY-3.0), Iconmonstr icons (Iconmonstr licence), SQLite (public domain), ANTLR 3 runtime (BSD) |
+| `com.unity.timeline` | 6.6.0 | built-in | Unity Companion License | APK | |
+| `com.unity.visualscripting` | 1.9.13 | registry | Unity Package Distribution License | APK (runtime), Editor | AQN Parser and DotNetZip (MS-PL), Deep Copy, Full Serializer, MD4, Reorderable List, SQLite .NET, YamlDotNet, Ensure.That, NCalc (MIT), FatCow icons (CC-BY-3.0), Iconmonstr icons (Iconmonstr licence), SQLite (public domain), ANTLR 3 runtime (BSD) |
 | `com.unity.2d.sprite` | 1.0.0 | built-in | Unity Package Distribution License | Editor | |
-| `com.unity.test-framework` | 1.6.0 | built-in | Unity Companion License | Dev | |
-| `com.unity.ext.nunit` | 2.0.5 | built-in | Unity Package Distribution License | Dev | NUnit 3.5 (MIT) |
-| `com.unity.test-framework.performance` | 3.2.0 | registry (dependency of `com.unity.collections`) | Unity Companion License | Dev (its generated run files used to ship; see note 2) | Perfolizer (MIT) |
-| `com.unity.ide.rider` | 3.0.39 | registry | MIT (Unity Technologies, JetBrains) | Editor | |
+| `com.unity.test-framework` | 1.8.0 | built-in | Unity Companion License | Dev | |
+| `com.unity.ext.nunit` | 2.1.0 | built-in | Unity Package Distribution License | Dev | NUnit 3.5 (MIT) |
+| `com.unity.test-framework.performance` | 6.6.0 | built-in (dependency of `com.unity.collections`) | Unity Companion License | Dev (its generated run files used to ship; see note 2) | Perfolizer (MIT) |
+| `com.unity.ide.rider` | 3.1.0 | registry | MIT (Unity Technologies, JetBrains) | Editor | |
 | `com.unity.ide.visualstudio` | 2.0.27 | registry | MIT (Unity Technologies, Microsoft) | Editor | VSWhere (MIT), EnvDTE (0BSD) |
 | `com.unity.mobile.android-logcat` | 1.4.7 | registry | Unity Companion License | Editor | |
-| `com.unity.multiplayer.center` | 1.0.1 | built-in | Unity Package Distribution License | Editor | |
-| `com.unity.editorcoroutines` | 1.0.1 | registry | Unity Companion License | Editor | |
-| `com.unity.searcher` | 4.9.4 | registry | Unity Companion Package License v1.0 | Editor | |
+| `com.unity.multiplayer.center` | 2.1.0 | built-in | Unity Package Distribution License | Editor | |
+| `com.unity.editorcoroutines` | 6.6.0 | built-in | Unity Companion License | Editor | |
+| `com.unity.searcher` | 4.9.5 | registry | Unity Companion Package License v1.0 | Editor | |
 | `com.unity.nuget.mono-cecil` | 1.11.6 | registry | Unity Companion License | Editor | Mono.Cecil (MIT) |
+| `com.unity.profiling.core` | 1.0.3 | built-in (dependency of `com.unity.render-pipelines.core` 17.6) | Unity Companion License | APK | |
+| `com.unity.graph-authoring` | 1.0.0 | built-in (dependency of `com.unity.shadergraph` 17.6) | No licence file in the package; ships with the Unity 6000.6 editor | Editor | |
 | `com.unity.modules.*` | 1.0.0 | built-in engine modules | [Unity Editor Software Terms](https://unity.com/legal/terms-of-service/software) (Unity Runtime) | APK | |
 
 Licence references:
