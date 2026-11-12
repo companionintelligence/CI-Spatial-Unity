@@ -12,7 +12,8 @@ using UnityEngine.TestTools;
 namespace CompanionScan.Tests.PlayMode
 {
     /// <summary>
-    /// QA integration tests that send real photographs from the /test folder
+    /// QA integration tests that send the synthetic room renders in the
+    /// Fixtures folder (and any images in the repo-root /test folder)
     /// through each cv-server model (Florence2, GroundingDINO, SAM2) and verify
     /// the results contain valid 2D bounding boxes and data suitable for 3D
     /// anchor placement.
@@ -40,17 +41,10 @@ namespace CompanionScan.Tests.PlayMode
         /// <summary>Image â†’ (prompt for GDino/SAM2, description)</summary>
         private static readonly (string file, string prompt, string desc)[] TestImages =
         {
-            ("closet2.jpg",                "clothing . shelf . hanger . box .",       "closet"),
-            ("closet3.jpeg",               "clothing . shelf . hanger . box .",       "closet"),
-            ("food-storage-containers.jpg", "container . jar . lid . shelf .",        "food containers"),
-            ("food-storage-jars.jpg",      "jar . bottle . label . shelf .",          "food jars"),
-            ("How-To-Organize-ACloset.jpg","shelf . bin . box . basket . clothing .", "organized closet"),
-            ("laundry-room1.jpg",          "washer . dryer . shelf . basket .",       "laundry room"),
-            ("laundry-room2.jpg",          "washer . dryer . shelf . basket .",       "laundry room"),
-            ("pantry-organization.jpg",    "shelf . jar . container . can . box .",   "pantry"),
-            ("pantry-organization2.jpg",   "shelf . jar . container . can . box .",   "pantry"),
-            ("pantry.jpg",                 "shelf . jar . container . can . box .",   "pantry"),
-            ("walk-in-pantry-design.jpg",  "shelf . jar . container . can . box .",   "walk-in pantry"),
+            ("synthetic_closet_1280x1024.jpg",       "clothing . shelf . hanger . box . basket .", "closet (synth)"),
+            ("synthetic_food_storage_1280x1024.jpg", "container . jar . lid . shelf .",           "food storage (synth)"),
+            ("synthetic_laundry_room_1280x1024.jpg", "washer . dryer . shelf . basket . bottle .", "laundry room (synth)"),
+            ("synthetic_pantry_1280x1024.jpg",       "shelf . jar . container . can . box .",      "pantry (synth)"),
             ("kitchen_1280x1024.jpg",      "appliance . counter . sink . stove .",    "kitchen (synth)"),
             ("living_room_1280x1024.jpg",  "sofa . table . lamp . chair .",           "living room (synth)"),
             ("office_1280x1024.jpg",       "desk . monitor . chair . keyboard .",     "office (synth)"),
