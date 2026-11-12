@@ -58,12 +58,22 @@ public static class CommandLineBuild
         // Keep the machine-specific Meta DevAgentSettings out of the APK even if Unity skips build callbacks.
         CompanionScan.Editor.DevAgentSettingsBuildFilter.RemoveFromProject();
 
+        // Unity skips the remaining build callbacks (Burst AOT among them) when one throws while it
+        // creates them, and still reports success: fail before building instead.
+        CompanionScan.Editor.BuildIntegrityChecks.VerifyBuildCallbacksConstruct();
+
         Debug.Log($"CommandLineBuild: Building APK to {outputPath}");
         var report = BuildPipeline.BuildPlayer(options);
 
         if (report.summary.result != BuildResult.Succeeded)
         {
             throw new InvalidOperationException($"Build failed: {report.summary.result}");
+        }
+
+        if (CompanionScan.Editor.BuildIntegrityChecks.IsBurstEnabledForAndroid())
+        {
+            CompanionScan.Editor.BuildIntegrityChecks.VerifyBurstCode(
+                outputPath, CompanionScan.Editor.BuildIntegrityChecks.AndroidAbis());
         }
 
         Debug.Log("CommandLineBuild: Build succeeded.");
