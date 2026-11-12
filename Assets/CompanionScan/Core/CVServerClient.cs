@@ -23,8 +23,8 @@ namespace CompanionScan.Core
             {
                 image = Convert.ToBase64String(jpegBytes),
                 prompt = prompt,
-                box_threshold = _config.boxThreshold,
-                text_threshold = _config.textThreshold
+                box_threshold = _config.ResolveBoxThreshold(),
+                text_threshold = _config.ResolveTextThreshold()
             };
             return PostAsync<DetectionResult>("/v1/detect", payload);
         }
@@ -38,8 +38,8 @@ namespace CompanionScan.Core
                 grounding_model = groundingModel,
                 return_masks = true,
                 mask_format = "rle",
-                box_threshold = _config.boxThreshold,
-                text_threshold = _config.textThreshold
+                box_threshold = _config.ResolveBoxThreshold(),
+                text_threshold = _config.ResolveTextThreshold()
             };
             return PostAsync<SegmentationResult>("/v1/segment", payload);
         }
@@ -60,7 +60,7 @@ namespace CompanionScan.Core
             var baseUrl = _config != null ? _config.ResolveBaseUrl() : null;
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
-                throw new Exception("CV server base URL is not set.");
+                throw new Exception("CV server base URL is not set. Press the left Menu button to enter it.");
             }
 
             var url = baseUrl.TrimEnd('/') + endpoint;

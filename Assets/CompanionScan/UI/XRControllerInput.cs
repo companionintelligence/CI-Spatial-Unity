@@ -17,10 +17,15 @@ namespace CompanionScan.UI
     ///   Primary / Secondary Index Trigger -> Cycle display mode
     /// Either hand trigger:
     ///   Primary / Secondary Hand Trigger -> Preview glTF
+    /// Left Menu button (Button.Start) -> open / close CV server settings.
+    ///   While the settings panel is open, A edits the server URL and B saves it;
+    ///   the capture controls above are suspended.
     /// </summary>
     public class XRControllerInput : MonoBehaviour
     {
         [SerializeField] private ControllerMenuUI menuUI;
+        [Tooltip("Server settings panel. If null, the active SettingsPanel in the scene is used.")]
+        [SerializeField] private SettingsPanel settingsPanel;
         private bool _loggedNoController;
 
         /// <summary>
@@ -44,6 +49,9 @@ namespace CompanionScan.UI
 
         private void Update()
         {
+            if (HandleSettingsInput())
+                return;
+
             // Late-bind: ControllerMenuBuilder creates MenuUI in Start(),
             // so it may not exist during our Awake().
             if (menuUI == null)
@@ -84,6 +92,32 @@ namespace CompanionScan.UI
             if (OVRInput.GetDown(OVRInput.Button.PrimaryHandTrigger) ||
                 OVRInput.GetDown(OVRInput.Button.SecondaryHandTrigger))
                 menuUI.PreviewGltf();
+        }
+
+        /// <summary>
+        /// Menu toggles the server settings panel; while it is open, A edits the URL
+        /// and B saves it. Returns true when the panel consumed this frame's input.
+        /// </summary>
+        private bool HandleSettingsInput()
+        {
+            if (settingsPanel == null)
+                settingsPanel = SettingsPanel.Active;
+            if (settingsPanel == null)
+                return false;
+
+            if (OVRInput.GetDown(OVRInput.Button.Start))
+                settingsPanel.Toggle();
+
+            if (!settingsPanel.IsOpen)
+                return false;
+
+            if (OVRInput.GetDown(OVRInput.Button.One))
+                settingsPanel.EditUrl();
+
+            if (OVRInput.GetDown(OVRInput.Button.Two))
+                settingsPanel.Apply();
+
+            return true;
         }
     }
 }

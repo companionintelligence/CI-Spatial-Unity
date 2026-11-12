@@ -360,6 +360,13 @@ namespace CompanionScan.Mapping
                 return;
             }
 
+            if (!serverConfig.HasBaseUrl)
+            {
+                Debug.LogWarning("[Pipeline-CV] CV server URL is not set; skipping server detection. " +
+                                 "Press the left Menu button to enter it.");
+                return;
+            }
+
             var frame = _cameraProvider.GetCurrentFrameJpeg(jpegQuality);
             if (frame == null || frame.Length == 0)
             {

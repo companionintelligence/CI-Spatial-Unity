@@ -17,6 +17,8 @@
   </application>
   <uses-feature android:name="android.hardware.vr.headtracking" android:version="1" android:required="true" />
   <uses-feature android:name="oculus.software.handtracking" android:required="false" />
+  <!-- Horizon OS system keyboard, used to enter the CV server URL in-headset (SettingsPanel). -->
+  <uses-feature android:name="oculus.software.overlay_keyboard" android:required="false" />
   <uses-permission android:name="com.oculus.permission.HAND_TRACKING" />
   <uses-permission android:name="com.oculus.permission.USE_ANCHOR_API" />
   <uses-feature android:name="com.oculus.feature.PASSTHROUGH" android:required="true" />
