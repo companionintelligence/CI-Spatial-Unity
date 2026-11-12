@@ -14,6 +14,9 @@ if [ "${CV_SERVER_FETCH_WEIGHTS:-1}" != "0" ]; then
     python3 /app/scripts/fetch_weights.py --root /app
 fi
 
+# Largest WebSocket message on /v1/stream; HTTP request bodies are capped in app/limits.py.
+ws_max_size="${CV_SERVER_MAX_WS_MESSAGE_BYTES:-16777216}"
+
 # TLS is on when SSL_CERTFILE and SSL_KEYFILE both name existing files. Then the
 # server speaks HTTPS only, on :443, and starts no plain-HTTP listener, so the bearer
 # token and the images never cross the network in clear text. TLS is off when neither
@@ -26,6 +29,7 @@ if [ -n "${SSL_KEYFILE:-}" ] && [ -f "$SSL_KEYFILE" ]; then tls_files=$((tls_fil
 if [ "$tls_files" -eq 2 ]; then
     echo "TLS on: serving HTTPS only on :443 (no plain-HTTP listener)"
     exec uvicorn app.main:app --host 0.0.0.0 --port 443 \
+        --ws-max-size "$ws_max_size" \
         --ssl-certfile "$SSL_CERTFILE" \
         --ssl-keyfile "$SSL_KEYFILE"
 elif [ "$tls_files" -eq 1 ]; then
@@ -36,5 +40,5 @@ elif [ "${CV_SERVER_REQUIRE_TLS:-0}" = "1" ]; then
     exit 1
 else
     echo "TLS off (no certificate and key found): serving plain HTTP on :8000"
-    exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --ws-max-size "$ws_max_size"
 fi

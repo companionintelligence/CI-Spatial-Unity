@@ -119,6 +119,10 @@ names and key material out of the repository; `certs/` and `.env` are gitignored
 - `BOX_THRESHOLD`
 - `TEXT_THRESHOLD`
 - `GLTF_UPLOAD_DIR` (default: `uploads/gltf`)
+- `CV_SERVER_MAX_REQUEST_BYTES` (default: `33554432`, 32 MiB): largest HTTP request
+  body (base64 images, glTF uploads); larger requests get `413`
+- `CV_SERVER_MAX_WS_MESSAGE_BYTES` (default: `16777216`, 16 MiB): largest
+  WebSocket message on `/v1/stream`
 
 ## Endpoints
 
@@ -137,6 +141,11 @@ names and key material out of the repository; `certs/` and `.env` are gitignored
 - `gltf` (file)
 - `bin` (file, optional)
 - `extras` (field, optional)
+
+The whole request is capped at `CV_SERVER_MAX_REQUEST_BYTES` (32 MiB by
+default). A larger `Content-Length` is refused with `413` before anything is
+read, and a body sent without one is cut off with `413` as soon as it passes
+the cap, so nothing is written to `GLTF_UPLOAD_DIR`.
 
 The Quest app triggers this automatically when the user presses the **Y button**
 on the left controller (Save & Export). See the main [README](../README.md) for
