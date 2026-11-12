@@ -1,12 +1,18 @@
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
+# GPU architectures the GroundingDINO and SAM 2 CUDA extensions are compiled for:
+# Ampere (8.0 A100/A30, 8.6 RTX 30xx/A10/A40), Ada (8.9 RTX 40xx/L4/L40S) and
+# Hopper (9.0 H100/H200), plus PTX so newer GPUs can JIT-compile the kernels.
+# Narrow it to speed up a local build, e.g. --build-arg TORCH_CUDA_ARCH_LIST=8.9
+ARG TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0+PTX"
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=/usr/local/cuda/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ENV FORCE_CUDA=1
-ENV TORCH_CUDA_ARCH_LIST=8.9
+ENV TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"
 
 RUN apt-get update && apt-get install -y \
     python3.10 python3-pip git build-essential ninja-build cmake libgl1 libglib2.0-0 \
@@ -46,13 +52,21 @@ for so_file in (repo_dir / "groundingdino").glob("_C*.so"):
     shutil.copy2(so_file, site_pkg / so_file.name)
 PY
 
+# The model files are not in the build context (configs/ and checkpoints/ are
+# gitignored). The entrypoint downloads them from pinned URLs and verifies their
+# SHA-256 on first start; mount volumes on /app/configs and /app/checkpoints to keep
+# them. Build with --build-arg FETCH_WEIGHTS_AT_BUILD=1 to bake them in instead.
+COPY scripts/fetch_weights.py /app/scripts/fetch_weights.py
+ARG FETCH_WEIGHTS_AT_BUILD=0
+RUN mkdir -p /app/configs /app/checkpoints \
+    && if [ "$FETCH_WEIGHTS_AT_BUILD" = "1" ]; then python3 /app/scripts/fetch_weights.py --root /app; fi
+
 COPY app/ /app/app/
-COPY configs/ /app/configs/
-COPY checkpoints/ /app/checkpoints/
 
 EXPOSE 8000 443
 
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# A Windows checkout can give the script CRLF endings, which break its #! line.
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 CMD ["/app/entrypoint.sh"]

@@ -21,7 +21,7 @@ def _build_test_image_b64() -> str:
     not Path(settings.gdino_weights_path).exists(),
     reason="GroundingDINO weights not found",
 )
-def test_detect_endpoint_smoke() -> None:
+def test_detect_endpoint_smoke(auth_headers: dict) -> None:
     client = TestClient(app)
     payload = {
         "image": _build_test_image_b64(),
@@ -29,7 +29,7 @@ def test_detect_endpoint_smoke() -> None:
         "box_threshold": 0.35,
         "text_threshold": 0.25,
     }
-    response = client.post("/v1/detect", json=payload)
+    response = client.post("/v1/detect", json=payload, headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
     assert "bboxes" in body
@@ -41,7 +41,7 @@ def test_detect_endpoint_smoke() -> None:
     not Path(settings.gdino_weights_path).exists(),
     reason="GroundingDINO weights not found",
 )
-def test_detect_batch_endpoint_smoke() -> None:
+def test_detect_batch_endpoint_smoke(auth_headers: dict) -> None:
     client = TestClient(app)
     payload = [
         {
@@ -58,7 +58,7 @@ def test_detect_batch_endpoint_smoke() -> None:
             "text_threshold": 0.25,
         },
     ]
-    response = client.post("/v1/detect/batch", json=payload)
+    response = client.post("/v1/detect/batch", json=payload, headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
     assert isinstance(body, list)

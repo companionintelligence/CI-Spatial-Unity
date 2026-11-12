@@ -7,23 +7,31 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # Required: bearer token(s) for every endpoint except /v1/health.
+      - CV_SERVER_API_TOKEN=${CV_SERVER_API_TOKEN:-}
       - CV_SERVER_DEVICE=cuda
       - CV_SERVER_LOAD_ALL=true
+      - CV_SERVER_FETCH_WEIGHTS=${CV_SERVER_FETCH_WEIGHTS:-1}
       - GDINO_CONFIG_PATH=/app/configs/GroundingDINO_SwinT_OGC.py
       - GDINO_WEIGHTS_PATH=/app/checkpoints/groundingdino_swint_ogc.pth
       - SAM2_CONFIG_PATH=configs/sam2.1/sam2.1_hiera_t.yaml
       - SAM2_WEIGHTS_PATH=/app/checkpoints/sam2.1_hiera_tiny.pt
       - FLORENCE_MODEL_ID=microsoft/Florence-2-large
-      - SSL_CERTFILE=/app/certs/liam-razer.capybara-ulmer.ts.net.crt
-      - SSL_KEYFILE=/app/certs/liam-razer.capybara-ulmer.ts.net.key
+      # Optional TLS: put a certificate and key in ./certs and name them here
+      # (container paths, e.g. in .env). Without both files the server serves
+      # plain HTTP on :8000 only.
+      - SSL_CERTFILE=${CV_SERVER_SSL_CERTFILE:-/app/certs/server.crt}
+      - SSL_KEYFILE=${CV_SERVER_SSL_KEYFILE:-/app/certs/server.key}
     deploy:
       resources:
         reservations:
           devices:
             - capabilities: [gpu]
     volumes:
-      - ./configs:/app/configs:ro
-      - ./checkpoints:/app/checkpoints:ro
+      # Model files: downloaded and checksum-verified on first start
+      # (scripts/fetch_weights.py), so these mounts must be writable.
+      - ./configs:/app/configs
+      - ./checkpoints:/app/checkpoints
       - ./certs:/app/certs:ro
       - huggingface_cache:/root/.cache/huggingface
     restart: unless-stopped
