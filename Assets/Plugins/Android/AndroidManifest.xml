@@ -12,17 +12,19 @@
       <meta-data android:name="com.oculus.vr.focusaware" android:value="true" />
     </activity>
     <meta-data android:name="unityplayer.SkipPermissionsDialog" android:value="false" />
-    <meta-data android:name="com.oculus.handtracking.frequency" android:value="LOW" />
     <meta-data android:name="com.oculus.ossplash.background" android:value="passthrough-contextual" />
     <meta-data android:name="com.oculus.telemetry.project_guid" android:value="be1cb618-05aa-4c09-890b-003e0d74dc0c" />
     <!-- Quest 3 and 3S only: the Passthrough Camera API that frame capture needs exists only on these headsets. -->
     <meta-data android:name="com.oculus.supportedDevices" android:value="quest3|quest3s" />
   </application>
   <uses-feature android:name="android.hardware.vr.headtracking" android:version="1" android:required="true" />
-  <uses-feature android:name="oculus.software.handtracking" android:required="false" />
   <!-- Horizon OS system keyboard, used to enter the CV server URL in-headset (SettingsPanel). -->
   <uses-feature android:name="oculus.software.overlay_keyboard" android:required="false" />
-  <uses-permission android:name="com.oculus.permission.HAND_TRACKING" />
+  <!-- Space Setup is read through Meta's spatial entity extension (XR_FB_spatial_entity): MetaSceneCollector's
+       OVRAnchor room query and locate calls, and the AR Foundation plane, bounding box, mesh and raycast features.
+       USE_SCENE is the run-time permission for the scene data; USE_ANCHOR_API is the install-time permission for
+       those calls, so it stays although the app saves and shares no anchors. Meta XR Core's OVRManifestPreprocessor
+       adds it whenever Scene Support is on, and Unity's Meta OpenXR package adds it for those AR features. -->
   <uses-permission android:name="com.oculus.permission.USE_ANCHOR_API" />
   <uses-feature android:name="com.oculus.feature.PASSTHROUGH" android:required="true" />
   <uses-permission android:name="com.oculus.permission.USE_SCENE" />
@@ -34,6 +36,11 @@
        itself while camera image support is on, so dropping it would also need tools:node="remove". -->
   <uses-permission android:name="horizonos.permission.HEADSET_CAMERA" />
   <uses-permission android:name="android.permission.CAMERA" />
+  <!-- Controllers only: no code, scene or prefab reads hand tracking, and every control is a controller button.
+       handTrackingSupport is ControllersOnly in Assets/Oculus/OculusProjectConfig.asset; tools:node="remove" also
+       drops the permission and feature if an SDK setting or OpenXR feature adds them again. -->
+  <uses-permission android:name="com.oculus.permission.HAND_TRACKING" tools:node="remove" />
+  <uses-feature android:name="oculus.software.handtracking" tools:node="remove" />
   <!-- Added at build time by enabled Unity OpenXR / Meta OpenXR features (Foveated Rendering with a
        Quest Pro target, AR Anchors, Colocation Discovery, Boundary Visibility) but unused by this app:
        it calls no eye gaze, eye-tracked foveation, anchor sharing, colocation or boundary visibility APIs.
