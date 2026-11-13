@@ -302,7 +302,7 @@ pytest
 |---|---|---|---|
 | [Unity Tests](.github/workflows/unity-tests.yml) | Self-hosted Windows GPU | Pull requests to `main` that change `Assets/`, `Packages/`, `ProjectSettings/` or `test/` (unit tests); manual runs (unit and cv-server integration tests) | Test results and screenshots |
 | [Web Tests](.github/workflows/web-tests.yml) | GitHub-hosted Ubuntu | Manual runs | Playwright report |
-| [Quest APK Build](.github/workflows/quest-build.yml) | GitHub-hosted Ubuntu | Manual runs and `v*` tags | `CompanionScan-<version>.apk` and its `.sha256`, kept for 7 days; a draft GitHub Release for `v*` tags |
+| [Quest APK Build](.github/workflows/quest-build.yml) | GitHub-hosted Ubuntu | Manual runs (debug key on any branch, or the release key on `main`) and `v*` tags on `main` (release key) | The APK (or AAB) and its `.sha256`, kept for 7 days; a draft GitHub Release for `v*` tags |
 
 Pull requests from forks skip the Unity tests, so code from outside the
 repository never runs on the self-hosted runner. The actions in these
@@ -319,20 +319,26 @@ change: the Unity Tests run warns about any Unity version in `README.md` or
 ### Repository secrets
 
 Add these under **Settings → Secrets and variables → Actions → Repository
-secrets**. Workflows started from forks do not receive them.
+secrets**, or the four `ANDROID_*` ones in the `release` environment (see
+[The release environment](#the-release-environment)). Workflows started from
+forks do not receive them.
 
 | Secret | Needed for | Value |
 |---|---|---|
 | `UNITY_EMAIL` | Unity Tests, Quest APK Build | Email address of the Unity ID that holds the licence |
 | `UNITY_PASSWORD` | Unity Tests, Quest APK Build | Password of that Unity ID |
 | `UNITY_SERIAL` | Paid seats only (Pro, Enterprise, Industry) | The seat's serial key; leave it unset for a Personal licence |
-| `ANDROID_KEYSTORE_BASE64` | Optional, Quest APK Build | Release keystore, base64-encoded |
-| `ANDROID_KEYSTORE_PASS` | Only with a keystore | Keystore password |
-| `ANDROID_KEYALIAS_NAME` | Only with a keystore | Key alias |
-| `ANDROID_KEYALIAS_PASS` | Only with a keystore | Key password |
+| `ANDROID_KEYSTORE_BASE64` | Quest APK Build, release job only (`v*` tags and release runs) | Release keystore `companion-scan-release.p12`, base64 on one line |
+| `ANDROID_KEYSTORE_PASS` | Release job | Keystore password: at least 20 letters and digits, nothing else |
+| `ANDROID_KEYALIAS_NAME` | Release job | Key alias: `companion-scan` |
+| `ANDROID_KEYALIAS_PASS` | Release job | Key password; in a PKCS12 keystore it is the keystore password |
 | `CV_SERVER_API_TOKEN` | Unity Tests integration job | API token of the cv-server on the runner host (sent by the health check and the Play Mode tests) |
 
-The Quest APK Build stops early and names any secret that is missing.
+The Quest APK Build stops early and names any secret that is missing. Only its
+release job reads the `ANDROID_*` secrets. The signing passwords must be long,
+random letters and digits, and the release job refuses anything else: GameCI
+passes them on the docker and Unity command lines, and Unity writes them inside
+single quotes into a Gradle build script.
 
 **Unity licence.** Both workflows run GameCI actions (`unity-builder` v6,
 `unity-test-runner` v4.4) that download the game-ci CLI release named in
@@ -358,18 +364,25 @@ With the `gh` CLI, secret values come from a prompt or from standard input, so
 they stay out of your shell history and off command lines:
 
 ```bash
-gh secret set UNITY_EMAIL        # prompts for the value
+gh secret set UNITY_EMAIL              # prompts for the value
 gh secret set UNITY_PASSWORD
-base64 -w0 release.keystore | gh secret set ANDROID_KEYSTORE_BASE64   # macOS: base64 -i release.keystore
+gh secret set ANDROID_KEYSTORE_PASS
+gh secret set ANDROID_KEYALIAS_PASS    # the same password as ANDROID_KEYSTORE_PASS
+gh secret set ANDROID_KEYALIAS_NAME --body companion-scan
+base64 -w0 ~/ci-signing/companion-scan-release.p12 | gh secret set ANDROID_KEYSTORE_BASE64   # macOS: base64 -i
 ```
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes('release.keystore')) | gh secret set ANDROID_KEYSTORE_BASE64
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\ci-signing\companion-scan-release.p12")) |
+  gh secret set ANDROID_KEYSTORE_BASE64
 ```
 
-Without the keystore secrets, each CI build is signed with a debug key created
-for that run, so one CI build cannot be installed over another without
-uninstalling it first.
+Add `--env release` to the four `ANDROID_*` commands to store them in the
+`release` environment instead of the repository.
+
+Manual runs without **release** are signed with a debug key made for that run,
+so one such build cannot be installed over another without uninstalling it
+first.
 
 **Release keystore.** Each Quest app has its own release key, kept outside
 every repository. This app's is `companion-scan-release.p12` (PKCS12, alias
@@ -393,36 +406,116 @@ $env:ANDROID_KEYSTORE_PASS = [Net.NetworkCredential]::new('', (Read-Host 'New ke
 Remove-Item Env:ANDROID_KEYSTORE_PASS
 ```
 
+### The release environment
+
+The Quest APK Build's release job, the only job that receives the signing
+secrets, runs in a GitHub environment named `release`. Set the environment up
+before the first release build: GitHub creates a missing environment without
+any protection the first time a job uses it.
+
+1. **Settings → Environments → New environment**, named `release`.
+2. **Required reviewers:** add the maintainers who approve release builds.
+   Every tag build and every manual run with **release** then waits until one
+   of them approves it with **Review deployments** on the run's page.
+3. **Deployment branches and tags:** choose **Selected branches and tags** and
+   add the branch rule `main` and the tag rule `v*`. The workflow also refuses
+   release runs on other branches, and tags that are not on `main`.
+4. Optional, and safer: keep the four `ANDROID_*` secrets in this environment
+   instead of the repository (`gh secret set <name> --env release`, then
+   `gh secret delete <name>` for the repository copy). Environment secrets
+   reach only the jobs that the environment lets in, so a workflow changed on
+   another branch cannot read them.
+
+A tag ruleset (**Settings → Rules → Rulesets**) that lets only maintainers
+create `v*` tags closes the remaining gap.
+
 ### Building and releasing the Quest APK
 
 ```bash
-gh workflow run quest-build.yml --ref main
+gh workflow run quest-build.yml --ref main                       # debug-signed APK of main
+gh workflow run quest-build.yml --ref <branch> -f package=aab    # debug-signed AAB of a branch
+gh workflow run quest-build.yml --ref main -f release=true       # release-signed APK, once approved
 gh run list --workflow quest-build.yml --limit 3
 gh run download <run-id> --dir quest-apk
 ```
 
-Build versions come from git tags (GameCI semantic versioning): the latest
-`vMAJOR.MINOR` tag sets the major and minor version and the number of commits
-since that tag sets the patch, so tag `v0.2` builds as `0.2.0` and a build five
-commits later as `0.2.5`. Before the first tag, builds are
-`0.0.<commit count>`. The Android version code follows the version
-(major × 1000000 + minor × 1000 + patch), so later commits get higher version
-codes. A three-part tag such as `v0.2.1` also works for its own build, but
-later untagged builds then keep that version.
+The workflow runs `CommandLineBuild.BuildAndroidQuest`, the build method of
+[Release builds from the command line](#release-builds-from-the-command-line),
+in GameCI's Unity image, so CI and local builds share their signing, version
+and checks. A short plan job reads the versions and starts one of two build
+jobs:
 
-To publish a release, push a tag:
+- **Debug job:** manual runs on a branch without **release**. It receives no
+  `ANDROID_*` secret, so the package is signed with a debug key made for the
+  run. Its artifact is `CompanionScan-<version>-<commit>-debug`.
+- **Release job:** `v*` tags on `main`, manual runs on `main` with **release**,
+  and manual runs on a `v*` tag. It waits for approval in the
+  [release environment](#the-release-environment), checks the four `ANDROID_*`
+  secrets and builds with `-release`, which fails unless the release key signs
+  the package. Its artifact is `CompanionScan-<version>` for a tag and
+  `CompanionScan-<version>-<commit>` for `main`. A build of a tag also attaches
+  the package and its checksum to the tag's draft GitHub Release.
 
-```bash
-git tag v0.2
-git push origin v0.2
-```
+More details:
 
-The tag build attaches the APK and its checksum to a draft GitHub Release with
-generated notes. Review the draft on GitHub, then publish it.
+- **Version.** It comes from Player Settings > Version (`bundleVersion` in
+  `ProjectSettings/ProjectSettings.asset`), and the Android versionCode is
+  MAJOR × 1000000 + MINOR × 1000 + PATCH of it, so `0.1.0` builds as
+  versionCode 1000. Every build of one version has the same versionCode, which
+  is why builds other than tags carry the commit in their name.
+- **Package.** `package=aab` builds an Android App Bundle (`-aab`) instead of
+  the APK, for Google Play. A pushed tag always builds the APK, which Meta
+  Horizon Store uploads and sideloading use.
+- **Checks.** An APK must verify with `apksigner` with a v2 signature, and
+  `aapt2` must report the planned versionCode, versionName and target API
+  level 34. For an AAB, `bundletool` must report the same values, and a release
+  AAB must verify with `jarsigner`. A release package must not be signed with
+  the Android debug certificate. The run summary shows the signing
+  certificate's SHA-256 fingerprint; it must match the one `keytool -list -v`
+  prints for your keystore.
+- **Caches.** During a signed build Unity writes both signing passwords in
+  plain text into `Library/Bee` and into Gradle's home, and anyone who can open
+  a pull request can read the Actions caches of this public repository. So
+  only the debug job saves the Unity `Library` cache. The release job restores
+  it read-only, never saves a `Library` or Gradle cache and never uploads
+  `Library`. When the build step ends, also after a failure, it deletes the
+  decoded keystore, `Library/Bee` and `~/.gradle` on the runner: GameCI mounts
+  the runner's home folder as the build container's `/root`, so that is where
+  Gradle's home `/root/.gradle` ends up. It then searches the workspace and the
+  runner's home folder for both passwords in plain text and fails the job,
+  before anything is uploaded, if a file still holds one; the log names the
+  files, never the passwords. Keep it that way when you change the workflow.
+  Release builds reuse the cache that debug builds on `main` save, so a debug
+  build on `main` makes the next release build faster.
 
-The Unity `Library` folder is cached per editor version. Tag builds can reuse
-the cache saved by builds on `main`, so dispatching a build on `main` first
-speeds up the release build.
+**To release a version:**
+
+1. Set Player Settings > Version to the new `MAJOR.MINOR.PATCH`, higher than
+   the last upload: PATCH for fixes and re-uploads, MINOR for new features.
+   MINOR and PATCH go up to 999. The versionCode follows by itself.
+2. Commit the change to `main`, then tag that commit with the same version and
+   push the tag. A tag that does not match `bundleVersion`, or that is not on
+   `main`, fails the build.
+
+   ```bash
+   git tag v0.1.1
+   git push origin v0.1.1
+   ```
+
+3. Approve the release job (**Review deployments** on the run's page). It
+   attaches the release-signed APK and its checksum to a draft GitHub Release
+   with generated notes.
+4. For Google Play, build the AAB of the same tag; it is added to the same
+   draft release:
+
+   ```bash
+   gh workflow run quest-build.yml --ref v0.1.1 -f package=aab
+   ```
+
+5. Review the draft on GitHub, then publish it.
+
+A store accepts each versionCode only once and only in increasing order, so a
+rejected upload is rebuilt as a new PATCH version, never under the same one.
 
 To install a build on a headset, see [docs/SIDELOAD.md](docs/SIDELOAD.md).
 

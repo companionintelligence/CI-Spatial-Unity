@@ -18,10 +18,12 @@ If they change there, list the installed package with
 ## 1. Get the APK
 
 **From a CI run.** On GitHub, open **Actions → Quest APK Build**, pick a
-successful run and download the `CompanionScan-<version>` artifact (you need to
-be signed in to GitHub). It is a zip holding `CompanionScan-<version>.apk` and
-`CompanionScan-<version>.apk.sha256`. Artifacts are kept for 7 days. With the
-`gh` CLI, from a clone of this repository:
+successful run and download its artifact (you need to be signed in to GitHub):
+`CompanionScan-<version>-<commit>-debug` for a debug-signed build of a branch,
+`CompanionScan-<version>-<commit>` for a release build of `main`, or
+`CompanionScan-<version>` for a tag. It is a zip holding the APK and its
+`.sha256` file. Artifacts are kept for 7 days. With the `gh` CLI, from a clone
+of this repository:
 
 ```bash
 gh run list --workflow quest-build.yml --status success --limit 5
@@ -139,13 +141,17 @@ address from `adb shell ip route` (the address after `src`), then run
 An update installs in place, keeping the app's data, only when the new APK is
 signed with the same key and does not lower the version code.
 
-- **Different signing key.** CI builds made without the `ANDROID_KEYSTORE_*`
-  repository secrets are signed with a debug key generated for that run, and
-  local editor builds use your own debug key. Installing over a build signed
-  with another key fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
+- **Different signing key.** Tag builds and other release builds are signed
+  with the release key. Debug-signed CI builds (the `-debug` artifacts) are
+  signed with a debug key generated for that run, and local editor builds use
+  your own debug key. Installing over a build signed with another key fails
+  with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
 - **Lower version code.** Installing an older build over a newer one fails with
   `INSTALL_FAILED_VERSION_DOWNGRADE` (`adb install -d` only helps for
-  debuggable builds).
+  debuggable builds). The version code comes from the app version (0.1.0 is
+  1000), so builds of the same version and key replace each other with
+  `adb install -r`. Editor builds from the CompanionScan menu keep the version
+  code stored in Player Settings (1).
 
 In both cases, uninstall the old build first. **Uninstalling deletes the app's
 data on the headset**, including glTF exports under `files/exports`, so copy
