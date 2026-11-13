@@ -119,12 +119,14 @@ address from `adb shell ip route` (the address after `src`), then run
    sideloaded apps are listed there, not with store apps.
 2. Run **Space Setup** for the room if you have not done so. Meta Scene
    Understanding (pipeline A) reads the room model it creates.
-3. On first launch, allow the permissions the app asks for: spatial data
-   (`com.oculus.permission.USE_SCENE`) and headset cameras
-   (`horizonos.permission.HEADSET_CAMERA`). If you dismissed a prompt, turn the
-   permission back on in the headset's app permission settings (Meta Help
-   Center: [Manage headset camera permissions](https://www.meta.com/help/quest/511837681585017/)),
-   or uninstall and reinstall the app to be asked again.
+3. Allow the permissions the app asks for. On first launch it asks for the
+   headset cameras (`horizonos.permission.HEADSET_CAMERA`) and camera access
+   (`android.permission.CAMERA`); frame capture starts once both are allowed.
+   Spatial data (`com.oculus.permission.USE_SCENE`) is asked for at the first
+   capture. A dismissed prompt is shown again the next time the app needs the
+   permission. If you denied one, turn it back on in the headset's app
+   permission settings (Meta Help Center: [Manage headset camera permissions](https://www.meta.com/help/quest/511837681585017/))
+   and capture picks it up, or uninstall and reinstall the app to be asked again.
 4. The CV server pipeline (pipeline B) needs the headset to reach the CV server
    configured in the build. See [Quick Start](../README.md#quick-start), steps 1
    and 2.

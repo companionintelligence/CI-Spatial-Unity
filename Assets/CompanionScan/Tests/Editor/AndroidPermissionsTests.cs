@@ -1,4 +1,6 @@
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Xml;
 using CompanionScan.Core;
 using CompanionScan.Platform;
@@ -9,6 +11,7 @@ namespace CompanionScan.Tests.Editor
     public class AndroidPermissionsTests
     {
         private const string ManifestPath = "Assets/Plugins/Android/AndroidManifest.xml";
+        private const string ScenePath = "Assets/CompanionScan/Scenes/CompanionCapture.unity";
         private const string AndroidNamespace = "http://schemas.android.com/apk/res/android";
 
         [Test]
@@ -30,24 +33,59 @@ namespace CompanionScan.Tests.Editor
         }
 
         [Test]
-        public void QuestCameraProvider_RequestsTheHeadsetCameraPermission()
+        public void PassthroughCameraPermission_RequestsTheHeadsetCameraPermissionFirst()
         {
-            Assert.AreEqual("horizonos.permission.HEADSET_CAMERA", QuestCameraProvider.HeadsetCameraPermission);
-            Assert.AreEqual(QuestCameraProvider.HeadsetCameraPermission, QuestCameraProvider.RequiredPermissions.First(),
+            Assert.AreEqual("horizonos.permission.HEADSET_CAMERA", PassthroughCameraPermission.HeadsetCamera);
+            Assert.AreEqual(PassthroughCameraPermission.HeadsetCamera, PassthroughCameraPermission.RequiredPermissions.First(),
                 "HEADSET_CAMERA gates the Quest passthrough cameras and must be requested");
-            // Kept until capture is verified on a headset without it: WebCamTexture checks it.
-            CollectionAssert.Contains(QuestCameraProvider.RequiredPermissions.ToList(), "android.permission.CAMERA");
+            // Kept until capture is verified on a headset without it: Meta OpenXR opens the cameras
+            // through the NDK Camera2 API, and WebCamTexture checks it too.
+            CollectionAssert.Contains(PassthroughCameraPermission.RequiredPermissions.ToList(), "android.permission.CAMERA");
         }
 
         [Test]
-        public void Manifest_DeclaresEveryCameraPermissionTheProviderRequests()
+        public void PassthroughCameraPermission_IsNotRequiredInTheEditor()
+        {
+            var request = PassthroughCameraPermission.RequestAsync();
+
+            Assert.IsTrue(request.IsCompleted);
+            Assert.IsTrue(request.Result);
+            Assert.IsTrue(PassthroughCameraPermission.IsGranted);
+            Assert.AreEqual(PassthroughCameraPermission.State.NotRequired, PassthroughCameraPermission.LastKnown);
+        }
+
+        [Test]
+        public void BothCameraProviders_UseTheSharedCameraPermissions()
+        {
+            Assert.AreEqual(PassthroughCameraPermission.HeadsetCamera, QuestCameraProvider.HeadsetCameraPermission);
+            Assert.AreEqual(PassthroughCameraPermission.AndroidCamera, QuestCameraProvider.AndroidCameraPermission);
+            CollectionAssert.AreEqual(PassthroughCameraPermission.RequiredPermissions.ToList(),
+                QuestCameraProvider.RequiredPermissions.ToList());
+        }
+
+        [Test]
+        public void Manifest_DeclaresEveryCameraPermissionThatIsRequested()
         {
             var manifest = LoadManifest();
-            foreach (var permission in QuestCameraProvider.RequiredPermissions)
+            foreach (var permission in PassthroughCameraPermission.RequiredPermissions)
             {
                 Assert.IsNotNull(FindUsesPermission(manifest, permission, out var toolsNode), permission + " is not declared");
                 Assert.IsEmpty(toolsNode, permission + " must be declared, not removed");
             }
+        }
+
+        [Test]
+        public void Scene_LeavesTheHeadsetCameraRequestToTheCapturePath()
+        {
+            // PassthroughCameraPermission asks for HEADSET_CAMERA and CAMERA together when capture starts.
+            // OVRManager's own startup request would ask for HEADSET_CAMERA a second time (twice in a row
+            // for a user who denies it), so it stays off.
+            var scene = File.ReadAllText(ScenePath);
+            var flags = Regex.Matches(scene, @"^\s*requestPassthroughCameraAccessPermissionOnStartup:\s*(\d+)\s*$", RegexOptions.Multiline);
+
+            Assert.AreEqual(1, flags.Count, "expected one OVRManager in " + ScenePath);
+            Assert.AreEqual("0", flags[0].Groups[1].Value,
+                "OVRManager must not request passthrough camera access on startup; PassthroughCameraPermission owns that request");
         }
 
         [TestCase("com.oculus.permission.EYE_TRACKING")]

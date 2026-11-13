@@ -26,9 +26,12 @@
   <uses-permission android:name="com.oculus.permission.USE_ANCHOR_API" />
   <uses-feature android:name="com.oculus.feature.PASSTHROUGH" android:required="true" />
   <uses-permission android:name="com.oculus.permission.USE_SCENE" />
-  <!-- Passthrough Camera API (Quest 3 / 3S, Horizon OS v74+); QuestCameraProvider requests both at run time.
-       android.permission.CAMERA stays until capture is verified on a headset without it: Unity's WebCamTexture
-       checks it, and Meta OpenXR's camera feature (camera image support on) declares it as well. -->
+  <!-- Passthrough Camera API (Quest 3 / 3S, Horizon OS v74+). PassthroughCameraPermission requests both at run
+       time when capture starts, and the camera starts only once both are granted: MobileCameraProvider (AR
+       Foundation and Meta OpenXR, the path the scene uses) and the QuestCameraProvider WebCamTexture fallback.
+       android.permission.CAMERA stays until capture is verified on a headset without it: Meta OpenXR opens the
+       passthrough cameras through Android's NDK Camera2 API, which checks it, and adds it to the merged manifest
+       itself while camera image support is on, so dropping it would also need tools:node="remove". -->
   <uses-permission android:name="horizonos.permission.HEADSET_CAMERA" />
   <uses-permission android:name="android.permission.CAMERA" />
   <!-- Added at build time by enabled Unity OpenXR / Meta OpenXR features (Foveated Rendering with a

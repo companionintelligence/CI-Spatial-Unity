@@ -210,14 +210,20 @@ namespace CompanionScan.Mapping
                 }
 
                 var cameraGo = new GameObject("PcaCamera");
+                // Assembled inactive, with the ARCameraManager disabled: enabling it starts Meta
+                // OpenXR's camera subsystem, which checks the headset camera permission only then.
+                // MobileCameraProvider enables it once the permissions are granted.
+                cameraGo.SetActive(false);
                 cameraGo.transform.SetParent(transform, false);
                 var camera = cameraGo.AddComponent<Camera>();
                 camera.enabled = false;
                 camera.clearFlags = CameraClearFlags.Nothing;
                 camera.cullingMask = 0;
-                cameraGo.AddComponent<ARCameraManager>();
+                var cameraManager = cameraGo.AddComponent<ARCameraManager>();
+                cameraManager.enabled = false;
                 cameraGo.AddComponent<ARCameraBackground>();
                 existingProvider = cameraGo.AddComponent<MobileCameraProvider>();
+                cameraGo.SetActive(true);
                 Debug.Log("[Pipeline] Created ARSession + PCA camera for passthrough capture.");
             }
 

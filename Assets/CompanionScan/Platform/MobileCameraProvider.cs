@@ -10,37 +10,110 @@ using UnityEngine.XR.ARSubsystems;
 namespace CompanionScan.Platform
 {
 #if UNITY_IOS || UNITY_ANDROID
+    /// <summary>
+    /// Camera frames through AR Foundation's <see cref="ARCameraManager"/>. On Meta Quest 3 / 3S this
+    /// is the passthrough capture path of the shipped scene: SpatialCapturePipeline creates this
+    /// provider when preferArCameraOnQuest is on, and Meta OpenXR's camera subsystem serves it.
+    ///
+    /// In Android players the ARCameraManager runs only once the passthrough camera permissions
+    /// (<see cref="PassthroughCameraPermission"/>) are granted. Meta OpenXR checks HEADSET_CAMERA once,
+    /// when its camera subsystem starts, and does not start it again after a later grant, so
+    /// <see cref="CameraPermissionGate"/> holds the camera back, asks when capture starts and
+    /// switches it on once the permissions are granted.
+    /// </summary>
     [RequireComponent(typeof(ARCameraManager))]
     public class MobileCameraProvider : MonoBehaviour, ICameraProvider
     {
         private ARCameraManager _cameraManager;
         private Texture2D _frame;
+        private CameraPermissionGate _permissionGate;
+        private bool _loggedWaiting;
 
         public bool IsAvailable => _cameraManager != null;
+
+        /// <summary>True while capture is requested but the camera waits for its permissions.</summary>
+        public bool IsWaitingForPermission => _permissionGate != null && _permissionGate.IsWaitingForPermission;
 
         private void Awake()
         {
             _cameraManager = GetComponent<ARCameraManager>();
+            _permissionGate = CreatePermissionGate(_cameraManager);
+            _permissionGate?.Initialize();
+        }
+
+        /// <summary>
+        /// Android players of this project are Meta Quest builds (Meta OpenXR; Quest 3 / 3S only), so
+        /// they get the gate. Elsewhere the passthrough camera permissions do not apply.
+        /// </summary>
+        private static CameraPermissionGate CreatePermissionGate(ARCameraManager cameraManager)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (cameraManager != null)
+            {
+                return new CameraPermissionGate(
+                    () => PassthroughCameraPermission.IsGranted,
+                    PassthroughCameraPermission.RequestInBackground,
+                    () => cameraManager.enabled,
+                    on => cameraManager.enabled = on);
+            }
+#endif
+            return null;
+        }
+
+        private void Update()
+        {
+            _permissionGate?.Update(Time.unscaledTime);
         }
 
         public void StartCapture()
         {
-            if (_cameraManager != null)
+            if (_cameraManager == null)
             {
-                _cameraManager.enabled = true;
+                return;
             }
+
+            if (_permissionGate != null)
+            {
+                _loggedWaiting = false;
+                _permissionGate.StartCapture(Time.unscaledTime);
+                return;
+            }
+
+            _cameraManager.enabled = true;
         }
 
         public void StopCapture()
         {
-            if (_cameraManager != null)
+            if (_cameraManager == null)
             {
-                _cameraManager.enabled = false;
+                return;
             }
+
+            if (_permissionGate != null)
+            {
+                _permissionGate.StopCapture();
+                return;
+            }
+
+            _cameraManager.enabled = false;
         }
 
         public byte[] GetCurrentFrameJpeg(int quality = 75)
         {
+            if (IsWaitingForPermission)
+            {
+                _permissionGate.OnFrameRequested();
+                if (!_loggedWaiting)
+                {
+                    _loggedWaiting = true;
+                    Debug.LogWarning(PassthroughCameraPermission.LastKnown == PassthroughCameraPermission.State.Denied
+                        ? "[MobileCamera] " + PassthroughCameraPermission.DeniedMessage
+                        : "[MobileCamera] No frame yet: the camera starts once the headset camera permissions are granted.");
+                }
+
+                return null;
+            }
+
             if (_cameraManager == null || !_cameraManager.TryAcquireLatestCpuImage(out XRCpuImage image))
             {
                 return null;
