@@ -16,7 +16,7 @@ services:
       - GDINO_WEIGHTS_PATH=/app/checkpoints/groundingdino_swint_ogc.pth
       - SAM2_CONFIG_PATH=configs/sam2.1/sam2.1_hiera_t.yaml
       - SAM2_WEIGHTS_PATH=/app/checkpoints/sam2.1_hiera_tiny.pt
-      - FLORENCE_MODEL_ID=microsoft/Florence-2-large
+      - FLORENCE_MODEL_ID=florence-community/Florence-2-large
       # Optional TLS: put a certificate and key in ./certs and name them here
       # (container paths, e.g. in .env). With both files the server serves HTTPS
       # on :443 only; without them, plain HTTP on :8000 only.

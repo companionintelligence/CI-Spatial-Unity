@@ -32,7 +32,7 @@ the deadsnakes PPA, installed in a virtualenv at `/opt/venv` that comes first on
 `PATH`. Ubuntu 22.04's default Python is 3.10, but `requirements.txt` pins
 `pillow==13.0.0`, which needs Python 3.11 or later. Ubuntu 22.04's own `python3.11`
 package is not used: it is 3.11.0rc1, a pre-release that gets no fixes, and
-importing timm (used by GroundingDINO and Florence-2) crashes it.
+importing timm (used by GroundingDINO) crashes it.
 
 Everything the image installs is pinned:
 
@@ -43,8 +43,15 @@ Everything the image installs is pinned:
 - GroundingDINO and SAM 2 at fixed commits. They are built with
   `--no-build-isolation`, so their CUDA extensions compile against the image's
   torch instead of the newest torch on PyPI.
-- `transformers` 4.40.1. transformers 5.x needs a newer torch than 2.5.1, so
-  moving to it means moving torch and the CUDA base image as well.
+- `transformers` 5.17.0, with `tokenizers`, `huggingface-hub`, `hf-xet` and
+  `safetensors` pinned beside it. It has no published advisories (every 4.x
+  release has some that are fixed only in 5.x) and is the last release that
+  needs nothing newer than torch 2.5.1: 5.18 adds a torch 2.6 call to its device
+  helper, 5.19 makes that call on import, and 5.20 and later require torch 2.6.
+  GroundingDINO's own BERT wrapper calls methods that transformers 5 removed,
+  so the server gives GroundingDINO an equivalent text encoder
+  (`app/gdino_text_encoder.py`). Florence-2 runs on transformers' own
+  implementation, so no code from a model repository runs in the server.
 
 ## Model Files
 
@@ -61,9 +68,32 @@ place. It runs:
 
 Files go where the server reads them (`GDINO_CONFIG_PATH`, `GDINO_WEIGHTS_PATH`,
 `SAM2_WEIGHTS_PATH`). A file already there with a different checksum is left
-alone and reported unless `--force` is given. Florence-2 is downloaded by
-`transformers` from the Hugging Face hub on first use and cached in the
-`huggingface_cache` volume.
+alone and reported unless `--force` is given.
+
+Two models come from the Hugging Face hub on first load, each at a fixed
+repository commit (`app/hub_pins.py`), and are cached in the
+`huggingface_cache` volume:
+
+- BERT base uncased (`google-bert/bert-base-uncased`), GroundingDINO's text
+  encoder. Its config names `bert-base-uncased`, which GroundingDINO would load
+  from the moving `main` branch; the server loads a snapshot of the pinned
+  commit instead (only `config.json`, `model.safetensors`, `tokenizer.json`,
+  `tokenizer_config.json` and `vocab.txt`).
+- Florence-2 (`FLORENCE_MODEL_ID`), loaded with transformers' own Florence-2
+  implementation from a repository in its format: Microsoft's weights converted
+  by Hugging Face, with configs and tokenizer files and no Python code.
+  `florence-community/Florence-2-large` (the default) and
+  `florence-community/Florence-2-base` have pinned commits. Microsoft's own
+  repositories (`microsoft/Florence-2-large`, `-base`) are made for code that
+  runs from the repository (`trust_remote_code`), which this server does not
+  run; their ids load the converted repositories instead. For any other model
+  id, set `FLORENCE_MODEL_REVISION` to a full 40-character commit id; the server
+  refuses to load it otherwise, and refuses branch or tag names, which can
+  move. A model id that is a local directory needs no revision. The server also
+  refuses a checkpoint that leaves any Florence-2 weight unset, such as one
+  made for the repository code.
+
+Once both are cached, the server also starts with `HF_HUB_OFFLINE=1`.
 
 ## Authentication
 
@@ -128,7 +158,9 @@ names and key material out of the repository; `certs/` and `.env` are gitignored
 - `GDINO_WEIGHTS_PATH`
 - `SAM2_CONFIG_PATH`
 - `SAM2_WEIGHTS_PATH`
-- `FLORENCE_MODEL_ID`
+- `FLORENCE_MODEL_ID` (default: `florence-community/Florence-2-large`)
+- `FLORENCE_MODEL_REVISION`: commit of `FLORENCE_MODEL_ID` to load; required for
+  model ids without a pinned commit (see [Model Files](#model-files))
 - `BOX_THRESHOLD`
 - `TEXT_THRESHOLD`
 - `GLTF_UPLOAD_DIR` (default: `uploads/gltf`)

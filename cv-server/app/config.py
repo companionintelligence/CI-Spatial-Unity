@@ -23,9 +23,14 @@ class Settings(BaseSettings):
     sam2_weights_path: str = os.getenv(
         "SAM2_WEIGHTS_PATH", "checkpoints/sam2.1_hiera_tiny.pt"
     )
+    # A repository in the format of transformers' own Florence-2 implementation. The
+    # Microsoft ids load their converted repositories (app/hub_pins.py).
     florence_model_id: str = os.getenv(
-        "FLORENCE_MODEL_ID", "microsoft/Florence-2-large"
+        "FLORENCE_MODEL_ID", "florence-community/Florence-2-large"
     )
+    # Commit of FLORENCE_MODEL_ID to load. Empty: the commit pinned in app/hub_pins.py,
+    # which covers florence-community/Florence-2-large and -base; other ids need one.
+    florence_model_revision: str = os.getenv("FLORENCE_MODEL_REVISION", "")
     gltf_upload_dir: str = os.getenv("GLTF_UPLOAD_DIR", "uploads/gltf")
     # Largest HTTP request body accepted, in bytes (base64 images, glTF uploads); 413 above it.
     max_request_bytes: int = int(os.getenv("CV_SERVER_MAX_REQUEST_BYTES", str(32 * 1024 * 1024)))
