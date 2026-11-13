@@ -134,7 +134,7 @@ the current state:
 Model: Florence
 Display: Both
 Preview: Near (1m)
-BUSY…            ← shown during capture
+BUSY...          ← shown during capture
 ```
 
 ### Model Presets
