@@ -18,7 +18,7 @@ git+https://github.com/facebookresearch/sam2.git@2b90b9f5ceec907a1c18123530e92e7
 # wheels (it uses torch.float8_e8m0fnu), so BertModel (GroundingDINO) and the Florence-2 auto
 # classes fail to import in the image. 4.40.1 is the version the server ran with before the
 # dependabot bump. Upgrade together with torch and the CUDA base image.
-transformers==4.40.1
+transformers==5.10.1
 accelerate==1.15.0
 einops==0.7.0
 timm==0.9.16
