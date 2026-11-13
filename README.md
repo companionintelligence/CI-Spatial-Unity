@@ -393,7 +393,7 @@ To install a build on a headset, see [docs/SIDELOAD.md](docs/SIDELOAD.md).
 ### Release builds from the command line
 
 `CommandLineBuild.BuildAndroidQuest` builds the Quest APK in batch mode
-(`Builds/Android/CompanionCapture.apk`). It reads release signing and version
+(`Builds/Android/CompanionScan.apk`). It reads release signing and version
 settings from the environment only, applies them to that one build and puts
 Player Settings back afterwards, so no keystore path, alias or password ends
 up in `ProjectSettings/ProjectSettings.asset`.
@@ -413,7 +413,7 @@ up in `ProjectSettings/ProjectSettings.asset`.
 - `-release` makes the build fail unless all four are set and `KEYSTORE_PATH`
   points to an existing file. Use it for every build meant for a store or for
   testers who update in place.
-- `-aab` builds an Android App Bundle (`Builds/Android/CompanionCapture.aab`)
+- `-aab` builds an Android App Bundle (`Builds/Android/CompanionScan.aab`)
   instead of an APK, for stores that take bundles (Google Play requires them for
   new apps). Meta Horizon Store uploads and sideloading use the APK.
 - versionCode is `VERSION_CODE` when set, otherwise
