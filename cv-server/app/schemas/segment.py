@@ -11,7 +11,13 @@ class RLEMask(BaseModel):
 class SegmentAnnotation(BaseModel):
     label: str
     score: float
-    bbox: List[float]
+    bbox: List[float] = Field(
+        ...,
+        description=(
+            "[x1, y1, x2, y2]: top-left and bottom-right corners as fractions (0-1) "
+            "of the image width (x) and height (y), origin top-left"
+        ),
+    )
     mask: Optional[RLEMask] = None
 
 
@@ -30,4 +36,7 @@ class SegmentRequest(BaseModel):
 
 class SegmentResponse(BaseModel):
     annotations: List[SegmentAnnotation]
-    image_size: List[int]
+    image_size: List[int] = Field(
+        ...,
+        description="[height, width] in pixels of the image the masks were computed on (after max_side)",
+    )
