@@ -379,6 +379,14 @@ namespace CompanionScan.Mapping
                 return;
             }
 
+            // No snapshot leaves the headset before the user has agreed to the camera notice.
+            // Until then nothing is captured; when they agree, the notice runs the CV pipeline.
+            if (!CaptureConsent.EnsureGranted(serverConfig.ResolveBaseUrl(), CaptureAndPin))
+            {
+                Debug.Log("[Pipeline-CV] Waiting for agreement to send camera snapshots; nothing was captured or sent.");
+                return;
+            }
+
             // Pin placement prefers environment raycasts, which need the spatial
             // data permission: ask before the first capture (no-op once answered;
             // when denied the raycaster falls back to physics/fixed-distance hits).

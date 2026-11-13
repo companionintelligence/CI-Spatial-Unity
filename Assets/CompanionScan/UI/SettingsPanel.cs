@@ -2,17 +2,22 @@
 using CompanionScan.Core;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace CompanionScan.UI
 {
     /// <summary>
-    /// In-headset CV server settings.
+    /// In-headset settings: the CV server, the privacy policy, the open-source licences and the
+    /// agreement to send camera snapshots.
     ///
     /// Opens automatically on first run (no server URL configured) and with the
     /// left controller Menu button. While it is open, <see cref="XRControllerInput"/>
     /// routes A to <see cref="EditUrl"/> (Horizon OS system keyboard), X to
-    /// <see cref="EditToken"/> and B to <see cref="Apply"/>; capture controls are suspended.
+    /// <see cref="EditToken"/>, B to <see cref="Apply"/>, Y to <see cref="OpenPrivacyPolicy"/>,
+    /// either trigger to <see cref="ShowLicenses"/> and either grip to
+    /// <see cref="WithdrawCaptureConsent"/>; capture controls are suspended.
+    ///
+    /// The camera notice (<see cref="CaptureConsentPanel"/>) and the licences view
+    /// (<see cref="LicensesPanel"/>) are added next to this component at run time.
     ///
     /// The CV server requires a bearer token on every route. The token is typed with the
     /// system keyboard in secure mode, stored only as a PlayerPrefs override (see
@@ -40,15 +45,16 @@ namespace CompanionScan.UI
         [SerializeField] private Color textColor = Color.white;
         [SerializeField] private Color errorColor = new(1f, 0.45f, 0.4f, 1f);
 
-        private const float PanelWidth = 640f;
-        private const float PanelHeight = 350f;
-        private const float RecenterAngleDegrees = 35f;
+        private const float PanelWidth = 700f;
+        private const float PanelHeight = 490f;
         private const string Hint = "A  URL     X  API token     B  save     Menu  close";
+        private const string MoreHint = "Y  privacy policy     Trigger  licences     Grip  withdraw";
 
-        private GameObject _panelRoot;
+        private HeadsetPanel _panel;
         private TMP_Text _urlText;
         private TMP_Text _tokenText;
         private TMP_Text _statusText;
+        private TMP_Text _consentText;
         private TouchScreenKeyboard _keyboard;
         private bool _keyboardEditsToken;
         private string _draftUrl = string.Empty;
@@ -78,6 +84,21 @@ namespace CompanionScan.UI
             {
                 config = Resources.Load<ServerConfig>(ServerConfig.ResourcesPath);
             }
+
+            // Built at run time like this panel. The notice must exist before the first capture:
+            // without it the pipeline sends nothing.
+            if (Application.isPlaying)
+            {
+                if (GetComponent<CaptureConsentPanel>() == null)
+                {
+                    gameObject.AddComponent<CaptureConsentPanel>();
+                }
+
+                if (GetComponent<LicensesPanel>() == null)
+                {
+                    gameObject.AddComponent<LicensesPanel>();
+                }
+            }
         }
 
         private void OnEnable()
@@ -97,10 +118,7 @@ namespace CompanionScan.UI
 
         private void OnDestroy()
         {
-            if (_panelRoot != null)
-            {
-                Destroy(_panelRoot);
-            }
+            _panel?.Destroy();
         }
 
         private void Start()
@@ -136,7 +154,10 @@ namespace CompanionScan.UI
         private void Update()
         {
             PollKeyboard();
-            KeepPanelInView();
+            if (_isOpen && _keyboard == null)
+            {
+                _panel?.KeepInView();
+            }
         }
 
         public void Toggle()
@@ -163,8 +184,7 @@ namespace CompanionScan.UI
             if (urlField == null)
             {
                 EnsurePanel();
-                PlaceInFrontOfViewer();
-                _panelRoot.SetActive(true);
+                _panel.Show();
             }
 
             SetStatus(message ?? "Current server shown above.", false);
@@ -174,10 +194,44 @@ namespace CompanionScan.UI
         {
             CloseKeyboard();
             _isOpen = false;
-            if (_panelRoot != null)
+            _panel?.Hide();
+        }
+
+        /// <summary>Y button: open the privacy policy in the headset's browser.</summary>
+        public void OpenPrivacyPolicy()
+        {
+            PrivacyPolicy.Open();
+            SetStatus("Opening the privacy policy in the browser.", false);
+        }
+
+        /// <summary>Trigger: show the open-source licences; Menu there comes back here.</summary>
+        public void ShowLicenses()
+        {
+            var licenses = GetComponent<LicensesPanel>();
+            if (licenses == null)
             {
-                _panelRoot.SetActive(false);
+                SetStatus("The open-source licences are not available.", true);
+                return;
             }
+
+            Close();
+            licenses.Open(() => Open());
+        }
+
+        /// <summary>
+        /// Grip: withdraw the agreement to send camera snapshots. Nothing is sent until the user
+        /// agrees again, which the next capture asks for.
+        /// </summary>
+        public void WithdrawCaptureConsent()
+        {
+            if (!CaptureConsent.IsGranted)
+            {
+                SetStatus("There is no agreement to withdraw. The next capture asks first.", false);
+                return;
+            }
+
+            CaptureConsent.Withdraw();
+            SetStatus("Agreement withdrawn. The next capture asks again before sending anything.", false);
         }
 
         /// <summary>X button: enter the CV server's API token with the system keyboard (secure input).</summary>
@@ -413,131 +467,49 @@ namespace CompanionScan.UI
                 _statusText.text = StatusMessage;
                 _statusText.color = _statusIsError ? errorColor : textColor;
             }
+
+            if (_consentText != null)
+            {
+                _consentText.text = DescribeCaptureConsent();
+            }
+        }
+
+        /// <summary>The settings line about the agreement to send camera snapshots.</summary>
+        public static string DescribeCaptureConsent()
+        {
+            if (!CaptureConsent.IsGranted)
+            {
+                return "Camera snapshots: the first capture asks you first";
+            }
+
+            var agreedAt = CaptureConsent.AgreedAtUtc;
+            var date = agreedAt.Length >= 10 ? agreedAt.Substring(0, 10) : agreedAt;
+            return string.IsNullOrEmpty(date)
+                ? "Camera snapshots: you agreed (Grip withdraws)"
+                : $"Camera snapshots: you agreed on {date} (Grip withdraws)";
         }
 
         // ── World-space panel ─────────────────────────────────────────────
 
         private void EnsurePanel()
         {
-            if (_panelRoot != null)
+            if (_panel != null)
             {
                 return;
             }
 
-            // Scene root, not a child of this component: the panel is placed in
-            // world space in front of the viewer and must not follow its host.
-            _panelRoot = new GameObject("ServerSettingsPanel");
-            _panelRoot.transform.localScale = Vector3.one * panelScale;
+            _panel = new HeadsetPanel("ServerSettingsPanel", PanelWidth, PanelHeight, panelScale, panelDistance, backgroundColor);
+            _panel.AddText("Title", "Settings", 40f, 52f, FontStyles.Bold, textColor);
+            _urlText = _panel.AddText("Url", string.Empty, 32f, 44f, FontStyles.Normal, textColor);
+            _tokenText = _panel.AddText("Token", string.Empty, 28f, 40f, FontStyles.Normal, textColor);
+            _statusText = _panel.AddText("Status", string.Empty, 24f, 64f, FontStyles.Normal, textColor, wrap: true);
+            _consentText = _panel.AddText("CaptureConsent", string.Empty, 24f, 34f, FontStyles.Normal, textColor);
+            _panel.AddText("PrivacyPolicy", "Privacy policy: " + PrivacyPolicy.DisplayUrl, 24f, 34f, FontStyles.Normal,
+                textColor, richText: false);
+            _panel.AddText("Hint", Hint, 24f, 34f, FontStyles.Normal, textColor);
+            _panel.AddText("MoreHint", MoreHint, 24f, 34f, FontStyles.Normal, textColor);
 
-            var canvas = _panelRoot.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            _panelRoot.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 10f;
-            _panelRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(PanelWidth, PanelHeight);
-
-            var background = new GameObject("Background", typeof(RectTransform));
-            background.transform.SetParent(_panelRoot.transform, false);
-            Stretch(background.GetComponent<RectTransform>(), 0f);
-            background.AddComponent<Image>().color = backgroundColor;
-
-            var layout = new GameObject("Layout", typeof(RectTransform));
-            layout.transform.SetParent(background.transform, false);
-            Stretch(layout.GetComponent<RectTransform>(), 24f);
-            var group = layout.AddComponent<VerticalLayoutGroup>();
-            group.spacing = 14f;
-            group.childAlignment = TextAnchor.UpperLeft;
-            group.childControlWidth = true;
-            group.childControlHeight = false;
-            group.childForceExpandWidth = true;
-            group.childForceExpandHeight = false;
-
-            MakeText(layout.transform, "Title", "CV server", 40f, 52f, FontStyles.Bold);
-            _urlText = MakeText(layout.transform, "Url", string.Empty, 32f, 44f, FontStyles.Normal);
-            _tokenText = MakeText(layout.transform, "Token", string.Empty, 28f, 40f, FontStyles.Normal);
-            _statusText = MakeText(layout.transform, "Status", string.Empty, 24f, 64f, FontStyles.Normal);
-            _statusText.textWrappingMode = TextWrappingModes.Normal;
-            MakeText(layout.transform, "Hint", Hint, 24f, 34f, FontStyles.Normal);
-
-            _panelRoot.SetActive(false);
             RefreshPanel();
-        }
-
-        /// <summary>
-        /// Re-centers the open panel when it drifts out of view, e.g. when it was
-        /// opened before head tracking settled or the user turned away.
-        /// </summary>
-        private void KeepPanelInView()
-        {
-            if (!_isOpen || _panelRoot == null || !_panelRoot.activeSelf || _keyboard != null)
-            {
-                return;
-            }
-
-            var viewer = Camera.main != null ? Camera.main.transform : null;
-            if (viewer == null)
-            {
-                return;
-            }
-
-            // Compare headings only, so looking down at the controllers does not move the panel.
-            var flatForward = Vector3.ProjectOnPlane(viewer.forward, Vector3.up);
-            if (flatForward.sqrMagnitude < 1e-4f)
-            {
-                return;
-            }
-
-            var toPanel = _panelRoot.transform.position - viewer.position;
-            var flatToPanel = Vector3.ProjectOnPlane(toPanel, Vector3.up);
-            bool misplaced = toPanel.magnitude > panelDistance * 2f || Mathf.Abs(toPanel.y) > panelDistance * 0.5f;
-            bool outOfView = flatToPanel.sqrMagnitude > 1e-4f &&
-                             Vector3.Angle(flatForward, flatToPanel) > RecenterAngleDegrees;
-            if (misplaced || outOfView)
-            {
-                PlaceInFrontOfViewer();
-            }
-        }
-
-        private void PlaceInFrontOfViewer()
-        {
-            var viewer = Camera.main != null ? Camera.main.transform : null;
-            if (viewer == null || _panelRoot == null)
-            {
-                return;
-            }
-
-            var forward = Vector3.ProjectOnPlane(viewer.forward, Vector3.up);
-            if (forward.sqrMagnitude < 1e-4f)
-            {
-                forward = viewer.forward;
-            }
-
-            forward.Normalize();
-            _panelRoot.transform.SetPositionAndRotation(
-                viewer.position + forward * panelDistance,
-                Quaternion.LookRotation(forward, Vector3.up));
-        }
-
-        private TMP_Text MakeText(Transform parent, string name, string text, float size, float height, FontStyles style)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            go.GetComponent<RectTransform>().sizeDelta = new Vector2(PanelWidth - 48f, height);
-            var tmp = go.AddComponent<TextMeshProUGUI>();
-            tmp.text = text;
-            tmp.fontSize = size;
-            tmp.fontStyle = style;
-            tmp.color = textColor;
-            tmp.alignment = TextAlignmentOptions.Left;
-            tmp.textWrappingMode = TextWrappingModes.NoWrap;
-            tmp.overflowMode = TextOverflowModes.Ellipsis;
-            return tmp;
-        }
-
-        private static void Stretch(RectTransform rt, float inset)
-        {
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.offsetMin = new Vector2(inset, inset);
-            rt.offsetMax = new Vector2(-inset, -inset);
         }
     }
 }
