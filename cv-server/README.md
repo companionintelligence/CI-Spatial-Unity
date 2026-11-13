@@ -28,10 +28,23 @@ curl -H "Authorization: Bearer $CV_SERVER_API_TOKEN" http://localhost:8000/v1/he
 ## Image
 
 The image is `nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04` with Python 3.11 from
-Ubuntu 22.04's own archive, installed in a virtualenv at `/opt/venv` that comes
-first on `PATH`. Ubuntu 22.04's default Python is 3.10, but `requirements.txt`
-pins `pillow==13.0.0`, which needs Python 3.11 or later; every other pin and
-PyTorch 2.5.1 from the cu121 index also install on 3.11.
+the deadsnakes PPA, installed in a virtualenv at `/opt/venv` that comes first on
+`PATH`. Ubuntu 22.04's default Python is 3.10, but `requirements.txt` pins
+`pillow==13.0.0`, which needs Python 3.11 or later. Ubuntu 22.04's own `python3.11`
+package is not used: it is 3.11.0rc1, a pre-release that gets no fixes, and
+importing timm (used by GroundingDINO and Florence-2) crashes it.
+
+Everything the image installs is pinned:
+
+- PyTorch 2.5.1, torchvision 0.20.1 and torchaudio 2.5.1 from the cu121 index.
+  2.5.1 is the last PyTorch release with CUDA 12.1 wheels.
+- flash-attn 2.8.3.post2, which downloads a prebuilt wheel for CUDA 12, torch 2.5
+  and Python 3.11.
+- GroundingDINO and SAM 2 at fixed commits. They are built with
+  `--no-build-isolation`, so their CUDA extensions compile against the image's
+  torch instead of the newest torch on PyPI.
+- `transformers` 4.40.1. transformers 5.x needs a newer torch than 2.5.1, so
+  moving to it means moving torch and the CUDA base image as well.
 
 ## Model Files
 

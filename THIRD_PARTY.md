@@ -205,7 +205,7 @@ Fetched at run time from public CDNs by the SDK, not by our bundle:
 | Component | Version | Licence | Notes |
 | --- | --- | --- | --- |
 | `nvidia/cuda` base image | `12.1.1-cudnn8-devel-ubuntu22.04` | NVIDIA Deep Learning Container License; Dockerfiles BSD-3-Clause | Includes CUDA and cuDNN under NVIDIA licences and Ubuntu packages (various, including GPL). NVIDIA archives the open-source parts at <https://developer.download.nvidia.com/compute/cuda/opensource/image>. |
-| Ubuntu packages from `apt-get` (`python3.10`, `git`, `build-essential`, `ninja-build`, `cmake`, `libgl1`, `libglib2.0-0`) | Ubuntu 22.04 | Various (PSF, GPL, LGPL, MIT, BSD) | Build and runtime tools inside the image. |
+| Ubuntu packages from `apt-get` (`python3.11`, `python3.11-dev`, `python3.11-venv` from the deadsnakes PPA, 3.11.18 when the release candidate was built; `software-properties-common`, `git`, `build-essential`, `ninja-build`, `cmake`, `libgl1`, `libglib2.0-0` from Ubuntu) | Ubuntu 22.04; `ppa:deadsnakes/ppa` | Various (PSF-2.0 for Python, GPL, LGPL, MIT, BSD) | Build and runtime tools inside the image. Ubuntu's own `python3.11` (3.11.0rc1) is not used. |
 
 ### 3.2 Python packages
 
@@ -214,9 +214,10 @@ Licences from the PyPI metadata of the pinned version (`license_expression`,
 
 | Package | Version | Licence | Notes |
 | --- | --- | --- | --- |
-| `torch`, `torchvision`, `torchaudio` | unpinned, CUDA 12.1 wheels from `download.pytorch.org` | BSD-3-Clause, with bundled third-party code under other permissive licences (current `torch` metadata: Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND ISC AND MIT AND Zlib) | The CUDA wheels carry NVIDIA runtime libraries under NVIDIA licences. |
-| `flash-attn` | unpinned | BSD-3-Clause | Installed in the image for Florence-2's model code. |
-| `packaging` | unpinned | Apache-2.0 OR BSD-2-Clause | |
+| `torch`, `torchvision`, `torchaudio` | 2.5.1, 0.20.1, 2.5.1 (CUDA 12.1 wheels from `download.pytorch.org`; the last release with CUDA 12.1 wheels) | BSD-3-Clause, with bundled third-party code under other permissive licences (current `torch` metadata: Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND ISC AND MIT AND Zlib) | The CUDA wheels carry NVIDIA runtime libraries under NVIDIA licences. |
+| `flash-attn` | 2.8.3.post2 | BSD-3-Clause | Installed in the image for Florence-2's model code. Installs the prebuilt `cu12torch2.5cxx11abiFALSE-cp311` wheel from the project's GitHub release. |
+| `packaging` | 26.3 | Apache-2.0 OR BSD-2-Clause | |
+| `wheel` | 0.48.0 | MIT | Build tool for flash-attn and the git packages. |
 | `fastapi` | 0.110.0 | MIT | |
 | `uvicorn[standard]` | 0.27.1 | BSD-3-Clause | |
 | `pydantic` | 2.6.1 | MIT | |
@@ -230,12 +231,12 @@ Licences from the PyPI metadata of the pinned version (`license_expression`,
 | `pytest` | 9.0.3 | MIT | Test-only, listed in the runtime requirements. |
 | `httpx` | 0.27.0 | BSD-3-Clause | |
 | `python-multipart` | 0.0.31 | Apache-2.0 | |
-| `transformers` | 5.10.1 | Apache-2.0 | |
+| `transformers` | 4.40.1 | Apache-2.0 | Not 5.x: 5.10.1 needs a newer torch than 2.5.1 and cannot import its model classes in the image. 4.40.1 has published advisories, fixed in 4.48 to 5.10: ReDoS in tokenizers and processors the server does not use, deserialization in conversion scripts, and code execution through a crafted model config or `Trainer`. The server loads only its configured models and does not train. |
 | `accelerate` | 1.15.0 | Apache-2.0 | |
 | `einops` | 0.7.0 | MIT | |
 | `timm` | 0.9.16 | Apache-2.0 | |
-| GroundingDINO | git `IDEA-Research/GroundingDINO`, default branch, unpinned | Apache-2.0 | Brings `supervision` (MIT), `addict` (MIT), `yapf` (Apache-2.0). |
-| SAM 2 (`sam2`) | git `facebookresearch/sam2`, default branch, unpinned | Apache-2.0 | Brings `hydra-core` (MIT), `iopath` (MIT), `tqdm` (MPL-2.0 AND MIT). |
+| GroundingDINO | git `IDEA-Research/GroundingDINO`, commit `856dde20aee659246248e20734ef9ba5214f5e44` (2024-08-12) | Apache-2.0 | Brings `supervision` (MIT), `addict` (MIT), `yapf` (Apache-2.0). |
+| SAM 2 (`sam2`) | git `facebookresearch/sam2`, commit `2b90b9f5ceec907a1c18123530e92e794ad901a4` (2024-12-16) | Apache-2.0 | Brings `hydra-core` (MIT), `iopath` (MIT), `tqdm` (MPL-2.0 AND MIT). |
 | `locust` (`cv-server/load/requirements.txt`) | 2.27.0 | MIT | Dev (load testing). |
 
 ### 3.3 Model weights and configs
@@ -300,11 +301,11 @@ removed because it was unused and broke the APK build.
    (`opencv-python`). Publishing the Dockerfile alone does not. Switching to
    `opencv-python-headless` drops Qt (and the need for `libgl1`); FFmpeg
    stays.
-4. Reproducibility: GroundingDINO and SAM 2 are installed from unpinned git
-   branches, `torch`/`flash-attn` are unpinned, and Florence-2 is loaded with
-   `trust_remote_code=True` without a pinned `revision`. Pin each to a commit
-   or version so the licence and the code you ship cannot change underneath
-   you.
+4. Reproducibility: `torch`, `flash-attn`, GroundingDINO and SAM 2 are now
+   pinned to the versions and commits the release-candidate image was built
+   with. Florence-2 is still loaded with `trust_remote_code=True` without a
+   pinned `revision`. Pin it to a commit so the code you ship cannot change
+   underneath you.
 5. The npm/PyPI attribution generator must not overwrite this file or
    [NOTICE.md](NOTICE.md); it cannot see Unity packages, assets or weights.
    [CREDITS.md](CREDITS.md) is still its output and credits only the npm and
