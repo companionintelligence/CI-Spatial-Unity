@@ -87,7 +87,8 @@ Quest 3 App
   │
   ├─ XR Controller Input (button → action dispatch)
   │
-  └─ glTF export + sync → /v1/gltf
+  └─ glTF export → app storage on the headset
+     (GltfSyncClient upload to /v1/gltf exists but is off)
 
 Local CV Server (Docker)
   - /v1/detect   (GroundingDINO)
@@ -114,7 +115,7 @@ to the controller model at runtime.
 | Button | Colour | Action | Details |
 |--------|--------|--------|---------|
 | **X** | Yellow | **Preview Distance** | Cycles the raycaster fallback distance: Near (1 m) → Far (3 m) → Off → Near … |
-| **Y** | Green | **Save & Export** | Exports glTF and uploads to the CV server via `GltfSyncClient`. |
+| **Y** | Green | **Save & Export** | Saves a glTF of the room (pins, floor plan, scene data, and the session's snapshots with their camera poses) in the app's storage on the headset (`files/exports`). Nothing is uploaded: the shipped scene has `uploadAfterExport` off and no `GltfSyncClient`. |
 | **Menu** | — | **Server settings** | Opens or closes the CV server settings panel (it also opens on first run). While it is open, **A** edits the server URL, **X** the server's API token (secure keyboard; stored on the headset only, never shown) and **B** saves; the other controls pause. |
 
 ### Either Controller
@@ -183,9 +184,13 @@ Use Unity `6000.6.9f1`, the editor version pinned in
 1. **Run the CV server**
    - See [cv-server/README.md](cv-server/README.md) for local Docker setup.
 
-2. **Create a Server Config asset**
-   - Project window → Create → Companion Scan → Server Config.
-   - Set `baseUrl` to your server IP (example: `https://my-server.ts.net`).
+2. **Point the app at your CV server**
+   - On the headset: the settings panel opens on first run (and with the left
+     **Menu** button). Enter the server's HTTPS URL and its API token there.
+   - In the Editor: set the `CompanionScan_SERVER_URL` and
+     `CompanionScan_API_TOKEN` environment variables before starting Unity.
+   - Leave `baseUrl` empty in `Assets/CompanionScan/Resources/ServerConfig.asset`:
+     the app ships with no server address.
 
 3. **Open the Quest scene**
    - `Assets/CompanionScan/Scenes/CompanionCapture.unity`.
@@ -207,7 +212,7 @@ Use Unity `6000.6.9f1`, the editor version pinned in
     - **A** — capture (both pipelines run, 3D labels appear in world space).
     - **B** — switch model if you only want one AI model active.
     - **X** — change preview distance.
-    - **Y** — export and upload glTF.
+    - **Y** — save a glTF export on the headset.
     - **Trigger** — toggle between 2D boxes, 3D labels, or both.
 
 ### Web Client
@@ -237,7 +242,10 @@ instructions, see [web/README.md](web/README.md).
    - Full Meta scene anchor data (labels, planes, volumes, optional meshes)
    - Pin metadata: `capture_id`, `capture_session_id`, `capture_frame_index`,
       `placement_confidence`, `hit_type`, `track_id`
-- Uploads to the local server at `POST /v1/gltf`.
+- Saves the export in the app's storage on the headset. `GltfSyncClient` can
+  upload it to `POST /v1/gltf` (`SpatialMapExporter.uploadAfterExport`), but
+  the shipped Quest scene leaves upload off and has no sync client, so the Quest
+  app uploads nothing. The web client uploads its exports.
 
 ## Testing
 
