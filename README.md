@@ -198,7 +198,11 @@ Use Unity `6000.6.9f1`, the editor version pinned in
 
 5. **Build to Quest 3**
    - Menu → CompanionScan → Build Quest APK (writes `Builds/Quest/CompanionScan.apk`),
-     or Build and Run Quest APK to install it on the connected headset.
+     or Build and Run Quest APK to install it on the connected headset. These are
+     development builds signed with your debug key; builds for a store or for
+     testers come from
+     [Release builds from the command line](#release-builds-from-the-command-line)
+     or from a tagged CI build.
    - CI builds come from the [Quest APK Build](#continuous-integration-and-releases)
      workflow. To install either APK, see [docs/SIDELOAD.md](docs/SIDELOAD.md).
    - Run Space Setup on the headset and grant `com.oculus.permission.USE_SCENE`.
@@ -352,10 +356,29 @@ Get-Content -Raw 'C:\ProgramData\Unity\Unity_lic.ulf' | gh secret set UNITY_LICE
 
 Without the keystore secrets, each CI build is signed with a debug key created
 for that run, so one CI build cannot be installed over another without
-uninstalling it first. A release keystore (for example from
-`keytool -genkeypair -keystore release.keystore -alias companionscan -keyalg RSA -keysize 2048 -validity 10000`)
-keeps updates in place. Keep the keystore and its passwords out of the
-repository.
+uninstalling it first.
+
+**Release keystore.** Each Quest app has its own release key, kept outside
+every repository. This app's is `companion-scan-release.p12` (PKCS12, alias
+`companion-scan`, RSA 4096, valid for 10950 days), by default in
+`%USERPROFILE%\ci-signing`. The same key signs Meta Horizon Store builds and
+would be the Google Play upload key. Every update of the app must be signed
+with it, so keep two offline encrypted backups and the password in a password
+manager. To create one with `keytool` from the editor's OpenJDK module, with
+the password read from the environment rather than the command line:
+
+```powershell
+$keytool = '<Unity editor>\Editor\Data\PlaybackEngines\AndroidPlayer\OpenJDK\bin\keytool.exe'
+$dir = "$env:USERPROFILE\ci-signing"
+New-Item -ItemType Directory -Force $dir | Out-Null
+# Letters and digits only: Unity's Gradle export quotes the password without escaping it.
+$env:ANDROID_KEYSTORE_PASS = [Net.NetworkCredential]::new('', (Read-Host 'New keystore password' -AsSecureString)).Password
+& $keytool -genkeypair -storetype PKCS12 -keystore "$dir\companion-scan-release.p12" -alias companion-scan `
+  -keyalg RSA -keysize 4096 -sigalg SHA256withRSA -validity 10950 `
+  -dname 'CN=Companion Intelligence, O=LifeScope Inc.' -storepass:env ANDROID_KEYSTORE_PASS
+& $keytool -list -v -storetype PKCS12 -keystore "$dir\companion-scan-release.p12" -storepass:env ANDROID_KEYSTORE_PASS   # note the SHA-256 fingerprint
+Remove-Item Env:ANDROID_KEYSTORE_PASS
+```
 
 ### Building and releasing the Quest APK
 
@@ -393,52 +416,88 @@ To install a build on a headset, see [docs/SIDELOAD.md](docs/SIDELOAD.md).
 ### Release builds from the command line
 
 `CommandLineBuild.BuildAndroidQuest` builds the Quest APK in batch mode
-(`Builds/Android/CompanionCapture.apk`). It reads release signing and version
-settings from the environment only, applies them to that one build and puts
-Player Settings back afterwards, so no keystore path, alias or password ends
-up in `ProjectSettings/ProjectSettings.asset`.
+(`Builds/Android/CompanionCapture.apk`). It reads release signing from the
+environment only, under the names GameCI uses in CI, applies it to that one
+build and puts Player Settings back afterwards, so no keystore path, alias or
+password ends up in `ProjectSettings/ProjectSettings.asset`.
 
 | Environment variable | Meaning |
 |---|---|
-| `KEYSTORE_PATH` | Path of the release keystore file (keep it outside the repository) |
-| `KEYSTORE_PASS` | Keystore password |
-| `KEY_ALIAS` | Alias of the release key in the keystore |
-| `KEY_PASS` | Password of that key |
-| `VERSION_CODE` | Optional Android versionCode, 1 to 2100000000 |
-| `VERSION_NAME` | Optional version name; default: Player Settings > Version (`bundleVersion`) |
+| `ANDROID_KEYSTORE_NAME` | Path of the release keystore file, absolute or relative to the project folder; keep the file outside the repository |
+| `ANDROID_KEYSTORE_PASS` | Keystore password |
+| `ANDROID_KEYALIAS_NAME` | Alias of the release key: `companion-scan` |
+| `ANDROID_KEYALIAS_PASS` | Password of that key, the keystore password for PKCS12 |
 
-- The build is signed with the release key only when all four signing
-  variables are set. Otherwise Unity signs it with its debug key, and a warning
-  names any signing variables that are missing (names only, never values).
-- `-release` makes the build fail unless all four are set and `KEYSTORE_PATH`
-  points to an existing file. Use it for every build meant for a store or for
+- The build is signed with the release key only when all four are set.
+  Otherwise Unity signs it with its debug key, and a warning names any signing
+  variables that are missing (names only, never values).
+- `-release` makes the build fail unless all four are set and
+  `ANDROID_KEYSTORE_NAME` points to an existing file. It also fails while a
+  build profile is active: a profile such as
+  `Assets/Settings/Build Profiles/Meta Quest.asset` carries its own copy of
+  Player Settings, so switch to the Android platform profile (File > Build
+  Profiles) first. Use `-release` for every build meant for a store or for
   testers who update in place.
+- The version is Player Settings > Version (`bundleVersion`), and versionCode
+  is MAJOR × 1000000 + MINOR × 1000 + PATCH of it, as in CI: `0.1.0` is 1000
+  and `1.2.3` is 1002003. Builds from the CompanionScan menu or the Build
+  Profiles window keep the versionCode stored in Player Settings or the
+  profile instead.
+- `KEYSTORE_PATH`, `KEYSTORE_PASS`, `KEY_ALIAS`, `KEY_PASS`, `VERSION_CODE`
+  and `VERSION_NAME` are no longer read; the build warns when one is set.
 - `-aab` builds an Android App Bundle (`Builds/Android/CompanionCapture.aab`)
   instead of an APK, for stores that take bundles (Google Play requires them for
   new apps). Meta Horizon Store uploads and sideloading use the APK.
-- versionCode is `VERSION_CODE` when set, otherwise
-  MAJOR × 1000000 + MINOR × 1000 + PATCH of the version name, the same rule the
-  CI builds use: `0.1.0` is 1000 and `1.2.3` is 1002003. Every upload to a store
-  needs a higher versionCode than the last one.
-- The build never creates a keystore. Create the release keystore yourself (for
-  example with `keytool`, as above), back it up, and keep it and its passwords
-  out of the repository; `*.jks`, `*.keystore`, `*.p12` and
-  `keystore.properties` are gitignored. Every update of the app must be signed
-  with the same key.
+- During a signed build, Unity writes both passwords in plain text into the
+  Gradle project and build graph under `Library/Bee`. Afterwards the build
+  deletes every file there that holds one and logs which. If it warns that a
+  file could not be deleted or read (on Windows, a few compiled classes deep in
+  `Library/Bee` can exceed the 260-character path limit), delete `Library/Bee`
+  yourself before you copy, share or cache the `Library` folder. Gradle also
+  compiles the generated build script, passwords included, into its cache under
+  `GRADLE_USER_HOME` (by default `~/.gradle`), so run release builds with
+  `GRADLE_USER_HOME` set to a temporary folder and delete that folder
+  afterwards, as below. Gradle then downloads its dependencies again, about
+  700 MB.
+- After a signed build, `git status` can show `AndroidKeystoreName: '{inproject}: '`
+  in `ProjectSettings/ProjectSettings.asset`. That is how Unity writes the empty
+  keystore setting back; discard the change. If a signed build was killed, check
+  that file for your keystore path and alias, and discard those changes too.
+- The build never creates a keystore; see [Repository secrets](#repository-secrets).
+  `*.jks`, `*.keystore`, `*.p12` and `keystore.properties` are gitignored.
 
 ```powershell
-# Fill these from your password manager or CI secret store rather than typing
-# the passwords into a shell history.
-$env:KEYSTORE_PATH = 'D:\signing\companion-scan-release.p12'
-$env:KEYSTORE_PASS = '<keystore password>'
-$env:KEY_ALIAS = 'companion-scan'
-$env:KEY_PASS = '<key password>'
-& 'C:\Program Files\Unity\Hub\Editor\6000.6.9f1\Editor\Unity.exe' -batchmode -nographics -quit `
-  -projectPath . -buildTarget Android `
-  -executeMethod CommandLineBuild.BuildAndroidQuest -release -logFile build-release.log
+# Run from the project folder. The variables live in this PowerShell session only.
+$env:ANDROID_KEYSTORE_NAME = "$env:USERPROFILE\ci-signing\companion-scan-release.p12"
+$env:ANDROID_KEYALIAS_NAME = 'companion-scan'
+$env:ANDROID_KEYSTORE_PASS = [Net.NetworkCredential]::new('', (Read-Host 'Keystore password' -AsSecureString)).Password
+$env:ANDROID_KEYALIAS_PASS = $env:ANDROID_KEYSTORE_PASS
+$env:GRADLE_USER_HOME = Join-Path ([IO.Path]::GetTempPath()) "gradle-release-$PID"
+$unity = Start-Process '<Unity editor>\Editor\Unity.exe' -Wait -PassThru -ArgumentList @(
+  '-batchmode', '-nographics', '-quit', '-projectPath', (Get-Location).Path, '-buildTarget', 'Android',
+  '-executeMethod', 'CommandLineBuild.BuildAndroidQuest', '-release', '-logFile', 'build-release.log')
+"Unity exit code: $($unity.ExitCode)"   # 0 = built and signed
+Remove-Item -Recurse -Force $env:GRADLE_USER_HOME
+Remove-Item Env:ANDROID_KEYSTORE_PASS, Env:ANDROID_KEYALIAS_PASS, Env:GRADLE_USER_HOME
 ```
 
-Add `-aab` to the same command for an App Bundle.
+Add `-aab` to the argument list for an App Bundle. Check the signature before
+uploading: the signer must be `CN=Companion Intelligence, O=LifeScope Inc.`
+with the SHA-256 fingerprint of your keystore, never `CN=Android Debug`. For
+an APK, v2 must also be `true` (Meta accepts v1 or v2). Unity signs inside the
+build, which gives the APK a v2 signature; if you ever sign an APK again with
+`apksigner sign`, pass `--v2-signing-enabled true`, because its defaults
+produce a v3-only signature that Meta rejects.
+
+```powershell
+$android = '<Unity editor>\Editor\Data\PlaybackEngines\AndroidPlayer'
+$env:JAVA_HOME = "$android\OpenJDK"
+$apksigner = Get-ChildItem "$android\SDK\build-tools\*\apksigner.bat" | Select-Object -Last 1
+& $apksigner.FullName verify --verbose --print-certs Builds\Android\CompanionCapture.apk
+# An App Bundle is JAR-signed: "jar verified.", then the Owner and SHA256 of the certificate.
+& "$android\OpenJDK\bin\jarsigner.exe" -verify Builds\Android\CompanionCapture.aab
+& "$android\OpenJDK\bin\keytool.exe" -printcert -jarfile Builds\Android\CompanionCapture.aab
+```
 
 The build also fails when Player Settings > Android > Target API Level is not
 exactly 34, when a build callback throws while Unity creates it, or when the

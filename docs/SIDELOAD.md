@@ -38,6 +38,9 @@ gh release download <tag> --pattern 'CompanionScan-*'
 **From your own Unity build.** In the editor, **CompanionScan → Build Quest APK**
 writes `Builds/Quest/CompanionScan.apk`. **CompanionScan → Build and Run Quest APK**
 also installs it on the connected headset, which skips the rest of this guide.
+Both are signed with your own debug key. A release-signed build comes from
+`CommandLineBuild.BuildAndroidQuest -release` (README, "Release builds from the
+command line"), which writes `Builds/Android/CompanionCapture.apk`.
 
 **Check the checksum** of CI and release builds before installing:
 
