@@ -210,14 +210,20 @@ namespace CompanionScan.Mapping
                 }
 
                 var cameraGo = new GameObject("PcaCamera");
+                // Assembled inactive, with the ARCameraManager disabled: enabling it starts Meta
+                // OpenXR's camera subsystem, which checks the headset camera permission only then.
+                // MobileCameraProvider enables it once the permissions are granted.
+                cameraGo.SetActive(false);
                 cameraGo.transform.SetParent(transform, false);
                 var camera = cameraGo.AddComponent<Camera>();
                 camera.enabled = false;
                 camera.clearFlags = CameraClearFlags.Nothing;
                 camera.cullingMask = 0;
-                cameraGo.AddComponent<ARCameraManager>();
+                var cameraManager = cameraGo.AddComponent<ARCameraManager>();
+                cameraManager.enabled = false;
                 cameraGo.AddComponent<ARCameraBackground>();
                 existingProvider = cameraGo.AddComponent<MobileCameraProvider>();
+                cameraGo.SetActive(true);
                 Debug.Log("[Pipeline] Created ARSession + PCA camera for passthrough capture.");
             }
 
@@ -359,6 +365,24 @@ namespace CompanionScan.Mapping
                 Debug.LogWarning("[Pipeline-CV] Camera provider or server config is not assigned.");
                 return;
             }
+
+            if (!serverConfig.HasBaseUrl)
+            {
+                Debug.LogWarning("[Pipeline-CV] CV server URL is not set; skipping server detection. " +
+                                 "Press the left Menu button to enter it.");
+                return;
+            }
+
+            if (!serverConfig.IsUrlAllowed(serverConfig.ResolveBaseUrl(), out var policyError))
+            {
+                Debug.LogWarning($"[Pipeline-CV] {policyError}");
+                return;
+            }
+
+            // Pin placement prefers environment raycasts, which need the spatial
+            // data permission: ask before the first capture (no-op once answered;
+            // when denied the raycaster falls back to physics/fixed-distance hits).
+            await SpatialDataPermission.RequestAsync();
 
             var frame = _cameraProvider.GetCurrentFrameJpeg(jpegQuality);
             if (frame == null || frame.Length == 0)

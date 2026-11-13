@@ -9,8 +9,22 @@ name: Unity Tests
 #   schedule:
 #     - cron: "0 4 * * *"
 # <<< ci-local:gated
+# Pull requests run the unit tests again: they use the self-hosted GPU runner,
+# so they cost no GitHub-hosted minutes. Integration tests need a live
+# cv-server on the runner host and stay manual.
 on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'Assets/**'
+      - 'Packages/**'
+      - 'ProjectSettings/**'
+      - 'test/**'
+      - '.github/workflows/unity-tests.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,26 +33,67 @@ concurrency:
 jobs:
   unit-tests:
     name: EditMode and PlayMode (unit)
+    # Pull requests from forks never reach the self-hosted runner (they would
+    # not receive the Unity licence secrets either).
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, windows, x64, gpu]
+    outputs:
+      unity-version: ${{ steps.unity.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read Unity version from ProjectVersion.txt
+        id: unity
+        shell: pwsh
+        run: |
+          $match = Select-String -Path ProjectSettings/ProjectVersion.txt -Pattern '^m_EditorVersion:\s*(\S+)' | Select-Object -First 1
+          if (-not $match) { throw 'm_EditorVersion not found in ProjectSettings/ProjectVersion.txt' }
+          $version = $match.Matches[0].Groups[1].Value
+          Write-Host "Unity editor version: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Check documented Unity versions
+        # Documentation drift only warns; it never blocks the tests.
+        continue-on-error: true
+        shell: pwsh
+        env:
+          UNITY_VERSION: ${{ steps.unity.outputs.version }}
+        run: |
+          $docs = @(Get-Item README.md) + @(Get-ChildItem -Path docs -Filter *.md -Recurse -File -ErrorAction SilentlyContinue)
+          $stale = 0
+          foreach ($hit in Select-String -Path $docs.FullName -Pattern '\b\d{4}\.\d+\.\d+[abfp]\d+\b' -AllMatches) {
+            $file = [IO.Path]::GetRelativePath((Get-Location).Path, $hit.Path) -replace '\\', '/'
+            foreach ($m in $hit.Matches | Where-Object Value -ne $env:UNITY_VERSION) {
+              $stale++
+              Write-Host "::warning file=$file,line=$($hit.LineNumber)::Unity $($m.Value) does not match $env:UNITY_VERSION in ProjectSettings/ProjectVersion.txt"
+            }
+          }
+          if (-not (Select-String -Path README.md -Pattern $env:UNITY_VERSION -SimpleMatch -Quiet)) {
+            $stale++
+            Write-Host "::warning file=README.md::README.md does not mention Unity $env:UNITY_VERSION from ProjectSettings/ProjectVersion.txt"
+          }
+          if ($stale -eq 0) { Write-Host "README.md and docs/ match Unity $env:UNITY_VERSION" }
 
       - name: Unity Test Runner
-        uses: game-ci/unity-test-runner@v4
+        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           CompanionScan_TEST_ARTIFACTS: ${{ github.workspace }}/artifacts
         with:
-          unityVersion: 6000.3.9f1
+          unityVersion: ${{ steps.unity.outputs.version }}
           projectPath: .
           testMode: all
           artifactsPath: artifacts
 
       - name: Upload Test Artifacts
-        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 7
           name: unity-test-artifacts
@@ -47,19 +102,28 @@ jobs:
 
   integration-tests:
     name: CV Server Integration
+    # Manual runs only (and push/schedule if the original triggers come back).
+    if: github.event_name != 'pull_request'
     runs-on: [self-hosted, windows, x64, gpu]
     needs: unit-tests
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Wait for cv-server health
         shell: pwsh
+        env:
+          # Every cv-server route, the health check included, needs the bearer token.
+          CV_SERVER_API_TOKEN: ${{ secrets.CV_SERVER_API_TOKEN }}
         run: |
+          if (-not $env:CV_SERVER_API_TOKEN) { throw "Set the CV_SERVER_API_TOKEN repository secret (README.md, Repository secrets)." }
           $healthUrl = "http://localhost:8000/v1/health"
+          $headers = @{ Authorization = "Bearer $env:CV_SERVER_API_TOKEN" }
           for ($i = 0; $i -lt 30; $i++) {
             try {
-              $resp = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 5
+              $resp = Invoke-WebRequest -Uri $healthUrl -Headers $headers -UseBasicParsing -TimeoutSec 5
               if ($resp.StatusCode -eq 200) { exit 0 }
             } catch {}
             Start-Sleep -Seconds 10
@@ -67,21 +131,25 @@ jobs:
           throw "cv-server did not become healthy at $healthUrl"
 
       - name: Unity Test Runner (integration)
-        uses: game-ci/unity-test-runner@v4
+        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           CompanionScan_TEST_SERVER_URL: http://localhost:8000
+          # Bearer token the app sends; the cv-server requires it on every route.
+          CompanionScan_API_TOKEN: ${{ secrets.CV_SERVER_API_TOKEN }}
           CompanionScan_TEST_ARTIFACTS: ${{ github.workspace }}/artifacts
         with:
-          unityVersion: 6000.3.9f1
+          unityVersion: ${{ needs.unit-tests.outputs.unity-version }}
           projectPath: .
           testMode: playmode
           artifactsPath: artifacts
 
       - name: Upload Test Artifacts
-        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 7
           name: unity-test-artifacts-integration

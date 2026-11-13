@@ -321,9 +321,11 @@ namespace CompanionScan.UI
                     ? $"Fallback: {pipeline.LastFallbackHitCount}"
                     : "Fallback: 0";
                 var config = pipeline.ServerConfig;
-                string net = config != null
-                    ? $"Net: {Mathf.Max(1, config.requestTimeoutSeconds)}s x{Mathf.Max(0, config.retryCount)}"
-                    : "Net: ?";
+                string net = config == null
+                    ? "Net: ?"
+                    : !config.HasBaseUrl
+                        ? "Server: not set (Menu)"
+                        : $"Net: {Mathf.Max(1, config.requestTimeoutSeconds)}s x{Mathf.Max(0, config.retryCount)}";
                 statusLabel.text = $"Raycast: {intrinsics} | {fallback} | {net}";
             }
         }

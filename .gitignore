@@ -15,6 +15,10 @@
 /[Uu]ser[Ss]ettings/
 /Assets/XR-AI-Florence2/Data/ApiConfig.asset
 /Assets/XR-AI-Florence2/Data/ApiConfig.asset.meta
+# Meta XR SDK 209 recreates this on every editor load with the machine's LAN IP and
+# AgentBridge access token; CompanionScan.Editor.DevAgentSettingsBuildFilter keeps it out of builds.
+/Assets/Resources/DevAgentSettings.asset
+/Assets/Resources/DevAgentSettings.asset.meta
 
 *.log
 
@@ -93,3 +97,14 @@ crashlytics-build.properties
 *.crt
 *.key
 *.pem
+# Android signing material: keystores and their properties files
+*.jks
+*.keystore
+*.p12
+keystore.properties
+
+# com.unity.test-framework.performance writes these into Resources at the start
+# of every player build (Assets/CompanionScan/Editor/PerformanceTestRunFileStripper.cs
+# removes them before they are packed). Never commit stray copies.
+/[Aa]ssets/[Rr]esources/PerformanceTestRun*.json
+/[Aa]ssets/[Rr]esources/PerformanceTestRun*.json.meta

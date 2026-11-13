@@ -21,7 +21,7 @@ def _build_test_image_b64() -> str:
     not Path(settings.gdino_weights_path).exists(),
     reason="GroundingDINO weights not found",
 )
-def test_segment_endpoint_smoke() -> None:
+def test_segment_endpoint_smoke(auth_headers: dict) -> None:
     client = TestClient(app)
     payload = {
         "image": _build_test_image_b64(),
@@ -33,7 +33,7 @@ def test_segment_endpoint_smoke() -> None:
         "mask_format": "rle",
         "max_side": 64,
     }
-    response = client.post("/v1/segment", json=payload)
+    response = client.post("/v1/segment", json=payload, headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
     assert "annotations" in body

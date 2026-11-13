@@ -1,15 +1,36 @@
-﻿using System.Collections;
+﻿using System.Collections.Generic;
 using CompanionScan.Core;
 using UnityEngine;
 
 namespace CompanionScan.Platform
 {
+    /// <summary>
+    /// Passthrough camera frames on Meta Quest 3 / 3S through <see cref="WebCamTexture"/>.
+    ///
+    /// This is the fallback path: SpatialCapturePipeline uses it only when preferArCameraOnQuest is
+    /// off. The shipped scene keeps that option on, so Quest builds capture through
+    /// <see cref="MobileCameraProvider"/> (AR Foundation and Meta OpenXR's camera subsystem) instead.
+    ///
+    /// Horizon OS gates the passthrough cameras behind <see cref="HeadsetCameraPermission"/>
+    /// (Passthrough Camera API, Horizon OS v74+), and WebCamTexture checks
+    /// <see cref="AndroidCameraPermission"/> before it opens a camera, so in Android players the
+    /// webcam starts only once both are granted (<see cref="PassthroughCameraPermission"/>, through
+    /// <see cref="CameraPermissionGate"/>): without the headset camera permission the passthrough
+    /// cameras may not be listed at all.
+    /// </summary>
     public class QuestCameraProvider : MonoBehaviour, ICameraProvider
     {
+        public const string HeadsetCameraPermission = PassthroughCameraPermission.HeadsetCamera;
+        public const string AndroidCameraPermission = PassthroughCameraPermission.AndroidCamera;
+
+        /// <summary>Runtime permissions the camera needs, in the order they are requested.</summary>
+        public static IReadOnlyList<string> RequiredPermissions => PassthroughCameraPermission.RequiredPermissions;
+
         private WebCamTexture _webcam;
         private Texture2D _frame;
-        private bool _isRequesting;
+        private CameraPermissionGate _permissionGate;
         private bool _loggedDevices;
+        private bool _loggedNoDevice;
         private bool _loggedNotReady;
         private bool _loggedEmptyFrame;
 
@@ -20,28 +41,65 @@ namespace CompanionScan.Platform
 
         public bool IsAvailable => WebCamTexture.devices.Length > 0;
 
+        private void Awake()
+        {
+            _permissionGate = CreatePermissionGate();
+        }
+
+        /// <summary>Android players of this project are Meta Quest builds; elsewhere the permissions do not apply.</summary>
+        private CameraPermissionGate CreatePermissionGate()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            return new CameraPermissionGate(
+                () => PassthroughCameraPermission.IsGranted,
+                PassthroughCameraPermission.RequestInBackground,
+                () => _webcam != null && _webcam.isPlaying,
+                on =>
+                {
+                    if (on)
+                    {
+                        StartWebcam();
+                    }
+                    else
+                    {
+                        StopWebcam();
+                    }
+                });
+#else
+            return null;
+#endif
+        }
+
         public void StartCapture()
         {
-            if (!IsAvailable)
+            if (_permissionGate != null)
             {
+                // Asks first when needed; the gate starts the webcam, on the main thread, once granted.
+                _permissionGate.StartCapture(Time.unscaledTime);
                 return;
             }
-
-#if UNITY_ANDROID
-            if (!Application.HasUserAuthorization(UserAuthorization.WebCam))
-            {
-                if (!_isRequesting)
-                {
-                    StartCoroutine(RequestAndStart());
-                }
-                return;
-            }
-#endif
 
             StartWebcam();
         }
 
         public void StopCapture()
+        {
+            if (_permissionGate != null)
+            {
+                _permissionGate.StopCapture();
+                return;
+            }
+
+            StopWebcam();
+        }
+
+        private void Update()
+        {
+            // Starts the webcam once the permissions are granted (and retries one that failed to start).
+            _permissionGate?.Update(Time.unscaledTime);
+        }
+
+        private void StopWebcam()
         {
             if (_webcam != null)
             {
@@ -51,6 +109,17 @@ namespace CompanionScan.Platform
 
         private void StartWebcam()
         {
+            if (!IsAvailable)
+            {
+                if (!_loggedNoDevice)
+                {
+                    _loggedNoDevice = true;
+                    Debug.LogWarning("[QuestCamera] No camera available.");
+                }
+
+                return;
+            }
+
             if (_webcam == null)
             {
                 LogDevicesIfNeeded();
@@ -130,21 +199,12 @@ namespace CompanionScan.Platform
             }
         }
 
-        private IEnumerator RequestAndStart()
-        {
-            _isRequesting = true;
-            yield return Application.RequestUserAuthorization(UserAuthorization.WebCam);
-            _isRequesting = false;
-            if (Application.HasUserAuthorization(UserAuthorization.WebCam))
-            {
-                StartWebcam();
-            }
-        }
-
         public byte[] GetCurrentFrameJpeg(int quality = 75)
         {
             if (_webcam == null || !_webcam.isPlaying)
             {
+                // Ask again if capture is still waiting for the permissions (e.g. after a dismissed dialog).
+                _permissionGate?.OnFrameRequested();
                 return null;
             }
 

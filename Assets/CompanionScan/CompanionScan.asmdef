@@ -6,7 +6,8 @@
     "Oculus.VR",
     "Unity.XR.ARFoundation",
     "Unity.XR.Management",
-    "Unity.XR.ARSubsystems"
+    "Unity.XR.ARSubsystems",
+    "Oculus.Platform"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

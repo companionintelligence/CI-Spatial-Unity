@@ -23,8 +23,8 @@ namespace CompanionScan.Core
             {
                 image = Convert.ToBase64String(jpegBytes),
                 prompt = prompt,
-                box_threshold = _config.boxThreshold,
-                text_threshold = _config.textThreshold
+                box_threshold = _config.ResolveBoxThreshold(),
+                text_threshold = _config.ResolveTextThreshold()
             };
             return PostAsync<DetectionResult>("/v1/detect", payload);
         }
@@ -38,8 +38,8 @@ namespace CompanionScan.Core
                 grounding_model = groundingModel,
                 return_masks = true,
                 mask_format = "rle",
-                box_threshold = _config.boxThreshold,
-                text_threshold = _config.textThreshold
+                box_threshold = _config.ResolveBoxThreshold(),
+                text_threshold = _config.ResolveTextThreshold()
             };
             return PostAsync<SegmentationResult>("/v1/segment", payload);
         }
@@ -60,7 +60,12 @@ namespace CompanionScan.Core
             var baseUrl = _config != null ? _config.ResolveBaseUrl() : null;
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
-                throw new Exception("CV server base URL is not set.");
+                throw new Exception("CV server base URL is not set. Press the left Menu button to enter it.");
+            }
+
+            if (!_config.IsUrlAllowed(baseUrl, out var policyError))
+            {
+                throw new Exception(policyError);
             }
 
             var url = baseUrl.TrimEnd('/') + endpoint;
@@ -76,6 +81,7 @@ namespace CompanionScan.Core
                 request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
+                _config.ApplyAuthorization(request);
                 request.timeout = timeout;
 
                 var operation = request.SendWebRequest();
@@ -91,7 +97,11 @@ namespace CompanionScan.Core
 
                 string error = request.error;
                 long status = request.responseCode;
-                lastError = new Exception($"CV server error ({status}): {error}");
+                lastError = new Exception(ServerConfig.DescribeServerError(status, error));
+                if (status == 401 || status == 403 || status == 413 || status == 503)
+                {
+                    break; // retrying cannot help
+                }
 
                 if (attempt < retries)
                 {

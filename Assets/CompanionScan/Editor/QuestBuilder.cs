@@ -47,8 +47,16 @@ namespace CompanionScan.Editor
                 options = BuildOptions.None
             };
 
+            DevAgentSettingsBuildFilter.RemoveFromProject();
+            BuildIntegrityChecks.VerifyBuildCallbacksConstruct();
+
             BuildReport report = BuildPipeline.BuildPlayer(options);
             BuildSummary summary = report.summary;
+
+            if (summary.result == BuildResult.Succeeded && BuildIntegrityChecks.IsBurstEnabledForAndroid())
+            {
+                BuildIntegrityChecks.VerifyBurstCode(ApkPath, BuildIntegrityChecks.AndroidAbis());
+            }
 
             if (summary.result == BuildResult.Succeeded)
             {
@@ -88,8 +96,16 @@ namespace CompanionScan.Editor
                 options = BuildOptions.AutoRunPlayer
             };
 
+            DevAgentSettingsBuildFilter.RemoveFromProject();
+            BuildIntegrityChecks.VerifyBuildCallbacksConstruct();
+
             BuildReport report = BuildPipeline.BuildPlayer(options);
             BuildSummary summary = report.summary;
+
+            if (summary.result == BuildResult.Succeeded && BuildIntegrityChecks.IsBurstEnabledForAndroid())
+            {
+                BuildIntegrityChecks.VerifyBurstCode(ApkPath, BuildIntegrityChecks.AndroidAbis());
+            }
 
             if (summary.result == BuildResult.Succeeded)
             {

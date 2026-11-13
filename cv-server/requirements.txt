@@ -11,9 +11,14 @@ opencv-python==4.9.0.80
 pytest==9.0.3
 httpx==0.27.0
 python-multipart==0.0.31
-git+https://github.com/IDEA-Research/GroundingDINO.git
-git+https://github.com/facebookresearch/sam2.git
-transformers==5.10.1
+# Pinned to the commits the release-candidate image was built with.
+git+https://github.com/IDEA-Research/GroundingDINO.git@856dde20aee659246248e20734ef9ba5214f5e44
+git+https://github.com/facebookresearch/sam2.git@2b90b9f5ceec907a1c18123530e92e794ad901a4
+# Not 5.x: transformers 5.10.1 needs a newer torch than 2.5.1, the last release with CUDA 12.1
+# wheels (it uses torch.float8_e8m0fnu), so BertModel (GroundingDINO) and the Florence-2 auto
+# classes fail to import in the image. 4.40.1 is the version the server ran with before the
+# dependabot bump. Upgrade together with torch and the CUDA base image.
+transformers==4.40.1
 accelerate==1.15.0
 einops==0.7.0
 timm==0.9.16

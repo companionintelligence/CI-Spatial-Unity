@@ -115,6 +115,7 @@ to the controller model at runtime.
 |--------|--------|--------|---------|
 | **X** | Yellow | **Preview Distance** | Cycles the raycaster fallback distance: Near (1 m) → Far (3 m) → Off → Near … |
 | **Y** | Green | **Save & Export** | Exports glTF and uploads to the CV server via `GltfSyncClient`. |
+| **Menu** | — | **Server settings** | Opens or closes the CV server settings panel (it also opens on first run). While it is open, **A** edits the server URL, **X** the server's API token (secure keyboard; stored on the headset only, never shown) and **B** saves; the other controls pause. |
 
 ### Either Controller
 
@@ -175,6 +176,10 @@ semantic plane, or physics surface is hit:
 
 ### Unity Quest Runtime
 
+Use Unity `6000.6.9f1`, the editor version pinned in
+`ProjectSettings/ProjectVersion.txt`, with the Android Build Support module
+(including OpenJDK and Android SDK & NDK Tools).
+
 1. **Run the CV server**
    - See [cv-server/README.md](cv-server/README.md) for local Docker setup.
 
@@ -192,7 +197,10 @@ semantic plane, or physics surface is hit:
        controller indicators + HUD at runtime.
 
 5. **Build to Quest 3**
-   - Menu → Companion Scan → Build Quest APK (or Build and Run).
+   - Menu → CompanionScan → Build Quest APK (writes `Builds/Quest/CompanionScan.apk`),
+     or Build and Run Quest APK to install it on the connected headset.
+   - CI builds come from the [Quest APK Build](#continuous-integration-and-releases)
+     workflow. To install either APK, see [docs/SIDELOAD.md](docs/SIDELOAD.md).
    - Run Space Setup on the headset and grant `com.oculus.permission.USE_SCENE`.
 
 6. **Use the controller**
@@ -250,7 +258,10 @@ integration tests that run all three models against 14 fixture images:
 | BBox2D_RenderingData_ValidForAllDetections | 2D rendering data is valid |
 | Anchor3D_PinData_ValidForAllDetections | 3D pin data is valid |
 
-Run via Unity Test Runner (Play Mode) or CI.
+Run via Unity Test Runner (Play Mode) or CI. They need a running CV server:
+set `CompanionScan_TEST_SERVER_URL` to its URL and `CompanionScan_API_TOKEN` to
+its API token (`CV_SERVER_API_TOKEN`) in the environment of the Unity editor.
+Without a server URL the server tests are skipped or fail.
 
 ### QA XR Scene Asset
 
@@ -259,11 +270,20 @@ scene that focuses on button-driven UX validation (controller indicators + HUD).
 
 ### CI (Self-hosted GPU Runner)
 
-The CI workflow targets a Windows self-hosted runner with GPU support. Ensure:
+The Unity Tests workflow targets a Windows self-hosted runner with GPU support.
+Ensure:
 
 - Runner labels include `self-hosted`, `windows`, `x64`, `gpu`.
+- The runner is GitHub Actions runner 2.327.1 or newer (the pinned actions run
+  on Node.js 24).
 - cv-server is running as a stable local service on this machine.
-- Health check is available at `http://localhost:8000/v1/health`.
+- Health check is available at `http://localhost:8000/v1/health`; like every
+  cv-server route it needs `Authorization: Bearer <CV_SERVER_API_TOKEN>` (the
+  `CV_SERVER_API_TOKEN` repository secret).
+
+Pull requests run the unit tests; the cv-server integration tests run when the
+workflow is started by hand. See
+[Continuous integration and releases](#continuous-integration-and-releases).
 
 ### CV Server Tests
 
@@ -272,12 +292,167 @@ cd cv-server
 pytest
 ```
 
+## Continuous integration and releases
+
+| Workflow | Runner | Starts on | Output |
+|---|---|---|---|
+| [Unity Tests](.github/workflows/unity-tests.yml) | Self-hosted Windows GPU | Pull requests to `main` that change `Assets/`, `Packages/`, `ProjectSettings/` or `test/` (unit tests); manual runs (unit and cv-server integration tests) | Test results and screenshots |
+| [Web Tests](.github/workflows/web-tests.yml) | GitHub-hosted Ubuntu | Manual runs | Playwright report |
+| [Quest APK Build](.github/workflows/quest-build.yml) | GitHub-hosted Ubuntu | Manual runs and `v*` tags | `CompanionScan-<version>.apk` and its `.sha256`, kept for 7 days; a draft GitHub Release for `v*` tags |
+
+Pull requests from forks skip the Unity tests, so code from outside the
+repository never runs on the self-hosted runner. The actions in these
+workflows are pinned to full commit SHAs, with the release noted in a trailing
+comment.
+
+Both Unity workflows read the editor version from
+`ProjectSettings/ProjectVersion.txt`. When the editor is upgraded, update the
+version in [Quick Start](#unity-quest-runtime) and
+[Editor and capture reference](#editor-and-capture-reference) in the same
+change: the Unity Tests run warns about any Unity version in `README.md` or
+`docs/` that no longer matches.
+
+### Repository secrets
+
+Add these under **Settings → Secrets and variables → Actions → Repository
+secrets**. Workflows started from forks do not receive them.
+
+| Secret | Needed for | Value |
+|---|---|---|
+| `UNITY_EMAIL` | Unity Tests, Quest APK Build | Email address of the Unity ID that holds the licence |
+| `UNITY_PASSWORD` | Unity Tests, Quest APK Build | Password of that Unity ID |
+| `UNITY_LICENSE` | Unity Personal licence | Full contents of the activated `Unity_lic.ulf` file |
+| `UNITY_SERIAL` | Serial-based licence (Pro and up), instead of `UNITY_LICENSE` | The serial key |
+| `ANDROID_KEYSTORE_BASE64` | Optional, Quest APK Build | Release keystore, base64-encoded |
+| `ANDROID_KEYSTORE_PASS` | Only with a keystore | Keystore password |
+| `ANDROID_KEYALIAS_NAME` | Only with a keystore | Key alias |
+| `ANDROID_KEYALIAS_PASS` | Only with a keystore | Key password |
+| `CV_SERVER_API_TOKEN` | Unity Tests integration job | API token of the cv-server on the runner host (sent by the health check and the Play Mode tests) |
+
+For a Personal licence, activate Unity once in Unity Hub and use the licence
+file it writes: `C:\ProgramData\Unity\Unity_lic.ulf` (Windows),
+`/Library/Application Support/Unity/Unity_lic.ulf` (macOS) or
+`~/.local/share/unity3d/Unity/Unity_lic.ulf` (Linux). The Quest APK Build stops
+early and names any Unity secret that is missing.
+
+With the `gh` CLI, values come from a prompt or a file and stay out of your
+shell history:
+
+```bash
+gh secret set UNITY_EMAIL        # prompts for the value
+gh secret set UNITY_PASSWORD
+gh secret set UNITY_LICENSE < path/to/Unity_lic.ulf
+base64 -w0 release.keystore | gh secret set ANDROID_KEYSTORE_BASE64   # macOS: base64 -i release.keystore
+```
+
+```powershell
+Get-Content -Raw 'C:\ProgramData\Unity\Unity_lic.ulf' | gh secret set UNITY_LICENSE
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('release.keystore')) | gh secret set ANDROID_KEYSTORE_BASE64
+```
+
+Without the keystore secrets, each CI build is signed with a debug key created
+for that run, so one CI build cannot be installed over another without
+uninstalling it first. A release keystore (for example from
+`keytool -genkeypair -keystore release.keystore -alias companionscan -keyalg RSA -keysize 2048 -validity 10000`)
+keeps updates in place. Keep the keystore and its passwords out of the
+repository.
+
+### Building and releasing the Quest APK
+
+```bash
+gh workflow run quest-build.yml --ref main
+gh run list --workflow quest-build.yml --limit 3
+gh run download <run-id> --dir quest-apk
+```
+
+Build versions come from git tags (GameCI semantic versioning): the latest
+`vMAJOR.MINOR` tag sets the major and minor version and the number of commits
+since that tag sets the patch, so tag `v0.2` builds as `0.2.0` and a build five
+commits later as `0.2.5`. Before the first tag, builds are
+`0.0.<commit count>`. The Android version code follows the version
+(major × 1000000 + minor × 1000 + patch), so later commits get higher version
+codes. A three-part tag such as `v0.2.1` also works for its own build, but
+later untagged builds then keep that version.
+
+To publish a release, push a tag:
+
+```bash
+git tag v0.2
+git push origin v0.2
+```
+
+The tag build attaches the APK and its checksum to a draft GitHub Release with
+generated notes. Review the draft on GitHub, then publish it.
+
+The Unity `Library` folder is cached per editor version. Tag builds can reuse
+the cache saved by builds on `main`, so dispatching a build on `main` first
+speeds up the release build.
+
+To install a build on a headset, see [docs/SIDELOAD.md](docs/SIDELOAD.md).
+
+### Release builds from the command line
+
+`CommandLineBuild.BuildAndroidQuest` builds the Quest APK in batch mode
+(`Builds/Android/CompanionCapture.apk`). It reads release signing and version
+settings from the environment only, applies them to that one build and puts
+Player Settings back afterwards, so no keystore path, alias or password ends
+up in `ProjectSettings/ProjectSettings.asset`.
+
+| Environment variable | Meaning |
+|---|---|
+| `KEYSTORE_PATH` | Path of the release keystore file (keep it outside the repository) |
+| `KEYSTORE_PASS` | Keystore password |
+| `KEY_ALIAS` | Alias of the release key in the keystore |
+| `KEY_PASS` | Password of that key |
+| `VERSION_CODE` | Optional Android versionCode, 1 to 2100000000 |
+| `VERSION_NAME` | Optional version name; default: Player Settings > Version (`bundleVersion`) |
+
+- The build is signed with the release key only when all four signing
+  variables are set. Otherwise Unity signs it with its debug key, and a warning
+  names any signing variables that are missing (names only, never values).
+- `-release` makes the build fail unless all four are set and `KEYSTORE_PATH`
+  points to an existing file. Use it for every build meant for a store or for
+  testers who update in place.
+- `-aab` builds an Android App Bundle (`Builds/Android/CompanionCapture.aab`)
+  instead of an APK, for stores that take bundles (Google Play requires them for
+  new apps). Meta Horizon Store uploads and sideloading use the APK.
+- versionCode is `VERSION_CODE` when set, otherwise
+  MAJOR × 1000000 + MINOR × 1000 + PATCH of the version name, the same rule the
+  CI builds use: `0.1.0` is 1000 and `1.2.3` is 1002003. Every upload to a store
+  needs a higher versionCode than the last one.
+- The build never creates a keystore. Create the release keystore yourself (for
+  example with `keytool`, as above), back it up, and keep it and its passwords
+  out of the repository; `*.jks`, `*.keystore`, `*.p12` and
+  `keystore.properties` are gitignored. Every update of the app must be signed
+  with the same key.
+
+```powershell
+# Fill these from your password manager or CI secret store rather than typing
+# the passwords into a shell history.
+$env:KEYSTORE_PATH = 'D:\signing\companion-scan-release.p12'
+$env:KEYSTORE_PASS = '<keystore password>'
+$env:KEY_ALIAS = 'companion-scan'
+$env:KEY_PASS = '<key password>'
+& 'C:\Program Files\Unity\Hub\Editor\6000.6.9f1\Editor\Unity.exe' -batchmode -nographics -quit `
+  -projectPath . -buildTarget Android `
+  -executeMethod CommandLineBuild.BuildAndroidQuest -release -logFile build-release.log
+```
+
+Add `-aab` to the same command for an App Bundle.
+
+The build also fails when Player Settings > Android > Target API Level is not
+exactly 34, when a build callback throws while Unity creates it, or when the
+APK has no Burst-compiled code (`lib_burst_generated.so`).
+
 ## Documentation
 
 - Web client guide: [web/README.md](web/README.md)
 - World mapper pipeline + glTF schema: [docs/quest-capture-gltf.md](docs/quest-capture-gltf.md)
 - Spatial capture architecture: [docs/spatial-capture-architecture.md](docs/spatial-capture-architecture.md)
 - Scan/export pipeline details: [docs/scan-export-pipeline.md](docs/scan-export-pipeline.md)
+- Installing the APK on a Quest 3: [docs/SIDELOAD.md](docs/SIDELOAD.md)
+- Starting CI workflows by hand: [docs/CI.md](docs/CI.md)
+- Test tiers and CI plan: [docs/qa-ci.md](docs/qa-ci.md)
 - Current build plan: [docs/plan.md](docs/plan.md)
 
 ## Legacy Sample (Cloud API)
@@ -290,7 +465,7 @@ The original NVIDIA cloud API sample lives under `Assets/CompanionScanLegacy/Scr
 
 | Area | Current project setting |
 |---|---|
-| Unity editor | Unity `6000.3.10f1` (see `ProjectSettings/ProjectVersion.txt`) |
+| Unity editor | Unity `6000.6.9f1` (see `ProjectSettings/ProjectVersion.txt`) |
 | Primary runtime | Native Quest runtime |
 | Alternate route | Web client for browser-based use |
 | Capture handoff | glTF export and sync path |

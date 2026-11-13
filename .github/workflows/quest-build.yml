@@ -1,0 +1,206 @@
+name: Quest APK Build
+
+# Builds the Quest 3 APK (Android, ARM64, IL2CPP) with GameCI on a
+# GitHub-hosted Ubuntu runner and uploads it as a workflow artifact. Pushing a
+# v* tag also attaches the APK to a draft GitHub Release for review.
+#
+# The Unity editor version is read from ProjectSettings/ProjectVersion.txt.
+# Repository secrets (Settings > Secrets and variables > Actions) are listed in
+# README.md under "Continuous integration and releases".
+# Installing the APK on a headset: docs/SIDELOAD.md.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Builds feed releases, so queue instead of cancelling a run halfway.
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Quest APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    outputs:
+      artifact-name: ${{ steps.stage.outputs.artifact-name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # GameCI semantic versioning counts commits since the latest v* tag.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Read Unity version from ProjectVersion.txt
+        id: unity
+        shell: bash
+        run: |
+          version="$(sed -n 's/^m_EditorVersion:[[:space:]]*//p' ProjectSettings/ProjectVersion.txt | tr -d '[:space:]')"
+          if [ -z "$version" ]; then
+            echo "::error file=ProjectSettings/ProjectVersion.txt::m_EditorVersion not found"
+            exit 1
+          fi
+          echo "Unity editor version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check repository secrets
+        id: preflight
+        shell: bash
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEYALIAS_NAME: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          ANDROID_KEYALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+        run: |
+          missing=()
+          [ -n "$UNITY_EMAIL" ] || missing+=(UNITY_EMAIL)
+          [ -n "$UNITY_PASSWORD" ] || missing+=(UNITY_PASSWORD)
+          [ -n "$UNITY_LICENSE$UNITY_SERIAL" ] || missing+=("UNITY_LICENSE or UNITY_SERIAL")
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            [ -n "$ANDROID_KEYSTORE_PASS" ] || missing+=(ANDROID_KEYSTORE_PASS)
+            [ -n "$ANDROID_KEYALIAS_NAME" ] || missing+=(ANDROID_KEYALIAS_NAME)
+            [ -n "$ANDROID_KEYALIAS_PASS" ] || missing+=(ANDROID_KEYALIAS_PASS)
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing repository secrets: ${missing[*]}. See README.md, 'Continuous integration and releases'."
+            exit 1
+          fi
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "Signing with the release keystore from ANDROID_KEYSTORE_BASE64."
+            echo "signing=release keystore" >> "$GITHUB_OUTPUT"
+            echo "keystore-name=release.keystore" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::ANDROID_KEYSTORE_BASE64 is not set, so this APK is signed with a one-off debug key. Uninstall the previous build before installing it (docs/SIDELOAD.md)."
+            echo "signing=one-off debug key" >> "$GITHUB_OUTPUT"
+            echo "keystore-name=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Free disk space for the Unity Android image
+        shell: bash
+        run: |
+          df -h /
+          # GameCI brings its own Android SDK/NDK in the editor image.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+
+      - name: Cache Unity Library
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Library
+          key: Library-Android-${{ steps.unity.outputs.version }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-Android-${{ steps.unity.outputs.version }}-
+
+      - name: Build APK with GameCI
+        id: build
+        uses: game-ci/unity-builder@adaf7cd8f42fd48fbbf2d4f5f67ca30d87f819f1 # v5.0.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: ${{ steps.unity.outputs.version }}
+          projectPath: .
+          targetPlatform: Android
+          androidExportType: androidPackage
+          # Meta requires API level 34 exactly; QuestTargetSdkRequirement fails any other value.
+          androidTargetSdkVersion: AndroidApiLevel34
+          buildName: CompanionScan
+          buildsPath: build
+          versioning: Semantic
+          androidKeystoreName: ${{ steps.preflight.outputs.keystore-name }}
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+
+      - name: Stage APK and checksum
+        id: stage
+        shell: bash
+        env:
+          BUILD_VERSION: ${{ steps.build.outputs.buildVersion }}
+          VERSION_CODE: ${{ steps.build.outputs.androidVersionCode }}
+          UNITY_VERSION: ${{ steps.unity.outputs.version }}
+          SIGNING: ${{ steps.preflight.outputs.signing }}
+        run: |
+          apk=build/Android/CompanionScan.apk
+          if [ ! -f "$apk" ]; then
+            echo "::error::$apk was not produced"
+            ls -la build/Android || true
+            exit 1
+          fi
+          name="CompanionScan-${BUILD_VERSION}"
+          # build/ is owned by the container's root user, so stage in dist/.
+          mkdir -p dist
+          cp "$apk" "dist/${name}.apk"
+          (cd dist && sha256sum "${name}.apk" > "${name}.apk.sha256")
+          echo "artifact-name=${name}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Quest APK"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| File | \`${name}.apk\` |"
+            echo "| Version / versionCode | ${BUILD_VERSION} / ${VERSION_CODE} |"
+            echo "| Unity | ${UNITY_VERSION} |"
+            echo "| Signed with | ${SIGNING} |"
+            echo "| SHA-256 | \`$(cut -d ' ' -f 1 "dist/${name}.apk.sha256")\` |"
+            echo ""
+            echo "Install it on a Quest 3 with docs/SIDELOAD.md."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.stage.outputs.artifact-name }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Attach APK to draft release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+          path: dist
+
+      - name: Create or update draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          shopt -s nullglob
+          files=(dist/*.apk dist/*.sha256)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::The build artifact contains no APK"
+            exit 1
+          fi
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber
+          else
+            gh release create "$TAG" "${files[@]}" --draft --verify-tag \
+              --title "Companion Scan $TAG" --generate-notes
+          fi
