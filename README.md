@@ -325,32 +325,45 @@ secrets**. Workflows started from forks do not receive them.
 |---|---|---|
 | `UNITY_EMAIL` | Unity Tests, Quest APK Build | Email address of the Unity ID that holds the licence |
 | `UNITY_PASSWORD` | Unity Tests, Quest APK Build | Password of that Unity ID |
-| `UNITY_LICENSE` | Unity Personal licence | Full contents of the activated `Unity_lic.ulf` file |
-| `UNITY_SERIAL` | Serial-based licence (Pro and up), instead of `UNITY_LICENSE` | The serial key |
+| `UNITY_SERIAL` | Paid seats only (Pro, Enterprise, Industry) | The seat's serial key; leave it unset for a Personal licence |
 | `ANDROID_KEYSTORE_BASE64` | Optional, Quest APK Build | Release keystore, base64-encoded |
 | `ANDROID_KEYSTORE_PASS` | Only with a keystore | Keystore password |
 | `ANDROID_KEYALIAS_NAME` | Only with a keystore | Key alias |
 | `ANDROID_KEYALIAS_PASS` | Only with a keystore | Key password |
 | `CV_SERVER_API_TOKEN` | Unity Tests integration job | API token of the cv-server on the runner host (sent by the health check and the Play Mode tests) |
 
-For a Personal licence, activate Unity once in Unity Hub and use the licence
-file it writes: `C:\ProgramData\Unity\Unity_lic.ulf` (Windows),
-`/Library/Application Support/Unity/Unity_lic.ulf` (macOS) or
-`~/.local/share/unity3d/Unity/Unity_lic.ulf` (Linux). The Quest APK Build stops
-early and names any Unity secret that is missing.
+The Quest APK Build stops early and names any secret that is missing.
 
-With the `gh` CLI, values come from a prompt or a file and stay out of your
-shell history:
+**Unity licence.** Both workflows run GameCI actions (`unity-builder` v6,
+`unity-test-runner` v4.4) that download the game-ci CLI release named in
+`cliVersion` and activate Unity with it at the start of each job, returning the
+seat at the end:
+
+- **Personal:** `UNITY_EMAIL` and `UNITY_PASSWORD` only.
+- **Paid seat:** add `UNITY_SERIAL`.
+- `UNITY_LICENSE` is not used. A `.ulf` licence file no longer activates Unity
+  6000.6 in CI (Unity rejects its machine binding or timestamp), so the
+  workflows do not pass it, and the Quest APK Build warns while the secret
+  exists. Delete it.
+
+Use a Unity ID set aside for CI. It must sign in with a password (not with
+Google or Apple) and have two-factor authentication off, and its password must
+not contain `"` or `\`. For a Personal licence, sign in to Unity Hub with that
+ID once, accept the Personal licence terms, and sign out again. Unity may email
+the account to confirm a new device the first time a runner signs in. A
+Personal licence has few seats, so run one Unity job at a time; a paid seat can
+be active on two machines at once, a workstation included.
+
+With the `gh` CLI, secret values come from a prompt or from standard input, so
+they stay out of your shell history and off command lines:
 
 ```bash
 gh secret set UNITY_EMAIL        # prompts for the value
 gh secret set UNITY_PASSWORD
-gh secret set UNITY_LICENSE < path/to/Unity_lic.ulf
 base64 -w0 release.keystore | gh secret set ANDROID_KEYSTORE_BASE64   # macOS: base64 -i release.keystore
 ```
 
 ```powershell
-Get-Content -Raw 'C:\ProgramData\Unity\Unity_lic.ulf' | gh secret set UNITY_LICENSE
 [Convert]::ToBase64String([IO.File]::ReadAllBytes('release.keystore')) | gh secret set ANDROID_KEYSTORE_BASE64
 ```
 
