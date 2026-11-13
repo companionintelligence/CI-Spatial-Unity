@@ -78,10 +78,10 @@ allow us to build and sell Companion Scan, but only on the terms shown.
 | Json.NET (Newtonsoft.Json), via `com.unity.nuget.newtonsoft-json` 3.2.2 | MIT | Copyright (c) 2007 James Newton-King | package `Third Party Notices.md` |
 | Microsoft.Bcl.AsyncInterfaces 9.0.5, System.IO.Pipelines 9.0.5, System.Net.Http.Json 9.0.5, System.Runtime.CompilerServices.Unsafe 6.0.0, System.Text.Encodings.Web 9.0.5, System.Text.Json 9.0.5 | MIT | Copyright (c) .NET Foundation and Contributors | `Assets/Packages/<package>/LICENSE.TXT` and `THIRD-PARTY-NOTICES.TXT` |
 | Liberation Sans 2.00.1 (TextMesh Pro default font) | SIL Open Font License 1.1 | Digitized data copyright (c) 2010 Google Corporation, with Reserved Font Arimo, Tinos and Cousine. Copyright (c) 2012 Red Hat, Inc., with Reserved Font Name Liberation. | `Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt` |
-| Khronos OpenXR loader (OpenXR-SDK-Source), via `com.unity.xr.openxr` and `com.unity.xr.meta-openxr` | Apache-2.0 | Copyright (c) The Khronos Group Inc. | package `Third Party Notices.md` |
+| Khronos OpenXR loader and SDK code (OpenXR-SDK-Source): `libopenxr_loader.so` from the Meta XR Core SDK's `OVRPlugin.aar`, and the native libraries of `com.unity.xr.openxr`, `com.unity.xr.meta-openxr` and `com.unity.xr.hands` (`libUnityOpenXRHands.so`) | Apache-2.0 | Copyright (c) The Khronos Group Inc. | `Third Party Notices.md` in the Unity packages; <https://www.apache.org/licenses/LICENSE-2.0> |
 | Third-party code inside the Meta XR SDK: OpenVR (BSD-3-Clause, Valve), SimpleJSON (MIT), glTF loader (MIT, AltspaceVR); Boost (BSL-1.0), earcut.hpp (ISC), JSON for Modern C++ (MIT), folly (Apache-2.0), Protocol Buffers (BSD-3-Clause), an MPL-2.0 component; Kiss FFT, libjpeg, OOURA FFT, PFFFT, sfft, TinyThread++, zlib; Rust crates under Apache-2.0, MIT, ISC, BSL-1.0 and the Unlicense | as listed | as listed | `NOTICE.txt` in `com.meta.xr.sdk.core` and `com.meta.xr.mrutilitykit`; `THIRD_PARTY_NOTICES.txt` in `com.meta.xr.sdk.audio` and `com.meta.xr.sdk.haptics` |
 | Capsule ray-intersection shader code, inside the Meta XR Core SDK (Immersive Debugger shaders in a `Resources` folder) | MIT | Copyright © 2016 Inigo Quilez | header of `Scripts/ImmersiveDebugger/Gizmos/DebugGizmos/Resources/CapsuleRayIntersect.cginc` in `com.meta.xr.sdk.core` |
-| double-conversion (`libdouble-conversion.so`), inside the Meta XR Core SDK's `OVRPlugin.aar` | BSD-3-Clause | Copyright 2006-2011, the V8 project authors. All rights reserved. | BSD 3-Clause text in section 4 |
+| folly logging (`libxplat_folly_logging__logging.so`), inside the Meta XR Core SDK's `OVRPlugin.aar` | Apache-2.0 | Copyright (c) Meta Platforms, Inc. and affiliates. | <https://www.apache.org/licenses/LICENSE-2.0>; folly is also listed in `NOTICE.txt` of `com.meta.xr.mrutilitykit` |
 | Zstandard (`libxplat_third-party_zstd__zstd.so`), inside the Meta XR Core SDK's `OVRPlugin.aar` | BSD-3-Clause | Copyright (c) Meta Platforms, Inc. and affiliates. | BSD 3-Clause text in section 4 |
 | LLVM libc++ (`libc++_shared.so`), added to the APK by Unity's Android build from the Android NDK r27c | Apache-2.0 with LLVM Exceptions | Copyright (c) the LLVM Project contributors | `toolchains/llvm/prebuilt/*/NOTICE` in the NDK; <https://llvm.org/LICENSE.txt> |
 | Roboto Mono font, inside the Meta XR Core SDK (Immersive Debugger UI) | Apache-2.0 | Copyright 2015 The Roboto Mono Project Authors (https://github.com/googlefonts/robotomono). Roboto Mono is a trademark of Google. | <https://www.apache.org/licenses/LICENSE-2.0> |
@@ -149,7 +149,7 @@ Python packages in the server image are under MIT, BSD, Apache-2.0, HPND
   libraries carry none): the text below, with the copyright lines from
   section 3. For TinyEXR and OpenEXR, "the copyright holder" in clause 3
   reads "Syoyo Fujita" and "Industrial Light & Magic"; for Zstandard,
-  "Facebook"; for double-conversion, "Google Inc.".
+  "Facebook".
 - Apache-2.0: <https://www.apache.org/licenses/LICENSE-2.0>
 - SIL Open Font License 1.1: `Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt`
   and <https://openfontlicense.org>
