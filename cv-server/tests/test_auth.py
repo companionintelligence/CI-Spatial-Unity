@@ -30,6 +30,7 @@ def test_health_requires_token(auth_headers: dict) -> None:
         ("post", "/v1/segment"),
         ("post", "/v1/florence"),
         ("post", "/v1/gltf"),
+        ("delete", "/v1/gltf/0123456789abcdef0123456789abcdef"),
         ("get", "/openapi.json"),
         ("get", "/docs"),
         ("get", "/v1/does-not-exist"),

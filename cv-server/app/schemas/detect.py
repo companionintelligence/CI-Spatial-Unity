@@ -14,6 +14,12 @@ class DetectRequest(BaseModel):
 
 
 class DetectResponse(BaseModel):
-    bboxes: List[List[float]]
+    bboxes: List[List[float]] = Field(
+        ...,
+        description=(
+            "One [x1, y1, x2, y2] box per detection: top-left and bottom-right corners "
+            "as fractions (0-1) of the image width (x) and height (y), origin top-left"
+        ),
+    )
     labels: List[str]
     scores: List[float]

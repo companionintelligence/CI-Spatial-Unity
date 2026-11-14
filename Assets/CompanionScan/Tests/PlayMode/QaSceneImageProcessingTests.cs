@@ -26,6 +26,15 @@ namespace CompanionScan.Tests.PlayMode
         private static readonly string ExternalFixturesPath =
             Path.GetFullPath(Path.Combine(Application.dataPath, "..", "test"));
 
+        private TestServerConsent _consent;
+
+        [TearDown]
+        public void TearDown()
+        {
+            _consent?.Dispose();
+            _consent = null;
+        }
+
         [UnityTest]
         public IEnumerator QaScene_ProcessAllImages_Render2DAnd3D()
         {
@@ -63,6 +72,7 @@ namespace CompanionScan.Tests.PlayMode
             }
         #endif
 
+            _consent = TestServerConsent.Grant(config);
             var client = new CVServerClient(config);
 
             var systemsRoot = new GameObject("QaTestSystems");

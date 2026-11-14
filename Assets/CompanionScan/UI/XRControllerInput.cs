@@ -17,9 +17,16 @@ namespace CompanionScan.UI
     ///   Primary / Secondary Index Trigger -> Cycle display mode
     /// Either hand trigger:
     ///   Primary / Secondary Hand Trigger -> Preview glTF
-    /// Left Menu button (Button.Start) -> open / close CV server settings.
+    /// Left Menu button (Button.Start) -> open / close the settings.
     ///   While the settings panel is open, A edits the server URL, X the server's
-    ///   API token, and B saves; the capture controls above are suspended.
+    ///   API token, B saves, Y opens the privacy policy, either trigger shows the
+    ///   open-source licences and either grip withdraws the agreement to send camera
+    ///   snapshots; the capture controls above are suspended.
+    /// While the open-source licences are shown, A / X turn the page, B / Y change the
+    ///   document and Menu goes back to the settings.
+    /// While the camera notice is shown (before snapshots first go to a server), A agrees and
+    ///   captures, B sends nothing and Y opens the privacy policy. Menu opens the settings, which
+    ///   close the notice without agreeing (both panels open at the same spot).
     /// </summary>
     public class XRControllerInput : MonoBehaviour
     {
@@ -49,7 +56,13 @@ namespace CompanionScan.UI
 
         private void Update()
         {
+            if (HandleLicensesInput())
+                return;
+
             if (HandleSettingsInput())
+                return;
+
+            if (HandleConsentInput())
                 return;
 
             // Late-bind: ControllerMenuBuilder creates MenuUI in Start(),
@@ -95,8 +108,10 @@ namespace CompanionScan.UI
         }
 
         /// <summary>
-        /// Menu toggles the server settings panel; while it is open, A edits the URL,
-        /// X the API token, and B saves. Returns true when the panel consumed this frame's input.
+        /// Menu toggles the settings panel (opening it closes the camera notice); while it is open,
+        /// A edits the URL, X the API token, B saves, Y opens the privacy policy, a trigger shows the
+        /// licences and a grip withdraws the agreement to send snapshots. Returns true when the panel
+        /// consumed this frame's input.
         /// </summary>
         private bool HandleSettingsInput()
         {
@@ -119,6 +134,69 @@ namespace CompanionScan.UI
 
             if (OVRInput.GetDown(OVRInput.Button.Two))
                 settingsPanel.Apply();
+
+            if (OVRInput.GetDown(OVRInput.Button.Four))
+                settingsPanel.OpenPrivacyPolicy();
+
+            if (OVRInput.GetDown(OVRInput.Button.PrimaryHandTrigger) ||
+                OVRInput.GetDown(OVRInput.Button.SecondaryHandTrigger))
+                settingsPanel.WithdrawCaptureConsent();
+
+            if (OVRInput.GetDown(OVRInput.Button.PrimaryIndexTrigger) ||
+                OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger))
+                settingsPanel.ShowLicenses();
+
+            return true;
+        }
+
+        /// <summary>
+        /// While the licences are shown: A / X turn the page, B / Y change the document, Menu goes back.
+        /// Returns true when the view consumed this frame's input.
+        /// </summary>
+        private static bool HandleLicensesInput()
+        {
+            var licenses = LicensesPanel.Active;
+            if (licenses == null || !licenses.IsOpen)
+                return false;
+
+            if (OVRInput.GetDown(OVRInput.Button.Start))
+            {
+                licenses.Close();
+                return true;
+            }
+
+            if (OVRInput.GetDown(OVRInput.Button.One))
+                licenses.NextPage();
+
+            if (OVRInput.GetDown(OVRInput.Button.Three))
+                licenses.PreviousPage();
+
+            if (OVRInput.GetDown(OVRInput.Button.Two))
+                licenses.NextDocument();
+
+            if (OVRInput.GetDown(OVRInput.Button.Four))
+                licenses.PreviousDocument();
+
+            return true;
+        }
+
+        /// <summary>
+        /// While the camera notice is shown: A agrees (and the capture goes ahead), B sends nothing,
+        /// Y opens the privacy policy. Returns true when the notice consumed this frame's input.
+        /// </summary>
+        private static bool HandleConsentInput()
+        {
+            var notice = CaptureConsentPanel.Active;
+            if (notice == null || !notice.IsOpen)
+                return false;
+
+            if (OVRInput.GetDown(OVRInput.Button.One))
+                notice.Accept();
+            else if (OVRInput.GetDown(OVRInput.Button.Two))
+                notice.Decline();
+
+            if (OVRInput.GetDown(OVRInput.Button.Four))
+                notice.OpenPrivacyPolicy();
 
             return true;
         }

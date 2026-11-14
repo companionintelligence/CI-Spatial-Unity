@@ -11,6 +11,7 @@ namespace CompanionScan.Tests.Editor
     public class AndroidPermissionsTests
     {
         private const string ManifestPath = "Assets/Plugins/Android/AndroidManifest.xml";
+        private const string OvrProjectConfigPath = "Assets/Oculus/OculusProjectConfig.asset";
         private const string ScenePath = "Assets/CompanionScan/Scenes/CompanionCapture.unity";
         private const string AndroidNamespace = "http://schemas.android.com/apk/res/android";
 
@@ -89,6 +90,7 @@ namespace CompanionScan.Tests.Editor
         }
 
         [TestCase("com.oculus.permission.EYE_TRACKING")]
+        [TestCase("com.oculus.permission.HAND_TRACKING")]
         [TestCase("com.oculus.permission.IMPORT_EXPORT_IOT_MAP_DATA")]
         [TestCase("com.oculus.permission.USE_COLOCATION_DISCOVERY_API")]
         [TestCase("com.oculus.permission.BOUNDARY_VISIBILITY")]
@@ -98,21 +100,64 @@ namespace CompanionScan.Tests.Editor
             Assert.AreEqual("remove", toolsNode);
         }
 
-        [Test]
-        public void Manifest_RemovesTheEyeTrackingFeature()
+        [TestCase("oculus.software.eye_tracking")]
+        [TestCase("oculus.software.handtracking")]
+        public void Manifest_RemovesUnusedTrackingFeatures(string name)
         {
             var manifest = LoadManifest();
             XmlElement feature = null;
             foreach (XmlElement element in manifest.SelectNodes("/manifest/uses-feature"))
             {
-                if (element.GetAttribute("name", AndroidNamespace) == "oculus.software.eye_tracking")
+                if (element.GetAttribute("name", AndroidNamespace) == name)
                 {
                     feature = element;
                 }
             }
 
-            Assert.IsNotNull(feature);
+            Assert.IsNotNull(feature, name + " has no removal entry");
             Assert.AreEqual("remove", feature.GetAttribute("node", "http://schemas.android.com/tools"));
+        }
+
+        [Test]
+        public void HandTracking_IsOffInTheMetaProjectConfig()
+        {
+            // OVRProjectConfig.HandTrackingSupport.ControllersOnly = 0: OVRManifestPreprocessor then adds no
+            // hand tracking permission, feature or frequency entry. Every control is a controller button.
+            var config = File.ReadAllText(OvrProjectConfigPath);
+            StringAssert.IsMatch(@"(?m)^\s*handTrackingSupport: 0\s*$", config);
+            StringAssert.DoesNotContain("com.oculus.handtracking.frequency", File.ReadAllText(ManifestPath));
+        }
+
+        [Test]
+        public void Manifest_KeepsTheAnchorPermissionThatSpaceSetupQueriesNeed()
+        {
+            // MetaSceneCollector reads Space Setup through OVRAnchor (XR_FB_spatial_entity), and Meta XR Core adds
+            // USE_ANCHOR_API whenever Scene Support is on: it must stay declared, not removed.
+            Assert.IsNotNull(FindUsesPermission(LoadManifest(), "com.oculus.permission.USE_ANCHOR_API", out var toolsNode));
+            Assert.IsEmpty(toolsNode, "USE_ANCHOR_API must be declared, not removed");
+            StringAssert.IsMatch(@"(?m)^\s*sceneSupport: [12]\s*$", File.ReadAllText(OvrProjectConfigPath));
+        }
+
+        [Test]
+        public void HandTracking_IsNotUsedByTheAppCode()
+        {
+            foreach (var file in Directory.GetFiles("Assets/CompanionScan", "*.cs", SearchOption.AllDirectories))
+            {
+                if (file.Replace('\\', '/').Contains("/Tests/"))
+                {
+                    continue;
+                }
+
+                var source = File.ReadAllText(file);
+                foreach (var api in new[]
+                         {
+                             "OVRHand", "OVRSkeleton", "XRHandSubsystem", "UnityEngine.XR.Hands",
+                             "OVRInput.Controller.Hands", "OVRInput.Controller.LHand", "OVRInput.Controller.RHand"
+                         })
+                {
+                    StringAssert.DoesNotContain(api, source, $"{file} uses {api}; hand tracking needs HAND_TRACKING back");
+                }
+            }
         }
 
         private static XmlDocument LoadManifest()

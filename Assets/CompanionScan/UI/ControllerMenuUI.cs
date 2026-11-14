@@ -95,7 +95,7 @@ namespace CompanionScan.UI
         private void Update()
         {
             if (busyLabel != null && pipeline != null)
-                busyLabel.text = pipeline.IsBusy ? "BUSYâ€¦" : "";
+                busyLabel.text = pipeline.IsBusy ? "BUSY..." : "";
         }
 
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•

@@ -1,10 +1,10 @@
-import os
-import time
-import uuid
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
+from starlette import status
+from starlette.concurrency import run_in_threadpool
 
+from app import gltf_store
 from app.config import settings
 
 router = APIRouter()
@@ -15,31 +15,25 @@ async def upload_gltf(
     gltf: UploadFile = File(...),
     bin: Optional[UploadFile] = File(None),
     extras: Optional[str] = Form(None),
-):
-    os.makedirs(settings.gltf_upload_dir, exist_ok=True)
-    stamp = time.strftime("%Y%m%d-%H%M%S")
-    uid = uuid.uuid4().hex[:8]
-    base_name = f"spatial-map-{stamp}-{uid}"
-
-    gltf_path = os.path.join(settings.gltf_upload_dir, base_name + ".gltf")
-    with open(gltf_path, "wb") as f:
-        f.write(await gltf.read())
-
-    bin_path = None
-    if bin is not None:
-        bin_path = os.path.join(settings.gltf_upload_dir, base_name + ".bin")
-        with open(bin_path, "wb") as f:
-            f.write(await bin.read())
-
-    extras_path = None
-    if extras:
-        extras_path = os.path.join(settings.gltf_upload_dir, base_name + ".extras.json")
-        with open(extras_path, "w", encoding="utf-8") as f:
-            f.write(extras)
-
+) -> dict:
+    """Store a glTF upload under a new opaque ID (app/gltf_store.py)."""
+    gltf_bytes = await gltf.read()
+    bin_bytes = await bin.read() if bin is not None else None
+    stored = await run_in_threadpool(
+        gltf_store.save_upload, settings.gltf_upload_dir, gltf_bytes, bin_bytes, extras
+    )
     return {
         "ok": True,
-        "gltf_path": gltf_path,
-        "bin_path": bin_path,
-        "extras_path": extras_path,
+        "id": stored.upload_id,
+        "gltf_path": stored.gltf_path,
+        "bin_path": stored.bin_path,
+        "extras_path": stored.extras_path,
     }
+
+
+@router.delete("/gltf/{upload_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_gltf(upload_id: str) -> Response:
+    """Delete an upload's files; 404 when the ID names no upload."""
+    if not gltf_store.delete_upload(settings.gltf_upload_dir, upload_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload not found.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

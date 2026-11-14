@@ -132,9 +132,9 @@ The weights are not in this repository. The operator downloads them into
 | Model | Licence | Copyright / publisher | Source |
 | --- | --- | --- | --- |
 | Grounding DINO Swin-T OGC (`groundingdino_swint_ogc.pth`) and its config | Apache-2.0 | IDEA Research | <https://github.com/IDEA-Research/GroundingDINO> (release `v0.1.0-alpha`) |
-| BERT base, uncased (text encoder that Grounding DINO downloads on first load) | Apache-2.0 | Google | <https://huggingface.co/google-bert/bert-base-uncased> |
+| BERT base, uncased (Grounding DINO's text encoder, downloaded on first load at a pinned commit) | Apache-2.0 | Google | <https://huggingface.co/google-bert/bert-base-uncased> |
 | SAM 2.1 Hiera Tiny (`sam2.1_hiera_tiny.pt`) and its config | Apache-2.0 | Meta Platforms, Inc. | <https://github.com/facebookresearch/sam2> |
-| Florence-2-large, including the model code it loads with `trust_remote_code` | MIT | Microsoft | <https://huggingface.co/microsoft/Florence-2-large> |
+| Florence-2-large, converted by Hugging Face for transformers' own Florence-2 implementation (`florence-community/Florence-2-large`) | MIT | Microsoft | <https://huggingface.co/microsoft/Florence-2-large> (converted: <https://huggingface.co/florence-community/Florence-2-large>) |
 
 None of these weights carries research-only or non-commercial terms. The
 Python packages in the server image are under MIT, BSD, Apache-2.0, HPND

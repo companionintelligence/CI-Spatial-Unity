@@ -7,7 +7,7 @@ workflow, from a GitHub Release, and from a local Unity build.
 
 | | |
 |---|---|
-| App name in the headset library | `CompanionCapture` |
+| App name in the headset library | `Companion Scan` |
 | Package name | `com.CompanionIntelligence.CompanionCapture` |
 
 Both come from the Android Player Settings in `ProjectSettings/ProjectSettings.asset`.
@@ -42,7 +42,7 @@ writes `Builds/Quest/CompanionScan.apk`. **CompanionScan → Build and Run Quest
 also installs it on the connected headset, which skips the rest of this guide.
 Both are signed with your own debug key. A release-signed build comes from
 `CommandLineBuild.BuildAndroidQuest -release` (README, "Release builds from the
-command line"), which writes `Builds/Android/CompanionCapture.apk`.
+command line"), which writes `Builds/Android/CompanionScan.apk`.
 
 **Check the checksum** of CI and release builds before installing:
 

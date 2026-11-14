@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app import gltf_store
 from app.auth import BearerTokenMiddleware, require_configured_token
 from app.config import settings
 from app.limits import RequestSizeLimitMiddleware
@@ -36,6 +37,17 @@ def startup() -> None:
         mm.load_florence2()
 
 
+@app.on_event("startup")
+async def start_upload_retention() -> None:
+    # With GLTF_UPLOAD_RETENTION_DAYS set, delete expired glTF uploads now and then hourly.
+    await gltf_store.start_retention()
+
+
 @app.on_event("shutdown")
 def shutdown() -> None:
     ModelManager.get_instance().shutdown()
+
+
+@app.on_event("shutdown")
+async def stop_upload_retention() -> None:
+    await gltf_store.stop_retention()

@@ -14,11 +14,19 @@ python-multipart==0.0.31
 # Pinned to the commits the release-candidate image was built with.
 git+https://github.com/IDEA-Research/GroundingDINO.git@856dde20aee659246248e20734ef9ba5214f5e44
 git+https://github.com/facebookresearch/sam2.git@2b90b9f5ceec907a1c18123530e92e794ad901a4
-# Not 5.x: transformers 5.10.1 needs a newer torch than 2.5.1, the last release with CUDA 12.1
-# wheels (it uses torch.float8_e8m0fnu), so BertModel (GroundingDINO) and the Florence-2 auto
-# classes fail to import in the image. 4.40.1 is the version the server ran with before the
-# dependabot bump. Upgrade together with torch and the CUDA base image.
-transformers==5.10.1
+# 5.17.0: no published advisories, and the last release that needs nothing newer than
+# torch 2.5.1, the last torch with CUDA 12.1 wheels. Every 4.x release has advisories fixed
+# only in 5.x. 5.18 adds a torch 2.6 call (torch.accelerator) to its device helper, 5.19
+# makes that call on import, 5.20 and later require torch 2.6, and 5.10.x needs
+# torch.float8_e8m0fnu (torch 2.7). On 5.x, GroundingDINO runs with app/gdino_text_encoder.py,
+# and Florence-2 with transformers' own implementation, from a converted repository with no
+# code in it (app/hub_pins.py).
+transformers==5.17.0
+# transformers' Hugging Face stack, at the versions the image was checked with.
+tokenizers==0.23.3
+huggingface-hub==1.33.0
+hf-xet==1.8.0
+safetensors==0.8.0
 accelerate==1.15.0
 einops==0.7.0
 timm==0.9.16

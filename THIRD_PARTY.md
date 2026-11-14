@@ -215,7 +215,7 @@ Licences from the PyPI metadata of the pinned version (`license_expression`,
 | Package | Version | Licence | Notes |
 | --- | --- | --- | --- |
 | `torch`, `torchvision`, `torchaudio` | 2.5.1, 0.20.1, 2.5.1 (CUDA 12.1 wheels from `download.pytorch.org`; the last release with CUDA 12.1 wheels) | BSD-3-Clause, with bundled third-party code under other permissive licences (current `torch` metadata: Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND ISC AND MIT AND Zlib) | The CUDA wheels carry NVIDIA runtime libraries under NVIDIA licences. |
-| `flash-attn` | 2.8.3.post2 | BSD-3-Clause | Installed in the image for Florence-2's model code. Installs the prebuilt `cu12torch2.5cxx11abiFALSE-cp311` wheel from the project's GitHub release. |
+| `flash-attn` | 2.8.3.post2 | BSD-3-Clause | Installed for Florence-2's repository code, which the server no longer runs; transformers' Florence-2 implementation uses PyTorch's attention, so nothing needs it now (open item 9). Installs the prebuilt `cu12torch2.5cxx11abiFALSE-cp311` wheel from the project's GitHub release. |
 | `packaging` | 26.3 | Apache-2.0 OR BSD-2-Clause | |
 | `wheel` | 0.48.0 | MIT | Build tool for flash-attn and the git packages. |
 | `fastapi` | 0.110.0 | MIT | |
@@ -231,7 +231,11 @@ Licences from the PyPI metadata of the pinned version (`license_expression`,
 | `pytest` | 9.0.3 | MIT | Test-only, listed in the runtime requirements. |
 | `httpx` | 0.27.0 | BSD-3-Clause | |
 | `python-multipart` | 0.0.31 | Apache-2.0 | |
-| `transformers` | 4.40.1 | Apache-2.0 | Not 5.x: 5.10.1 needs a newer torch than 2.5.1 and cannot import its model classes in the image. 4.40.1 has published advisories, fixed in 4.48 to 5.10: ReDoS in tokenizers and processors the server does not use, deserialization in conversion scripts, and code execution through a crafted model config or `Trainer`. The server loads only its configured models and does not train. |
+| `transformers` | 5.17.0 | Apache-2.0 | No published advisories (OSV, 13 November 2026); every 4.x release has advisories fixed only in 5.x. The last release that needs nothing newer than torch 2.5.1: 5.18 adds a call to `torch.accelerator` (torch 2.6) to its device helper, 5.19 makes that call on import, 5.20 and later require torch 2.6, and 5.10.x needs `torch.float8_e8m0fnu` (torch 2.7). GroundingDINO runs with the server's own BERT text encoder (`app/gdino_text_encoder.py`) in place of GroundingDINO's wrapper, which calls methods transformers 5 removed. Florence-2 runs on transformers' own implementation. |
+| `tokenizers` | 0.23.3 | Apache-2.0 | Pinned with `transformers`. |
+| `huggingface-hub` | 1.33.0 | Apache-2.0 | Downloads BERT and Florence-2 at their pinned commits (section 3.3). |
+| `hf-xet` | 1.8.0 | Apache-2.0 | Download backend of `huggingface-hub` for Xet-stored files. |
+| `safetensors` | 0.8.0 | Apache-2.0 | Both Hugging Face models load from `model.safetensors`, not from pickle files. |
 | `accelerate` | 1.15.0 | Apache-2.0 | |
 | `einops` | 0.7.0 | MIT | |
 | `timm` | 0.9.16 | Apache-2.0 | |
@@ -249,9 +253,9 @@ Face cache.
 | Model | File or ID | Source | Licence (where stated) | Research-only or non-commercial terms? |
 | --- | --- | --- | --- | --- |
 | Grounding DINO, Swin-T OGC | `groundingdino_swint_ogc.pth`; config `GroundingDINO_SwinT_OGC.py` | GitHub release `v0.1.0-alpha` of <https://github.com/IDEA-Research/GroundingDINO>; mirror <https://huggingface.co/ShilongLiu/GroundingDINO> | Apache-2.0 (repository `LICENSE`; Hugging Face card `license: apache-2.0`) | No |
-| BERT base, uncased | `bert-base-uncased`, set as `text_encoder_type` in the Grounding DINO config and downloaded on first load | <https://huggingface.co/google-bert/bert-base-uncased> | Apache-2.0 (model card) | No |
+| BERT base, uncased | `google-bert/bert-base-uncased` at commit `86b5e0934494bd15c9632b12f734a8a67f723594`, Grounding DINO's text encoder (its config names the old alias `bert-base-uncased`); five files downloaded on first load | <https://huggingface.co/google-bert/bert-base-uncased> | Apache-2.0 (model card) | No |
 | SAM 2.1 Hiera Tiny | `sam2.1_hiera_tiny.pt`; config `configs/sam2.1/sam2.1_hiera_t.yaml` (ships in the `sam2` package) | <https://github.com/facebookresearch/sam2> (also <https://huggingface.co/facebook/sam2.1-hiera-tiny>) | Apache-2.0: "The SAM 2 model checkpoints ... are licensed under Apache 2.0" (README, "License") | No |
-| Florence-2-large | `microsoft/Florence-2-large`, loaded with `trust_remote_code=True` | <https://huggingface.co/microsoft/Florence-2-large> | MIT (model card `license: mit`; covers the remote model code in the same repository) | No |
+| Florence-2-large | `florence-community/Florence-2-large` at commit `4271c66b88cdbc05735372ec13b2360108de5317`: Microsoft's Florence-2-large weights converted by Hugging Face for transformers' own Florence-2 implementation (weights, configs and tokenizer files; no code). `florence-community/Florence-2-base` is pinned too, at `00921df66db728a9ceb750f5eca43e5c203a2051`, for `FLORENCE_MODEL_ID`; the ids `microsoft/Florence-2-large` and `-base` load these | <https://huggingface.co/florence-community/Florence-2-large>, converted from <https://huggingface.co/microsoft/Florence-2-large> | MIT (model card `license: mit`, linking Microsoft's licence) | No |
 
 All four allow commercial use, so no substitute is needed. The licences cover
 the published weights; the datasets the publishers trained on carry their own
@@ -287,9 +291,12 @@ removed because it was unused and broke the APK build.
 
 ## 6. Open items for the owner
 
-1. Ship the notices with each build: an "Open-source licences" screen in the
-   Quest app and a notices file in `web/dist`. Nothing in the builds carries
-   them today.
+1. Ship the notices with each build. The Quest APK carries them: the Android
+   build copies `LICENSE`, `NOTICE.md`, this file and the licence and notice
+   files of the vendored assets and of every resolved package into the APK
+   under `assets/licenses`, and Settings shows them in the headset (Menu,
+   then a trigger). Only `web/dist` still needs them, as a notices file in the
+   bundle.
 2. Meta XR SDK: apps built with it may target only Meta-approved hardware
    and software (licence §1.1). The Voice and Interaction SDKs are gone
    (section 5). The project's code, scenes, prefabs and assets reference only
@@ -301,11 +308,14 @@ removed because it was unused and broke the APK build.
    (`opencv-python`). Publishing the Dockerfile alone does not. Switching to
    `opencv-python-headless` drops Qt (and the need for `libgl1`); FFmpeg
    stays.
-4. Reproducibility: `torch`, `flash-attn`, GroundingDINO and SAM 2 are now
-   pinned to the versions and commits the release-candidate image was built
-   with. Florence-2 is still loaded with `trust_remote_code=True` without a
-   pinned `revision`. Pin it to a commit so the code you ship cannot change
-   underneath you.
+4. Reproducibility: `torch`, `flash-attn`, GroundingDINO and SAM 2 are pinned
+   to the versions and commits the release-candidate image was built with, and
+   `transformers` with its Hugging Face packages to the versions the image was
+   checked with. The Hugging Face downloads (Florence-2 and Grounding DINO's
+   BERT) are pinned to repository commits in `cv-server/app/hub_pins.py`.
+   Still floating: the other transitive Python packages (for example `regex`,
+   `requests`, `PyYAML`) and the apt packages. A constraints file generated
+   from the built image would pin those too.
 5. The npm/PyPI attribution generator must not overwrite this file or
    [NOTICE.md](NOTICE.md); it cannot see Unity packages, assets or weights.
    [CREDITS.md](CREDITS.md) is still its output and credits only the npm and
@@ -333,3 +343,11 @@ removed because it was unused and broke the APK build.
    Neither the font file nor the package's notice file names a licence. It
    reaches us under the Unity Companion License as part of the package. Ask
    Unity to confirm the font's terms before a commercial release.
+9. CV-server torch: torch 2.5.1 is the last release with CUDA 12.1 wheels, and
+   it is why `transformers` stops at 5.17.0. It has published advisories of its
+   own (19 CVEs on OSV, 13 November 2026, including CVE-2025-32434 in
+   `torch.load` with `weights_only=True`; the server loads only checkpoints
+   pinned by SHA-256). torch 2.13.0 and later have none; moving needs a newer
+   CUDA base image and new builds of GroundingDINO's and SAM 2's CUDA
+   extensions. `flash-attn` is unused since Florence-2 moved to transformers'
+   own implementation and can go with that change.
