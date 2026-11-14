@@ -1,6 +1,6 @@
 import os
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -32,11 +32,26 @@ class Settings(BaseSettings):
     # which covers florence-community/Florence-2-large and -base; other ids need one.
     florence_model_revision: str = os.getenv("FLORENCE_MODEL_REVISION", "")
     gltf_upload_dir: str = os.getenv("GLTF_UPLOAD_DIR", "uploads/gltf")
+    # Days to keep glTF uploads. A positive value deletes uploads older than that, at
+    # startup and then hourly (app/gltf_store.py). 0 or unset, the default, keeps them
+    # until DELETE /v1/gltf/{id}: how long to keep scans is the owner's decision.
+    gltf_upload_retention_days: int = Field(
+        default=0, ge=0, validation_alias="GLTF_UPLOAD_RETENTION_DAYS"
+    )
     # Largest HTTP request body accepted, in bytes (base64 images, glTF uploads); 413 above it.
     max_request_bytes: int = int(os.getenv("CV_SERVER_MAX_REQUEST_BYTES", str(32 * 1024 * 1024)))
     load_all_models: bool = os.getenv("CV_SERVER_LOAD_ALL", "true").lower() == "true"
     default_box_threshold: float = float(os.getenv("BOX_THRESHOLD", "0.35"))
     default_text_threshold: float = float(os.getenv("TEXT_THRESHOLD", "0.25"))
+
+    @field_validator("gltf_upload_retention_days", mode="before")
+    @classmethod
+    def _blank_retention_keeps_uploads(cls, value: object) -> object:
+        # docker compose passes a variable that is set but empty as "".
+        if isinstance(value, str):
+            value = value.strip()
+            return value or 0
+        return value
 
 
 settings = Settings()
