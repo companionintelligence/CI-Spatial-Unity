@@ -153,8 +153,20 @@ BUSY...          ← shown during capture
 | SpatialLabel3D | – | ✓ |
 | Both | ✓ | ✓ |
 
-3D spatial labels **persist** across captures by default. The pin manager can
-optionally prune stale pins and merge updates by track ID to reduce clutter.
+Each pin is a dot on the detected object with its 3D label floating just
+above it, turned to face you. Pins and labels **persist** across captures: a
+pin stays where it was placed until a newer detection of the same object
+updates it (the same track ID, the same Space Setup anchor, or the same label
+within 15 cm). Nothing in the app clears pins, so they last until the app is
+closed. Pruning pins by age (`SpatialPinManager.enablePinLifecycle`) is
+optional and off.
+
+The modes only show or hide: boxes are still drawn and pins still placed while
+they are hidden, and capture and every button keep working in all three modes.
+
+Pins, and so labels, come from GDino and SAM2 detections and from Space Setup.
+The Florence preset captions the snapshot and lists its objects but places no
+pins.
 
 ### Preview Distance
 

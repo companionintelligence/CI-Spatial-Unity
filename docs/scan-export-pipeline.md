@@ -66,10 +66,13 @@ see [`web/README.md`](../web/README.md).
 - Capture metadata is now stored per frame (pose + intrinsics).
 - Per-capture IDs are attached to pins and exported in glTF extras.
 - Placement confidence now combines model score and raycast hit quality.
-- Pin de-duplication merges nearby pins with the same semantic label.
+- Pin de-duplication merges nearby pins with the same semantic label (for `OTHER`,
+  the same detector label).
 - Semantic plane hits (floor, wall, table) are preferred when available.
 - Pins carry capture session/frame IDs and per-label track IDs.
-- Pin lifecycle prunes stale pins and merges updates by track ID.
+- A newer pin of the same object (track ID, Space Setup anchor, or the same label
+  nearby) updates its pin. Nothing in the app clears pins, so they last until
+  the app is closed. Pruning by age is optional and off.
 
 ## Remaining Improvements
 

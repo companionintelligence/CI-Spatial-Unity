@@ -98,8 +98,9 @@ namespace CompanionScan.Mapping
         private bool _isBusy;
         private Texture2D _frameTexture;
         private CaptureFrame _lastCaptureFrame;
-        private readonly Dictionary<string, Vector3> _smoothedPositions = new Dictionary<string, Vector3>();
+        private readonly Dictionary<int, Vector3> _smoothedPositions = new Dictionary<int, Vector3>();
         private readonly Dictionary<string, List<TrackState>> _tracksByLabel = new Dictionary<string, List<TrackState>>();
+        private int _trackPass;
         private string _captureSessionId;
         private int _captureFrameIndex;
         private int _nextTrackId = 1;
@@ -112,6 +113,7 @@ namespace CompanionScan.Mapping
             public int id;
             public Vector3 position;
             public double timestamp;
+            public int pass;
         }
 
         /// <summary>Last caption produced by Florence2.</summary>
@@ -182,6 +184,13 @@ namespace CompanionScan.Mapping
         {
             _client = new CVServerClient(serverConfig);
             _captureSessionId = Guid.NewGuid().ToString("N");
+
+            // Every pin gets a 3D label, Space Setup and vision server pins alike: the label
+            // renderer follows the pin manager. Connect them if the scene did not.
+            if (labelRenderer != null && pinManager != null && labelRenderer.PinManager == null)
+            {
+                labelRenderer.Follow(pinManager);
+            }
 #if UNITY_ANDROID
             if (preferArCameraOnQuest)
             {
@@ -261,10 +270,18 @@ namespace CompanionScan.Mapping
             {
                 Debug.Log("[Pipeline] â•â•â• CaptureAll: running both pipelines â•â•â•");
 
-                // Meta Scene (fast, local, no network)
+                // Meta Scene (fast, local, no network). A failed Space Setup read must not stop
+                // the capture the user asked for.
                 if (runMetaSceneCapture)
                 {
-                    await RunMetaSceneCaptureAsync();
+                    try
+                    {
+                        await RunMetaSceneCaptureAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[Pipeline-Meta] Reading Space Setup failed: {ex.Message}");
+                    }
                 }
 
                 // CV Server (network)
@@ -522,20 +539,13 @@ namespace CompanionScan.Mapping
             }
 
             // â”€â”€ 3D label rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // The label renderer follows the pin manager, so each pin added above already has its
+            // one label. (Re-rendering every pin here put another copy of each label in the room
+            // after every capture, and those copies did not move with their pins.)
             if (labelRenderer != null && pinManager != null)
             {
-                var positions = new List<Vector3>();
-                var labels = new List<string>();
-                foreach (var pin in pinManager.CvPins)
-                {
-                    positions.Add(pin.position);
-                    labels.Add(pin.label);
-                }
-                if (positions.Count > 0)
-                {
-                    labelRenderer.RenderLabels(positions, labels);
-                    Debug.Log($"[Pipeline-CV] Rendered {positions.Count} 3D labels.");
-                }
+                Debug.Log($"[Pipeline-CV] {pinManager.CvPins.Count} vision server pins, " +
+                          $"{labelRenderer.PinLabelCount} 3D labels in the room.");
             }
 
             Debug.Log("[Pipeline-CV] CV pipeline complete.");
@@ -664,6 +674,7 @@ namespace CompanionScan.Mapping
             int imgW = capture != null ? capture.imageWidth : (_frameTexture != null ? _frameTexture.width : 0);
             int imgH = capture != null ? capture.imageHeight : (_frameTexture != null ? _frameTexture.height : 0);
             int added = 0;
+            int pass = ++_trackPass;
 
             foreach (var ann in segmentation.annotations)
             {
@@ -685,10 +696,10 @@ namespace CompanionScan.Mapping
                     hitNormal = Vector3.up;
 
                 string semantic = SemanticLabelMapper.MapToMetaLabel(ann.label);
-                var position = ApplySmoothing(semantic, hitPoint);
+                int trackId = AssignTrackId(TrackKey(ann.label, semantic), hitPoint,
+                    capture?.timestamp ?? Time.timeAsDouble, pass);
+                var position = ApplySmoothing(trackId, hitPoint);
                 float confidence = ComputePlacementConfidence(ann.score, hitType);
-
-                int trackId = AssignTrackId(semantic, position, capture?.timestamp ?? Time.timeAsDouble);
                 var pin = new SpatialPin
                 {
                     label = ann.label,
@@ -725,6 +736,7 @@ namespace CompanionScan.Mapping
 
             int count = Mathf.Min(detection.bboxes.Count, detection.labels.Count);
             int added = 0;
+            int pass = ++_trackPass;
 
             for (int i = 0; i < count; i++)
             {
@@ -754,10 +766,10 @@ namespace CompanionScan.Mapping
                 }
 
                 string semantic = SemanticLabelMapper.MapToMetaLabel(detection.labels[i]);
-                var position = ApplySmoothing(semantic, hitPoint);
+                int trackId = AssignTrackId(TrackKey(detection.labels[i], semantic), hitPoint,
+                    capture?.timestamp ?? Time.timeAsDouble, pass);
+                var position = ApplySmoothing(trackId, hitPoint);
                 float confidence = ComputePlacementConfidence(score, hitType);
-
-                int trackId = AssignTrackId(semantic, position, capture?.timestamp ?? Time.timeAsDouble);
                 var pin = new SpatialPin
                 {
                     label = detection.labels[i],
@@ -836,22 +848,33 @@ namespace CompanionScan.Mapping
             return viewportFallback;
         }
 
-        private Vector3 ApplySmoothing(string semanticLabel, Vector3 position)
+        // Smooths along one object's track. Smoothing by label alone pulled each detection toward the
+        // last one with that label, so a chair, a cup and a book (all "OTHER") landed between each other.
+        private Vector3 ApplySmoothing(int trackId, Vector3 position)
         {
-            if (!enableTemporalSmoothing || string.IsNullOrWhiteSpace(semanticLabel))
+            if (!enableTemporalSmoothing || trackId == 0)
             {
                 return position;
             }
 
-            if (_smoothedPositions.TryGetValue(semanticLabel, out var previous))
+            if (_smoothedPositions.TryGetValue(trackId, out var previous))
             {
                 var smoothed = Vector3.Lerp(previous, position, smoothingAlpha);
-                _smoothedPositions[semanticLabel] = smoothed;
+                _smoothedPositions[trackId] = smoothed;
                 return smoothed;
             }
 
-            _smoothedPositions[semanticLabel] = position;
+            _smoothedPositions[trackId] = position;
             return position;
+        }
+
+        // Tracks group detections by Meta label; "OTHER" covers every unmapped class, so those
+        // are grouped by their own label instead.
+        private static string TrackKey(string rawLabel, string semanticLabel)
+        {
+            return string.Equals(semanticLabel, "OTHER", StringComparison.OrdinalIgnoreCase)
+                ? "OTHER:" + (rawLabel ?? string.Empty).Trim().ToLowerInvariant()
+                : semanticLabel;
         }
 
         private static float ComputePlacementConfidence(float modelScore, RaycastHitType hitType)
@@ -868,25 +891,39 @@ namespace CompanionScan.Mapping
             return Mathf.Clamp01(modelScore * weight);
         }
 
-        private int AssignTrackId(string semanticLabel, Vector3 position, double timestamp)
+        private int AssignTrackId(string trackKey, Vector3 position, double timestamp, int pass)
         {
-            if (string.IsNullOrWhiteSpace(semanticLabel))
+            if (string.IsNullOrWhiteSpace(trackKey))
             {
                 return 0;
             }
 
-            if (!_tracksByLabel.TryGetValue(semanticLabel, out var tracks))
+            if (!_tracksByLabel.TryGetValue(trackKey, out var tracks))
             {
                 tracks = new List<TrackState>();
-                _tracksByLabel[semanticLabel] = tracks;
+                _tracksByLabel[trackKey] = tracks;
             }
 
-            tracks.RemoveAll(t => (timestamp - t.timestamp) > trackMaxAgeSeconds);
+            tracks.RemoveAll(t =>
+            {
+                bool expired = (timestamp - t.timestamp) > trackMaxAgeSeconds;
+                if (expired)
+                {
+                    _smoothedPositions.Remove(t.id);
+                }
+                return expired;
+            });
 
             TrackState best = null;
             float bestDist = float.MaxValue;
             foreach (var track in tracks)
             {
+                // Two detections in one capture are two objects: they never share a track.
+                if (track.pass == pass)
+                {
+                    continue;
+                }
+
                 float dist = Vector3.Distance(track.position, position);
                 if (dist < bestDist)
                 {
@@ -899,6 +936,7 @@ namespace CompanionScan.Mapping
             {
                 best.position = position;
                 best.timestamp = timestamp;
+                best.pass = pass;
                 return best.id;
             }
 
@@ -906,7 +944,8 @@ namespace CompanionScan.Mapping
             {
                 id = _nextTrackId++,
                 position = position,
-                timestamp = timestamp
+                timestamp = timestamp,
+                pass = pass
             };
             tracks.Add(created);
             return created.id;

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CompanionScan.Mapping;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
+using UnityGLTF;
 
 namespace CompanionScan.Export
 {
@@ -64,7 +65,15 @@ namespace CompanionScan.Export
             MetaSceneSnapshot metaSnapshot = null;
             if (captureMeta && metaSceneCollector != null)
             {
-                metaSnapshot = await metaSceneCollector.CaptureSnapshotAsync();
+                // A failed Space Setup read leaves that part out; it does not stop the export.
+                try
+                {
+                    metaSnapshot = await metaSceneCollector.CaptureSnapshotAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[Export] Reading Space Setup failed, so the export has no fresh scene data: {ex.Message}");
+                }
             }
 
             var spaceId = ResolveSpaceId(metaSnapshot, metaSceneCollector?.LastSnapshot);
@@ -82,10 +91,19 @@ namespace CompanionScan.Export
 
             if (!TryExportGltf(root, outputDir, exportName))
             {
-                Debug.LogError("UnityGLTF is not available. Install the UnityGLTF package to export.");
                 if (floorObject != null)
                 {
                     Destroy(floorObject);
+                }
+                if (sceneMeshObjects != null)
+                {
+                    foreach (var meshObject in sceneMeshObjects)
+                    {
+                        if (meshObject != null)
+                        {
+                            Destroy(meshObject);
+                        }
+                    }
                 }
                 return new ExportResult
                 {
@@ -520,30 +538,23 @@ namespace CompanionScan.Export
             return array;
         }
 
-        private bool TryExportGltf(Transform root, string outputDir, string exportName)
+        // UnityGLTF is called directly, not looked up by reflection: UnityGLTF 2.x has no
+        // GLTFSceneExporter(Transform[]) constructor and its SaveGLTFandBin takes four parameters,
+        // so the reflection lookup found neither and no export ever wrote a glTF. A signature
+        // change now fails the build instead.
+        private static bool TryExportGltf(Transform root, string outputDir, string exportName)
         {
-            var exporterType = Type.GetType("UnityGLTF.GLTFSceneExporter, UnityGLTFScripts")
-                               ?? Type.GetType("UnityGLTF.GLTFSceneExporter, UnityGLTF");
-            if (exporterType == null)
+            try
             {
+                var exporter = new GLTFSceneExporter(new[] { root }, new ExportContext());
+                exporter.SaveGLTFandBin(outputDir, exportName);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[Export] Writing the glTF failed: {ex}");
                 return false;
             }
-
-            var ctor = exporterType.GetConstructor(new[] { typeof(Transform[]) });
-            if (ctor == null)
-            {
-                return false;
-            }
-
-            var exporter = ctor.Invoke(new object[] { new[] { root } });
-            var saveMethod = exporterType.GetMethod("SaveGLTFandBin", new[] { typeof(string), typeof(string) });
-            if (saveMethod == null)
-            {
-                return false;
-            }
-
-            saveMethod.Invoke(exporter, new object[] { outputDir, exportName });
-            return true;
         }
     }
 }

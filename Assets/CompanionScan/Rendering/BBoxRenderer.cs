@@ -18,8 +18,50 @@ namespace CompanionScan.Rendering
 
         private GameObject _runtimePrefab;
         private RawImage _runtimeImage;
+        private bool _visible = true;
 
         private readonly List<GameObject> _instances = new List<GameObject>();
+
+        /// <summary>
+        /// Shows or hides the camera preview panel and its boxes. Only the panel's canvas is
+        /// switched off, never this component's GameObject, which in the shipped scene also runs
+        /// capture. Boxes are still drawn while the panel is hidden, so it shows the latest
+        /// capture's boxes when it comes back.
+        /// </summary>
+        public bool Visible
+        {
+            get => _visible;
+            set
+            {
+                _visible = value;
+                ApplyVisibility();
+            }
+        }
+
+        /// <summary>The outermost canvas of the preview panel, once there is one.</summary>
+        public Canvas PreviewCanvas
+        {
+            get
+            {
+                if (container == null)
+                {
+                    return null;
+                }
+
+                // Ordered from the container outwards; the last is the outermost.
+                var canvases = container.GetComponentsInParent<Canvas>(true);
+                return canvases.Length > 0 ? canvases[canvases.Length - 1] : null;
+            }
+        }
+
+        private void ApplyVisibility()
+        {
+            var canvas = PreviewCanvas;
+            if (canvas != null && canvas.enabled != _visible)
+            {
+                canvas.enabled = _visible;
+            }
+        }
 
         public void RenderBoxes(DetectionResult result, Texture sourceTexture)
         {
@@ -56,11 +98,13 @@ namespace CompanionScan.Rendering
                 float y2 = (normalized.y + normalized.height) * containerRect.height;
 
                 var boxObj = Instantiate(bboxPrefab, container);
+                // The runtime template is kept inactive; its copies must not be.
+                boxObj.SetActive(true);
                 var rect = boxObj.GetComponent<RectTransform>();
                 rect.sizeDelta = new Vector2(Mathf.Abs(x2 - x1), Mathf.Abs(y2 - y1));
                 rect.anchoredPosition = new Vector2(x1, containerRect.height - y2);
 
-                var label = boxObj.GetComponentInChildren<TMP_Text>();
+                var label = boxObj.GetComponentInChildren<TMP_Text>(true);
                 if (label != null && i < result.labels.Count)
                 {
                     label.text = result.labels[i];
@@ -107,6 +151,9 @@ namespace CompanionScan.Rendering
                 }
                 bboxPrefab = _runtimePrefab;
             }
+
+            // A panel made while the boxes are hidden starts hidden.
+            ApplyVisibility();
         }
 
         public void SetPreviewTexture(Texture sourceTexture)
@@ -179,19 +226,67 @@ namespace CompanionScan.Rendering
             createdContainer.sizeDelta = new Vector2(width, height);
         }
 
+        // The box drawn when the scene gives no prefab: a faint fill, four solid edges and the label.
+        // The earlier one never showed: its copies stayed inactive, they were placed from the
+        // container's centre instead of its corner, and their outline took the fill's 5% alpha.
         private GameObject BuildRuntimePrefab(Transform parent)
         {
+            const float edge = 6f; // in frame pixels
+            var boxColor = new Color(0.2f, 1f, 0.3f, 0.95f);
+
             var root = new GameObject("BBoxPrefab", typeof(RectTransform));
             root.transform.SetParent(parent, false);
             root.SetActive(false);
 
-            var image = root.AddComponent<Image>();
-            image.color = new Color(0f, 1f, 0f, 0.05f);
-            var outline = root.AddComponent<Outline>();
-            outline.effectColor = new Color(0f, 1f, 0f, 0.9f);
-            outline.effectDistance = new Vector2(2f, -2f);
+            // RenderBoxes places a box by its bottom-left corner, from the container's bottom-left.
+            var rect = root.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = Vector2.zero;
+
+            var fill = root.AddComponent<Image>();
+            fill.color = new Color(boxColor.r, boxColor.g, boxColor.b, 0.08f);
+            fill.raycastTarget = false;
+
+            AddPart(rect, "Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, edge), boxColor);
+            AddPart(rect, "Top", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, edge), boxColor);
+            AddPart(rect, "Left", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(edge, 0f), boxColor);
+            AddPart(rect, "Right", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(edge, 0f), boxColor);
+
+            // The detection's label, just above the box's top-left corner.
+            var labelGo = new GameObject("Label", typeof(RectTransform));
+            labelGo.transform.SetParent(root.transform, false);
+            var labelRect = labelGo.GetComponent<RectTransform>();
+            labelRect.anchorMin = new Vector2(0f, 1f);
+            labelRect.anchorMax = new Vector2(0f, 1f);
+            labelRect.pivot = new Vector2(0f, 0f);
+            labelRect.anchoredPosition = new Vector2(0f, edge);
+            labelRect.sizeDelta = new Vector2(480f, 44f);
+            var label = labelGo.AddComponent<TextMeshProUGUI>();
+            label.fontSize = 36f;
+            label.color = boxColor;
+            label.alignment = TextAlignmentOptions.BottomLeft;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.richText = false; // labels come from the vision server
+            label.raycastTarget = false;
 
             return root;
+        }
+
+        private static void AddPart(RectTransform parent, string name, Vector2 anchorMin, Vector2 anchorMax,
+                                    Vector2 pivot, Vector2 size, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.pivot = pivot;
+            rect.sizeDelta = size;
+            rect.anchoredPosition = Vector2.zero;
+            var image = go.AddComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
         }
 
         public void Clear()

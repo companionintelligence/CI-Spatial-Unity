@@ -48,7 +48,8 @@ For the browser/WebXR implementation, see [`web/README.md`](../web/README.md).
   2) Physics raycast, then
   3) Fallback distance along the camera forward vector.
 - The resulting world-space position becomes the `SpatialPin.position`.
-- `LabelRenderer` spawns a text label or pin prefab at the position.
+- `SpatialPinManager` places a pin prefab at the position, and `LabelRenderer`
+  floats the pin's label just above it.
 
 ### Required Guarantees
 
@@ -62,10 +63,14 @@ For the browser/WebXR implementation, see [`web/README.md`](../web/README.md).
 - CaptureFrame stores image bytes, size, pose, and intrinsics for each capture.
 - Intrinsics-based rays are used for bbox centers when available.
 - Placement confidence combines model score with raycast hit type.
-- Pins are smoothed and de-duplicated by semantic label.
+- Pins are smoothed along each object's track and de-duplicated by semantic label;
+  classes without a Meta label (`OTHER`) keep their own detector label for both,
+  so a chair and a cup are never averaged into one pin.
 - Pins prefer semantic plane intersections (floor, wall, table) when available.
 - Pins carry capture session/frame IDs plus per-label track IDs.
-- Pin lifecycle prunes stale pins and merges updates by track ID.
+- A newer pin of the same object (track ID, Space Setup anchor, or the same label
+  nearby) updates its pin. Nothing in the app clears pins, so they last until
+  the app is closed. Pruning by age is optional and off.
 
 ### Improvements (Remaining)
 

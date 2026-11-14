@@ -25,6 +25,24 @@ namespace CompanionScan.Mapping
         private List<OVRAnchor> _lastAnchors = new List<OVRAnchor>();
 
         /// <summary>
+        /// The transform that turns Space Setup's tracking-space poses into world space: the one the
+        /// scene sets, else the camera rig's tracking space, else none (poses taken as world poses).
+        /// </summary>
+        private Transform ResolveTrackingSpace()
+        {
+            if (trackingSpace == null)
+            {
+                var rig = FindAnyObjectByType<OVRCameraRig>();
+                if (rig != null && rig.trackingSpace != null)
+                {
+                    trackingSpace = rig.trackingSpace;
+                }
+            }
+
+            return trackingSpace;
+        }
+
+        /// <summary>
         /// Convert every anchor in the last snapshot into a <see cref="SpatialPin"/>
         /// with <c>source = PinSource.MetaScene</c>.  This lets both capture systems
         /// write to a single <see cref="SpatialPinManager"/>.
@@ -124,8 +142,15 @@ namespace CompanionScan.Mapping
                     continue;
                 }
 
-                var worldPosition = pose.ComputeWorldPosition(trackingSpace).GetValueOrDefault();
-                var worldRotation = pose.ComputeWorldRotation(trackingSpace).GetValueOrDefault();
+                // ComputeWorldPosition throws without a tracking space; with none, the poses are
+                // tracking-space poses taken as world poses.
+                var space = ResolveTrackingSpace();
+                var worldPosition = space != null
+                    ? pose.ComputeWorldPosition(space).GetValueOrDefault()
+                    : pose.Position.GetValueOrDefault();
+                var worldRotation = space != null
+                    ? pose.ComputeWorldRotation(space).GetValueOrDefault(Quaternion.identity)
+                    : pose.Rotation.GetValueOrDefault(Quaternion.identity);
 
                 var labelSet = new HashSet<OVRSemanticLabels.Classification>
                 {

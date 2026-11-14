@@ -128,8 +128,13 @@ It also reports raycast status (intrinsics vs pose-only) and fallback hit count
 for the most recent capture.
 Network timeout/retry settings are shown from the active `ServerConfig`.
 
-3D spatial labels **persist** across captures by default, but the
-`SpatialPinManager` can prune stale pins when lifecycle is enabled.
+3D spatial labels **persist** across captures: a pin stays where it was placed
+until a newer pin of the same object updates it. Nothing in the app calls
+`SpatialPinManager.ClearPins`, so pins last until the app is closed.
+`SpatialPinManager` can also prune pins by age (`enablePinLifecycle`), which is
+off by default and in the shipped scene. The display modes only show or hide the
+boxes, pins and labels; they never switch off the object that runs capture, so
+capture and the controls keep running.
 
 ## SpatialPin — Unified Data Type
 
@@ -171,7 +176,11 @@ public class SpatialPin
 ```
 
 `SpatialPinManager` provides filtered views: `.Pins` (all), `.CvPins`, `.MetaScenePins`.
-When lifecycle is enabled, stale pins are removed and updates are merged by `trackId`.
+A newer pin of the same object updates the existing one instead of adding another:
+the same `trackId`, the same Space Setup `anchorUuid` (which replaces the pin), or,
+with deduplication, the same semantic label (for `OTHER`, the same detector label)
+within `dedupDistance`. When lifecycle
+is enabled (off by default), pins older than `pinMaxAgeSeconds` are removed.
 
 ## Key Components
 
@@ -194,7 +203,8 @@ Components in `Assets/CompanionScan/`:
 | `XRControllerInput` | Polls OVRInput and dispatches button presses to `ControllerMenuUI` |
 | `ControllerMenuUI` | State machine: model preset, display mode, preview distance |
 | `ControllerMenuBuilder` | Builds coloured button indicators, wrist HUD, and wires everything at runtime |
-| `LabelRenderer` | 3D label spawning with optional persistence across captures |
+| `LabelRenderer` | Floats one 3D label beside every pin of the `SpatialPinManager`; a label moves with its pin and goes when the pin is cleared |
+| `SpatialLabelView` | The label prefab's text and plate; turns the label to face the viewer |
 | `BBoxRenderer` | 2D bounding-box overlay rendering |
 
 ## Scene Wiring
@@ -220,15 +230,26 @@ Components in `Assets/CompanionScan/`:
    - `ViewportRaycaster`
      - `Target Camera` → main XR camera
    - `SpatialPinManager`
-     - `Pin Prefab` → any world-space label prefab (TextMeshPro supported)
+     - `Pin Prefab` → `Assets/CompanionScan/Prefabs/SpatialPin.prefab` (any world-space
+       prefab works; a TextMeshPro text in it shows the pin's label)
+     - `Pin Root` → an object outside the export root, so pins are not exported as geometry
+   - `LabelRenderer`
+     - `Label Prefab` → `Assets/CompanionScan/Prefabs/SpatialLabel.prefab`
+     - `Label Root` → an object outside the export root
+     - `Pin Manager` → the `SpatialPinManager` (the pipeline connects its own when this is empty)
    - `MetaSceneCollector`
-     - `Tracking Space` → XR tracking origin Transform
+     - `Tracking Space` → the camera rig's `TrackingSpace` (without one it falls back to the
+       `OVRCameraRig`'s, then to taking Space Setup poses as world poses)
    - `SpatialMapExporter`
      - `Export Root` → root object to export
      - `Pin Manager` → the `SpatialPinManager`
      - `Boundary Provider` → the `BoundaryProvider`
      - `Meta Scene Collector` → the `MetaSceneCollector`
-     - `Sync Client` → the `GltfSyncClient`
+     - `Snapshot Store` → the `SnapshotFrameStore` the pipeline uses
+     - `Floor Material`, `Scene Mesh Material` → any material: UnityGLTF leaves out meshes
+       without one
+     - `Sync Client` → the `GltfSyncClient` (the shipped Quest scene has none: its exports
+       stay on the headset)
    - `GltfSyncClient`
      - `Server Config` → same `ServerConfig` ScriptableObject
 4. Add a `ControllerMenuBuilder` component to any GameObject in the scene.
