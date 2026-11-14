@@ -128,11 +128,13 @@ It also reports raycast status (intrinsics vs pose-only) and fallback hit count
 for the most recent capture.
 Network timeout/retry settings are shown from the active `ServerConfig`.
 
-3D spatial labels **persist** across captures: a pin stays until the pins are
-cleared or a newer pin of the same object replaces it. `SpatialPinManager` can
-also prune pins by age (`enablePinLifecycle`), which is off by default and in the
-shipped scene. The display modes only show or hide the boxes, pins and labels;
-they never switch off a GameObject, so capture and the controls keep running.
+3D spatial labels **persist** across captures: a pin stays where it was placed
+until a newer pin of the same object updates it. Nothing in the app calls
+`SpatialPinManager.ClearPins`, so pins last until the app is closed.
+`SpatialPinManager` can also prune pins by age (`enablePinLifecycle`), which is
+off by default and in the shipped scene. The display modes only show or hide the
+boxes, pins and labels; they never switch off the object that runs capture, so
+capture and the controls keep running.
 
 ## SpatialPin — Unified Data Type
 

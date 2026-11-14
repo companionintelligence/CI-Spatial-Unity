@@ -155,10 +155,11 @@ BUSY...          ← shown during capture
 
 Each pin is a dot on the detected object with its 3D label floating just
 above it, turned to face you. Pins and labels **persist** across captures: a
-pin stays where it was placed until the pins are cleared or a newer detection
-of the same object replaces it (the same track ID, the same Space Setup anchor,
-or the same label within 15 cm). Pruning pins by age
-(`SpatialPinManager.enablePinLifecycle`) is optional and off.
+pin stays where it was placed until a newer detection of the same object
+updates it (the same track ID, the same Space Setup anchor, or the same label
+within 15 cm). Nothing in the app clears pins, so they last until the app is
+closed. Pruning pins by age (`SpatialPinManager.enablePinLifecycle`) is
+optional and off.
 
 The modes only show or hide: boxes are still drawn and pins still placed while
 they are hidden, and capture and every button keep working in all three modes.

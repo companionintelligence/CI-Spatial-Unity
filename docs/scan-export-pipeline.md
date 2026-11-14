@@ -71,8 +71,8 @@ see [`web/README.md`](../web/README.md).
 - Semantic plane hits (floor, wall, table) are preferred when available.
 - Pins carry capture session/frame IDs and per-label track IDs.
 - A newer pin of the same object (track ID, Space Setup anchor, or the same label
-  nearby) updates its pin; pins otherwise stay until cleared. Pruning by age is
-  optional and off.
+  nearby) updates its pin. Nothing in the app clears pins, so they last until
+  the app is closed. Pruning by age is optional and off.
 
 ## Remaining Improvements
 
