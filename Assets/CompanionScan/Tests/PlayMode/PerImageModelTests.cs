@@ -246,8 +246,15 @@ namespace CompanionScan.Tests.PlayMode
                     Assert.AreEqual(4, bbox.Length,
                         $"{file} bbox[{i}] should have 4 values");
 
-                    // Bboxes from /v1/detect are absolute pixel coords or normalised
-                    // TryNormalize handles both
+                    // /v1/detect returns [x1, y1, x2, y2] corners as fractions of the
+                    // image size (cv-server/README.md, "Boxes"), never pixels.
+                    for (int j = 0; j < 4; j++)
+                    {
+                        Assert.IsTrue(bbox[j] >= 0f && bbox[j] <= 1f,
+                            $"{file} bbox[{i}] value {bbox[j]} at index {j} should be a fraction in [0,1]");
+                    }
+                    Assert.IsTrue(bbox[0] <= bbox[2] && bbox[1] <= bbox[3],
+                        $"{file} bbox[{i}] should be [x1, y1, x2, y2] with x1 <= x2 and y1 <= y2");
                     Assert.IsTrue(
                         BoundingBoxUtils.TryNormalize(bbox, 1280, 1024, out _),
                         $"{file} bbox[{i}] could not be normalised");

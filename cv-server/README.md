@@ -179,6 +179,33 @@ names and key material out of the repository; `certs/` and `.env` are gitignored
 - `GET /v1/health`
 - `WS /v1/stream`
 
+### Boxes
+
+Every box the API returns has the same format: `bboxes` from `/v1/detect`,
+`/v1/detect/batch` and `/v1/florence`, `bbox` in each `/v1/segment` annotation,
+and the same results on `WS /v1/stream`.
+
+- `[x1, y1, x2, y2]`: the top-left corner, then the bottom-right corner, so
+  `x1 <= x2` and `y1 <= y2`.
+- The origin is the top-left corner of the image; x points right, y points down.
+- Coordinates are fractions of the image size, from 0 to 1: x of the width, y of
+  the height.
+
+```json
+{"bboxes": [[0.15, 0.30, 0.35, 0.70]], "labels": ["shelf"], "scores": [0.81]}
+```
+
+On a 1280x1024 image this shelf spans pixels 192 to 448 across and 307.2 to
+716.8 down: multiply x by the width and y by the height of the image you sent.
+Fractions stay the same when `max_side` makes the server shrink the image.
+`/v1/segment` also returns `image_size`, the `[height, width]` of the image its
+RLE masks cover (the shrunk one when `max_side` applied).
+
+This is the format the Quest app reads (`BoundingBoxUtils.TryNormalize` in
+`Assets/CompanionScan/Core/BoundingBoxUtils.cs`) and the web client in `web/`
+expects. GroundingDINO itself outputs boxes as `(cx, cy, w, h)`, centre and size;
+`app/utils/boxes.py` converts them before they leave the server.
+
 ### glTF Upload
 
 `POST /v1/gltf` accepts multipart form data:
@@ -198,7 +225,8 @@ the full controller button mapping.
 
 ## Optional Request Fields
 
-All image endpoints accept `max_side` to let the client request server-side resizing.
+All image endpoints accept `max_side` to let the client request server-side
+resizing. Boxes are fractions of the image size either way (see [Boxes](#boxes)).
 
 ## Testing
 
@@ -207,6 +235,8 @@ pytest
 ```
 
 The smoke tests skip automatically if model weights are not present.
+`tests/test_box_contract.py` and `tests/test_boxes.py` check the box format with
+stand-in models, so they need neither weights nor a GPU.
 
 ## Load Testing
 
