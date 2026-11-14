@@ -52,6 +52,7 @@ namespace CompanionScan.Tests.PlayMode
 
         private ServerConfig _config;
         private CVServerClient _client;
+        private TestServerConsent _consent;
 
         // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         //  Setup
@@ -74,6 +75,15 @@ namespace CompanionScan.Tests.PlayMode
 
             if (!Directory.Exists(FixturesPath))
                 Assert.Inconclusive($"Fixtures directory missing: {FixturesPath}");
+
+            _consent = TestServerConsent.Grant(_config);
+        }
+
+        [OneTimeTearDown]
+        public void OneTimeTearDown()
+        {
+            _consent?.Dispose();
+            _consent = null;
         }
 
         // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

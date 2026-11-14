@@ -24,6 +24,7 @@ namespace CompanionScan.Tests.PlayMode
 
         private ServerConfig _config;
         private CVServerClient _client;
+        private TestServerConsent _consent;
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
@@ -41,6 +42,14 @@ namespace CompanionScan.Tests.PlayMode
             }
 
             _client = new CVServerClient(_config);
+            _consent = TestServerConsent.Grant(_config);
+        }
+
+        [OneTimeTearDown]
+        public void OneTimeTearDown()
+        {
+            _consent?.Dispose();
+            _consent = null;
         }
 
         // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

@@ -139,12 +139,14 @@ public static class CommandLineBuild
         return Environment.GetCommandLineArgs().Any(arg => string.Equals(arg, name, StringComparison.OrdinalIgnoreCase));
     }
 
+    // Drops spaces too: "Companion Scan" builds CompanionScan.apk, the name the editor menu build
+    // and CI use, and shell commands need no quotes.
     private static string SanitizeFileName(string name)
     {
         foreach (var c in Path.GetInvalidFileNameChars())
         {
             name = name.Replace(c, '_');
         }
-        return name.Trim();
+        return new string(name.Where(c => !char.IsWhiteSpace(c)).ToArray());
     }
 }

@@ -291,9 +291,12 @@ removed because it was unused and broke the APK build.
 
 ## 6. Open items for the owner
 
-1. Ship the notices with each build: an "Open-source licences" screen in the
-   Quest app and a notices file in `web/dist`. Nothing in the builds carries
-   them today.
+1. Ship the notices with each build. The Quest APK carries them: the Android
+   build copies `LICENSE`, `NOTICE.md`, this file and the licence and notice
+   files of the vendored assets and of every resolved package into the APK
+   under `assets/licenses`, and Settings shows them in the headset (Menu,
+   then a trigger). Only `web/dist` still needs them, as a notices file in the
+   bundle.
 2. Meta XR SDK: apps built with it may target only Meta-approved hardware
    and software (licence §1.1). The Voice and Interaction SDKs are gone
    (section 5). The project's code, scenes, prefabs and assets reference only

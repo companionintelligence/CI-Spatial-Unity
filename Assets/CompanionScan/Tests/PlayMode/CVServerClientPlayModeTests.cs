@@ -12,6 +12,15 @@ namespace CompanionScan.Tests.PlayMode
     {
         private const string ServerUrlEnv = "CompanionScan_TEST_SERVER_URL";
 
+        private TestServerConsent _consent;
+
+        [TearDown]
+        public void TearDown()
+        {
+            _consent?.Dispose();
+            _consent = null;
+        }
+
         [UnityTest]
         public IEnumerator DetectEndpoint_ReturnsResponse()
         {
@@ -29,6 +38,7 @@ namespace CompanionScan.Tests.PlayMode
 
             config.baseUrl = serverUrl;
 
+            _consent = TestServerConsent.Grant(config);
             var client = new CVServerClient(config);
             var jpeg = BuildTestJpeg();
 

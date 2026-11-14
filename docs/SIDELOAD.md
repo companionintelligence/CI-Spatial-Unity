@@ -7,7 +7,7 @@ workflow, from a GitHub Release, and from a local Unity build.
 
 | | |
 |---|---|
-| App name in the headset library | `CompanionCapture` |
+| App name in the headset library | `Companion Scan` |
 | Package name | `com.CompanionIntelligence.CompanionCapture` |
 
 Both come from the Android Player Settings in `ProjectSettings/ProjectSettings.asset`.

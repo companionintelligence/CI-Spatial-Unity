@@ -87,7 +87,8 @@ Quest 3 App
   │
   ├─ XR Controller Input (button → action dispatch)
   │
-  └─ glTF export + sync → /v1/gltf
+  └─ glTF export → app storage on the headset
+     (GltfSyncClient upload to /v1/gltf exists but is off)
 
 Local CV Server (Docker)
   - /v1/detect   (GroundingDINO)
@@ -98,15 +99,16 @@ Local CV Server (Docker)
 
 ## Controller Button Mapping
 
-All interaction uses the physical Quest controller buttons — no world-space
-UI panels. Each button has a coloured circle indicator and label attached
-to the controller model at runtime.
+All interaction uses the physical Quest controller buttons. Each button has a
+coloured circle indicator and label attached to the controller model at
+runtime. The settings, the camera notice and the open-source licences are
+world-space panels that the same buttons drive while they are open.
 
 ### Right Controller
 
 | Button | Colour | Action | Details |
 |--------|--------|--------|---------|
-| **A** | Red | **Capture** | Takes a snapshot. Runs both Meta Scene + CV Server pipelines (respects current model preset). 3D labels persist after each capture. |
+| **A** | Red | **Capture** | Takes a snapshot. Runs both Meta Scene + CV Server pipelines (respects current model preset). 3D labels persist after each capture. Before the first snapshot leaves the headset, a notice says what is sent and where; **A** agrees and captures, **B** sends nothing. The agreement is recorded on the headset, for that server only: after the server URL changes, the next capture asks again. |
 | **B** | Blue | **Cycle Model** | Cycles the active AI model preset: Florence → GDino → SAM2 → Florence … |
 
 ### Left Controller
@@ -114,8 +116,8 @@ to the controller model at runtime.
 | Button | Colour | Action | Details |
 |--------|--------|--------|---------|
 | **X** | Yellow | **Preview Distance** | Cycles the raycaster fallback distance: Near (1 m) → Far (3 m) → Off → Near … |
-| **Y** | Green | **Save & Export** | Exports glTF and uploads to the CV server via `GltfSyncClient`. |
-| **Menu** | — | **Server settings** | Opens or closes the CV server settings panel (it also opens on first run). While it is open, **A** edits the server URL, **X** the server's API token (secure keyboard; stored on the headset only, never shown) and **B** saves; the other controls pause. |
+| **Y** | Green | **Save & Export** | Saves a glTF of the room (pins, floor plan, scene data, and the session's snapshots with their camera poses) in the app's storage on the headset (`files/exports`). Nothing is uploaded: the shipped scene has `uploadAfterExport` off and no `GltfSyncClient`. |
+| **Menu** | — | **Settings** | Opens or closes the settings panel (it also opens on first run). Opening it closes the camera notice without agreeing. While it is open, **A** edits the server URL, **X** the server's API token (secure keyboard; stored on the headset only, never shown) and **B** saves; **Y** opens the privacy policy in the browser, a **trigger** shows the open-source licences, and a **grip** withdraws the agreement to send snapshots. The other controls pause. |
 
 ### Either Controller
 
@@ -132,7 +134,7 @@ the current state:
 Model: Florence
 Display: Both
 Preview: Near (1m)
-BUSY…            ← shown during capture
+BUSY...          ← shown during capture
 ```
 
 ### Model Presets
@@ -183,9 +185,13 @@ Use Unity `6000.6.9f1`, the editor version pinned in
 1. **Run the CV server**
    - See [cv-server/README.md](cv-server/README.md) for local Docker setup.
 
-2. **Create a Server Config asset**
-   - Project window → Create → Companion Scan → Server Config.
-   - Set `baseUrl` to your server IP (example: `https://my-server.ts.net`).
+2. **Point the app at your CV server**
+   - On the headset: the settings panel opens on first run (and with the left
+     **Menu** button). Enter the server's HTTPS URL and its API token there.
+   - In the Editor: set the `CompanionScan_SERVER_URL` and
+     `CompanionScan_API_TOKEN` environment variables before starting Unity.
+   - Leave `baseUrl` empty in `Assets/CompanionScan/Resources/ServerConfig.asset`:
+     the app ships with no server address.
 
 3. **Open the Quest scene**
    - `Assets/CompanionScan/Scenes/CompanionCapture.unity`.
@@ -207,7 +213,7 @@ Use Unity `6000.6.9f1`, the editor version pinned in
     - **A** — capture (both pipelines run, 3D labels appear in world space).
     - **B** — switch model if you only want one AI model active.
     - **X** — change preview distance.
-    - **Y** — export and upload glTF.
+    - **Y** — save a glTF export on the headset.
     - **Trigger** — toggle between 2D boxes, 3D labels, or both.
 
 ### Web Client
@@ -237,7 +243,10 @@ instructions, see [web/README.md](web/README.md).
    - Full Meta scene anchor data (labels, planes, volumes, optional meshes)
    - Pin metadata: `capture_id`, `capture_session_id`, `capture_frame_index`,
       `placement_confidence`, `hit_type`, `track_id`
-- Uploads to the local server at `POST /v1/gltf`.
+- Saves the export in the app's storage on the headset. `GltfSyncClient` can
+  upload it to `POST /v1/gltf` (`SpatialMapExporter.uploadAfterExport`), but
+  the shipped Quest scene leaves upload off and has no sync client, so the Quest
+  app uploads nothing. The web client uploads its exports.
 
 ## Testing
 
@@ -393,7 +402,7 @@ To install a build on a headset, see [docs/SIDELOAD.md](docs/SIDELOAD.md).
 ### Release builds from the command line
 
 `CommandLineBuild.BuildAndroidQuest` builds the Quest APK in batch mode
-(`Builds/Android/CompanionCapture.apk`). It reads release signing and version
+(`Builds/Android/CompanionScan.apk`). It reads release signing and version
 settings from the environment only, applies them to that one build and puts
 Player Settings back afterwards, so no keystore path, alias or password ends
 up in `ProjectSettings/ProjectSettings.asset`.
@@ -413,7 +422,7 @@ up in `ProjectSettings/ProjectSettings.asset`.
 - `-release` makes the build fail unless all four are set and `KEYSTORE_PATH`
   points to an existing file. Use it for every build meant for a store or for
   testers who update in place.
-- `-aab` builds an Android App Bundle (`Builds/Android/CompanionCapture.aab`)
+- `-aab` builds an Android App Bundle (`Builds/Android/CompanionScan.aab`)
   instead of an APK, for stores that take bundles (Google Play requires them for
   new apps). Meta Horizon Store uploads and sideloading use the APK.
 - versionCode is `VERSION_CODE` when set, otherwise
