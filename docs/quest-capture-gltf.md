@@ -116,7 +116,7 @@ All interaction uses physical Quest controller buttons via `XRControllerInput`
 | Button | Controller | Colour | Action |
 | --- | --- | --- | --- |
 | **A** | Right | Red | Capture (runs `CaptureAll()` with current model preset) |
-| **B** | Right | Blue | Cycle model: Florence → GDino → SAM2 |
+| **B** | Right | Blue | Cycle model, starting on GDino: GDino → SAM2 → Florence |
 | **X** | Left | Yellow | Cycle preview distance: Near (1 m) → Far (3 m) → Off |
 | **Y** | Left | Green | Save & Export glTF |
 | **Trigger** | Either | Orange | Cycle display: BBox2D → Label3D → Both |
@@ -267,12 +267,18 @@ Components in `Assets/CompanionScan/`:
 
 The CV pipeline uses a multi-stage prompt strategy:
 
-1. **Florence2 caption** (`<MORE_DETAILED_CAPTION>`) — free-form scene description
-2. **Florence2 OD** (`<OD>`) — extracts object labels
-3. **GroundingDINO prompt** — built automatically from Florence2 labels (e.g. `"couch . table . lamp ."`) with a configurable fallback: `"furniture . object ."`
-4. **SAM2 prompt** — built from GroundingDINO labels filtered by score, or Florence labels, or the fallback
+1. **Florence2 caption** (`<MORE_DETAILED_CAPTION>`): free-form scene description
+2. **Florence2 OD** (`<OD>`): extracts object labels
+3. **GroundingDINO prompt**: built automatically from Florence2 labels (e.g. `"couch . table . lamp ."`), or `groundingDinoFallbackPrompt` when Florence has not listed the snapshot's objects. With the GDino preset, which the app starts on, that is every capture.
+4. **SAM2 prompt**: built from GroundingDINO labels filtered by score, or Florence labels, or the same fallback prompt
 
-Each prompt stage feeds the next.  Update `florenceCaptionTask`, `florenceDetectionTask`, and `groundingDinoFallbackPrompt` in the Inspector to customise.
+The fallback prompt lists common room objects, the same list the CI Spatial Companion app uses, so both apps look for the same objects:
+
+```text
+chair . table . sofa . bed . lamp . cup . mug . bottle . bowl . book . laptop . monitor . keyboard . phone . remote control . plant . vase . clock . picture frame . shelf . cabinet . door . window . box . bag . pillow .
+```
+
+In the app each preset runs one model per capture (Florence2, GroundingDINO or SAM2), so GroundingDINO and SAM2 get the fallback prompt. Update `florenceCaptionTask`, `florenceDetectionTask`, and `groundingDinoFallbackPrompt` in the Inspector to customise. A blank `groundingDinoFallbackPrompt` uses the list above (`SpatialCapturePipeline.DefaultGroundingDinoPrompt`).
 
 ## CV Server
 

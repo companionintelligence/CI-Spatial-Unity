@@ -205,6 +205,18 @@ namespace CompanionScan.Tests.Editor
                 "the tracking space is not the camera rig's");
         }
 
+        // Capture
+
+        [Test]
+        public void Pipeline_AsksGroundingDinoForCommonRoomObjects()
+        {
+            // The app starts on the GDino preset, where Florence lists nothing, so every capture sends
+            // this prompt. The scene held "furniture . object .", so every pin was furniture or object.
+            var pipeline = new SerializedObject(Single<SpatialCapturePipeline>());
+            Assert.AreEqual(SpatialCapturePipeline.DefaultGroundingDinoPrompt,
+                pipeline.FindProperty("groundingDinoFallbackPrompt").stringValue);
+        }
+
         // Export
 
         [Test]

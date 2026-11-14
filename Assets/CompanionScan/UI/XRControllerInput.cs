@@ -9,7 +9,7 @@ namespace CompanionScan.UI
     ///
     /// Button mapping (right controller):
     ///   A  (Button.One)   -> Capture snapshot
-    ///   B  (Button.Two)   -> Cycle active model (Florence -> GDino -> SAM2)
+    ///   B  (Button.Two)   -> Cycle active model (GDino -> SAM2 -> Florence; starts on GDino)
     /// Left controller:
     ///   X  (Button.Three) -> Cycle preview distance (Near -> Far -> Off)
     ///   Y  (Button.Four)  -> Save & Export GLTF

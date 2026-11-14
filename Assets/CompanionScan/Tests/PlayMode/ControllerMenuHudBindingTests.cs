@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using CompanionScan.Core;
 using CompanionScan.Mapping;
 using CompanionScan.UI;
 using NUnit.Framework;
@@ -25,15 +26,67 @@ namespace CompanionScan.Tests.PlayMode
             var menuGo = new GameObject("MenuUI");
             var menu = menuGo.AddComponent<ControllerMenuUI>();
 
-            menu.CycleModel();
-
             var modelLabel = GameObject.Find("ModelLabel");
             Assert.IsNotNull(modelLabel, "Expected HUD model label to be found.");
-            var textValue = ReadTmpText(modelLabel);
-            Assert.AreEqual("Model: DINO", textValue);
+            Assert.AreEqual("Model: DINO", ReadTmpText(modelLabel), "the menu starts on GDino");
+
+            menu.CycleModel();
+            Assert.AreEqual("Model: SAM2", ReadTmpText(modelLabel));
 
             Object.DestroyImmediate(menuGo);
             Object.DestroyImmediate(hudRoot);
+        }
+
+        [Test]
+        public void TheWristHud_ShowsDino_FromTheStart()
+        {
+            // As in the shipped scene: the menu is enabled before ControllerMenuBuilder makes the wrist
+            // HUD in its Start. The HUD showed the builder's "Model: All" until B, X or a trigger was
+            // pressed.
+            // Inactive, so the pipeline sets up no camera. Its server config has no URL, as on a first run.
+            var config = ScriptableObject.CreateInstance<ServerConfig>();
+            var pipelineGo = new GameObject("Pipeline");
+            pipelineGo.SetActive(false);
+            var pipeline = pipelineGo.AddComponent<SpatialCapturePipeline>();
+
+            var go = new GameObject("ControllerUI");
+            go.SetActive(false);
+            var menu = go.AddComponent<ControllerMenuUI>();
+            var builder = go.AddComponent<ControllerMenuBuilder>();
+
+            try
+            {
+                SetPrivateField(pipeline, "serverConfig", config);
+                SetPrivateField(menu, "pipeline", pipeline);
+                go.SetActive(true);
+
+                SetPrivateField(builder, "_menuUI", menu);
+                var buildHud = typeof(ControllerMenuBuilder).GetMethod("BuildHUD",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(buildHud, "ControllerMenuBuilder.BuildHUD not found");
+                buildHud.Invoke(builder, null);
+
+                var modelLabel = FindChild(go, "ModelLabel");
+                Assert.IsNotNull(modelLabel, "the builder made no model label");
+                Assert.AreEqual("Model: DINO", ReadTmpText(modelLabel));
+
+                // The status line keeps the builder's placeholder. Nothing updates it when Settings
+                // saves the server URL or a capture ends, so filled in here it read "Server: not set
+                // (Menu)" on a first run and kept saying so after the URL was saved.
+                var statusLabel = FindChild(go, "StatusLabel");
+                Assert.IsNotNull(statusLabel, "the builder made no status label");
+                Assert.AreEqual("Raycast: --", ReadTmpText(statusLabel));
+
+                // A button still fills it in, as before.
+                menu.CyclePreviewDistance();
+                StringAssert.StartsWith("Raycast: PoseOnly | Fallback: 0 | ", ReadTmpText(statusLabel));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+                Object.DestroyImmediate(pipelineGo);
+                Object.DestroyImmediate(config);
+            }
         }
 
         [UnityTest]
@@ -81,6 +134,19 @@ namespace CompanionScan.Tests.PlayMode
             var field = target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.IsNotNull(field, $"{target.GetType().Name}.{name} not found");
             field.SetValue(target, value);
+        }
+
+        private static GameObject FindChild(GameObject root, string name)
+        {
+            foreach (var child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == name)
+                {
+                    return child.gameObject;
+                }
+            }
+
+            return null;
         }
 
         private static Component CreateLabel(Transform parent, string name)

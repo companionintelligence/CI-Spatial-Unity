@@ -61,9 +61,22 @@ namespace CompanionScan.Mapping
         [SerializeField] private float minScore = 0.3f;
         [SerializeField] private int maxPinsPerCapture = 20;
 
+        /// <summary>
+        /// The GroundingDINO prompt used whenever Florence has not listed the snapshot's objects:
+        /// common room objects, the same list the CI Spatial Companion app uses, so both apps look
+        /// for the same objects.
+        /// </summary>
+        public const string DefaultGroundingDinoPrompt =
+            "chair . table . sofa . bed . lamp . cup . mug . bottle . bowl . book . laptop . monitor . " +
+            "keyboard . phone . remote control . plant . vase . clock . picture frame . shelf . cabinet . " +
+            "door . window . box . bag . pillow .";
+
         [Header("Prompts")]
         [FormerlySerializedAs("detectionPrompt")]
-        [SerializeField] private string groundingDinoFallbackPrompt = "furniture . object .";
+        [Tooltip("The GroundingDINO prompt whenever Florence has not listed the snapshot's objects " +
+                 "(with the GDino preset, every capture), and SAM2's last fallback. " +
+                 "Blank uses the default list of common room objects.")]
+        [SerializeField] private string groundingDinoFallbackPrompt = DefaultGroundingDinoPrompt;
         [FormerlySerializedAs("segmentationPrompt")]
         [SerializeField] private string florenceDetectionTask = "<OD>";
         [FormerlySerializedAs("captionTask")]
@@ -131,6 +144,16 @@ namespace CompanionScan.Mapping
         public bool LastCaptureHadIntrinsics => _lastCaptureHadIntrinsics;
         public int LastFallbackHitCount => _lastFallbackHits;
         public ServerConfig ServerConfig => serverConfig;
+
+        /// <summary>
+        /// What GroundingDINO is asked to find when Florence has not listed the snapshot's objects
+        /// (with the GDino preset, every capture), and SAM2's last fallback: the prompt field, or
+        /// <see cref="DefaultGroundingDinoPrompt"/> when the field is blank.
+        /// </summary>
+        public string GroundingDinoFallbackPrompt =>
+            string.IsNullOrWhiteSpace(groundingDinoFallbackPrompt)
+                ? DefaultGroundingDinoPrompt
+                : groundingDinoFallbackPrompt.Trim();
 
         public bool IsBusy => _isBusy;
 
@@ -585,7 +608,7 @@ namespace CompanionScan.Mapping
             {
                 return string.Join(" . ", florenceLabels) + " .";
             }
-            return groundingDinoFallbackPrompt;
+            return GroundingDinoFallbackPrompt;
         }
 
         /// <summary>
@@ -613,7 +636,7 @@ namespace CompanionScan.Mapping
                 return string.Join(" . ", florenceLabels) + " .";
             }
 
-            return groundingDinoFallbackPrompt;
+            return GroundingDinoFallbackPrompt;
         }
 
         private void EnsureFrameTexture(byte[] jpegBytes)
