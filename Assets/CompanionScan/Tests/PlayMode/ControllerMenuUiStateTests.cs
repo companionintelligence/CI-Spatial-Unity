@@ -19,23 +19,64 @@ namespace CompanionScan.Tests.PlayMode
             var menu = menuGo.AddComponent<ControllerMenuUI>();
             SetPrivateField(menu, "pipeline", pipeline);
 
+            // The menu starts on GDino, so B goes GDino -> SAM2 -> Florence -> GDino.
             menu.CycleModel();
-            Assert.IsFalse(pipeline.RunFlorence);
-            Assert.IsTrue(pipeline.RunGroundingDino);
-            Assert.IsFalse(pipeline.RunSam2);
-
-            menu.CycleModel();
+            Assert.AreEqual(ControllerMenuUI.ModelPreset.SAM2, menu.ActiveModel);
             Assert.IsFalse(pipeline.RunFlorence);
             Assert.IsFalse(pipeline.RunGroundingDino);
             Assert.IsTrue(pipeline.RunSam2);
 
             menu.CycleModel();
+            Assert.AreEqual(ControllerMenuUI.ModelPreset.Florence, menu.ActiveModel);
             Assert.IsTrue(pipeline.RunFlorence);
             Assert.IsFalse(pipeline.RunGroundingDino);
             Assert.IsFalse(pipeline.RunSam2);
 
+            menu.CycleModel();
+            Assert.AreEqual(ControllerMenuUI.ModelPreset.GDino, menu.ActiveModel);
+            Assert.IsFalse(pipeline.RunFlorence);
+            Assert.IsTrue(pipeline.RunGroundingDino);
+            Assert.IsFalse(pipeline.RunSam2);
+
             Object.DestroyImmediate(menuGo);
             Object.DestroyImmediate(pipelineGo);
+        }
+
+        [Test]
+        public void TheMenu_StartsOnGDino_AndAppliesItOnEnableAndBeforeACapture()
+        {
+            // GDino places vision server pins; the Florence preset the app used to start on places none.
+            // Inactive, so the pipeline sets up no camera: the menu only switches its steps.
+            var pipelineGo = new GameObject("Pipeline");
+            pipelineGo.SetActive(false);
+            var pipeline = pipelineGo.AddComponent<SpatialCapturePipeline>();
+
+            var menuGo = new GameObject("MenuUI");
+            menuGo.SetActive(false);
+            var menu = menuGo.AddComponent<ControllerMenuUI>();
+            SetPrivateField(menu, "pipeline", pipeline);
+
+            try
+            {
+                Assert.AreEqual(ControllerMenuUI.ModelPreset.GDino, menu.ActiveModel);
+
+                // The pipeline's own defaults run every step until the menu applies its preset.
+                menuGo.SetActive(true);
+                AssertRunsGroundingDinoOnly(pipeline);
+
+                // A capture applies the preset again before it starts.
+                pipeline.RunFlorence = true;
+                pipeline.RunGroundingDino = false;
+                pipeline.RunSam2 = true;
+                menu.DoCapture();
+                AssertRunsGroundingDinoOnly(pipeline);
+                Assert.AreEqual(ControllerMenuUI.ModelPreset.GDino, menu.ActiveModel);
+            }
+            finally
+            {
+                Object.DestroyImmediate(menuGo);
+                Object.DestroyImmediate(pipelineGo);
+            }
         }
 
         [Test]
@@ -160,6 +201,13 @@ namespace CompanionScan.Tests.PlayMode
             Object.DestroyImmediate(bbox.PreviewCanvas.gameObject);
             Object.DestroyImmediate(bboxGo);
             Object.DestroyImmediate(frame);
+        }
+
+        private static void AssertRunsGroundingDinoOnly(SpatialCapturePipeline pipeline)
+        {
+            Assert.IsFalse(pipeline.RunFlorence, "Florence runs");
+            Assert.IsTrue(pipeline.RunGroundingDino, "GroundingDINO does not run");
+            Assert.IsFalse(pipeline.RunSam2, "SAM2 runs");
         }
 
         private static void AssertCaptureKeepsRunning(GameObject captureGo, SpatialCapturePipeline pipeline, ControllerMenuUI menu)

@@ -1806,7 +1806,7 @@ MonoBehaviour:
   snapshotDistance: 1
   minScore: 0.3
   maxPinsPerCapture: 20
-  groundingDinoFallbackPrompt: furniture . object .
+  groundingDinoFallbackPrompt: chair . table . sofa . bed . lamp . cup . mug . bottle . bowl . book . laptop . monitor . keyboard . phone . remote control . plant . vase . clock . picture frame . shelf . cabinet . door . window . box . bag . pillow .
   florenceDetectionTask: <OD>
   florenceCaptionTask: <MORE_DETAILED_CAPTION>
   bboxRenderer: {fileID: 319536159}

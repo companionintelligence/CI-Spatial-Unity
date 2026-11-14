@@ -291,6 +291,12 @@ namespace CompanionScan.UI
             SetField(_menuUI, "previewDistanceLabel", previewLbl);
             SetField(_menuUI, "statusLabel",          statusLbl);
             SetField(_menuUI, "busyLabel",            busyLbl);
+
+            // The menu was enabled before this HUD existed: show its model, display and preview now
+            // instead of the placeholders above, so the wrist names the preset the app starts on
+            // (Model: DINO). The status line keeps "Raycast: --" until a button refreshes the HUD:
+            // nothing updates it when Settings saves the server URL or a capture ends.
+            _menuUI.RefreshHUD(includeStatus: false);
         }
 
         private TMP_Text MakeLabel(Transform parent, string name, string text,

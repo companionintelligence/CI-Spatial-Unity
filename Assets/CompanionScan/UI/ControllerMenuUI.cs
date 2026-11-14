@@ -67,7 +67,8 @@ namespace CompanionScan.UI
         //  State
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-        private ModelPreset _activeModel = ModelPreset.Florence;
+        // The app starts on GDino, which places vision server pins (the Florence preset places none).
+        private ModelPreset _activeModel = ModelPreset.GDino;
         private AnchorDisplayMode _displayMode = AnchorDisplayMode.Both;
         private PreviewDistance _previewDist = PreviewDistance.Near;
 
@@ -273,7 +274,17 @@ namespace CompanionScan.UI
         //  HUD refresh
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-        private void RefreshHUD()
+        /// <summary>
+        /// Shows the current model, display mode, preview distance and status on the wrist HUD.
+        /// <see cref="ControllerMenuBuilder"/> calls it once it has made the HUD, after this menu
+        /// was enabled, without the status line.
+        /// </summary>
+        /// <param name="includeStatus">
+        /// False leaves the status line (raycast, fallback and server) as it is. Nothing updates
+        /// that line when Settings saves a server URL or a capture ends, so filled in at the start
+        /// it read "Server: not set (Menu)" on a first run and kept saying so after the URL was saved.
+        /// </param>
+        public void RefreshHUD(bool includeStatus = true)
         {
             EnsureHudLabels();
             if (modelLabel != null)
@@ -309,7 +320,7 @@ namespace CompanionScan.UI
                 };
             }
 
-            if (statusLabel != null && pipeline != null)
+            if (includeStatus && statusLabel != null && pipeline != null)
             {
                 string intrinsics = pipeline.LastCaptureHadIntrinsics ? "Intrinsics" : "PoseOnly";
                 string fallback = pipeline.LastFallbackHitCount > 0
