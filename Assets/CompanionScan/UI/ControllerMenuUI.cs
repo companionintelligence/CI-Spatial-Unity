@@ -248,22 +248,17 @@ namespace CompanionScan.UI
             bool show3D = _displayMode is AnchorDisplayMode.SpatialLabel3D
                        or AnchorDisplayMode.Both;
 
-            if (bboxRenderer != null) bboxRenderer.gameObject.SetActive(show2D);
-            if (labelRenderer != null) labelRenderer.gameObject.SetActive(show3D);
+            // Show and hide what each mode draws; never switch off a renderer's GameObject. In the
+            // shipped scene the renderers share one object with the capture pipeline, the camera,
+            // the exporter and (as a child) the controller input, so switching it off for the boxes
+            // mode stopped capture and every button, the trigger that would switch it back included.
+            // Boxes are still drawn while hidden, so the preview's boxes always match its frame.
+            var labels = labelRenderer != null ? labelRenderer : pipeline != null ? pipeline.LabelRenderer : null;
+            var pins = pinManager != null ? pinManager : pipeline != null ? pipeline.PinManager : null;
 
-            // Also control spatial pin visibility from SpatialPinManager
-            var pm = pinManager != null ? pinManager : pipeline?.PinManager;
-            if (pm != null && pm.transform != null)
-            {
-                // The pinRoot may be a child or the manager itself
-                pm.gameObject.SetActive(show3D);
-            }
-
-            if (pipeline != null)
-            {
-                pipeline.RenderBoxes = show2D;
-                pipeline.RenderMasks = show2D || show3D;
-            }
+            if (bboxRenderer != null) bboxRenderer.Visible = show2D;
+            if (labels != null) labels.Visible = show3D;
+            if (pins != null) pins.PinsVisible = show3D;
         }
 
         private void ApplyPreviewDistance()
