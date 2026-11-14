@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Stub docker for test-check-quest-package.sh. "docker image ls" lists one Unity Android image.
+# "docker run" runs the command on this machine instead of in that image: an argument under the
+# container path of a -v mount becomes the host path, and the inspect script looks for the
+# Android tools under $STUB_ROOT/opt instead of /opt.
+set -euo pipefail
+
+case "${1:-}" in
+  image)
+    echo "unityci/editor:ubuntu-${UNITY_VERSION}-android-3"
+    ;;
+  run)
+    shift
+    mounts=() # container path, host path, ...
+    while [[ "$1" == -* ]]; do
+      case "$1" in
+        -v)
+          spec="${2%:ro}"
+          mounts+=("${spec##*:}" "${spec%:*}")
+          shift 2
+          ;;
+        --entrypoint) shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    shift # the image
+    to_host() {
+      local i
+      for ((i = 0; i < ${#mounts[@]}; i += 2)); do
+        case "$1" in
+          "${mounts[i]}" | "${mounts[i]}"/*)
+            echo "${mounts[i + 1]}${1#"${mounts[i]}"}"
+            return
+            ;;
+        esac
+      done
+      echo "$1"
+    }
+    script="$(to_host "$1")"
+    shift
+    args=()
+    for arg in "$@"; do args+=("$(to_host "$arg")"); done
+    sed "s#find -L /opt #find -L '$STUB_ROOT/opt' #" "$script" > "$STUB_ROOT/inspect.sh"
+    if ! grep -qF "find -L '$STUB_ROOT/opt' " "$STUB_ROOT/inspect.sh"; then
+      echo "stub docker: the inspect script no longer finds its tools with 'find -L /opt '" >&2
+      exit 2
+    fi
+    exec bash "$STUB_ROOT/inspect.sh" "${args[@]}"
+    ;;
+  *)
+    echo "stub docker: unexpected arguments: $*" >&2
+    exit 2
+    ;;
+esac

@@ -1,0 +1,25 @@
+# What bundletool 1.17.2 prints for "dump manifest --bundle <aab> --xpath <xpath>": one value per
+# line, here as <xpath><tab><value>. An XPath not listed prints an empty line. The values are those
+# of the debug APK in aapt2-badging.txt (its uses-implied-feature is not in the manifest).
+/manifest/@android:versionCode	1000
+/manifest/@android:versionName	0.1.0
+/manifest/uses-sdk/@android:targetSdkVersion	34
+/manifest/@package	com.CompanionIntelligence.CompanionCapture
+/manifest/application/@android:label	@string/app_name
+/manifest/uses-permission/@android:name	com.oculus.permission.USE_ANCHOR_API
+/manifest/uses-permission/@android:name	com.oculus.permission.USE_SCENE
+/manifest/uses-permission/@android:name	horizonos.permission.HEADSET_CAMERA
+/manifest/uses-permission/@android:name	android.permission.CAMERA
+/manifest/uses-permission/@android:name	android.permission.INTERNET
+/manifest/uses-permission/@android:name	com.oculus.permission.USE_PASSTHROUGH_CAMERA
+/manifest/uses-permission/@android:name	com.CompanionIntelligence.CompanionCapture.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+//uses-feature/@android:name	android.hardware.camera
+//uses-feature/@android:name	android.hardware.camera.autofocus
+//uses-feature/@android:name	android.hardware.camera.front
+//uses-feature/@android:name	android.hardware.touchscreen
+//uses-feature/@android:name	android.hardware.touchscreen.multitouch
+//uses-feature/@android:name	android.hardware.touchscreen.multitouch.distinct
+//uses-feature/@android:name	android.hardware.vr.headtracking
+//uses-feature/@android:name	android.hardware.vulkan.version
+//uses-feature/@android:name	com.oculus.feature.PASSTHROUGH
+//uses-feature/@android:name	oculus.software.overlay_keyboard
