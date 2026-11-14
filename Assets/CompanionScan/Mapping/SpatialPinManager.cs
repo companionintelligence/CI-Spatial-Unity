@@ -8,8 +8,15 @@ namespace CompanionScan.Mapping
 {
     /// <summary>
     /// Central store for <see cref="SpatialPin"/>s from both capture systems.
-    /// Spawns a world-space label prefab for each pin.
+    /// Spawns a world-space pin prefab for each pin.
     /// </summary>
+    /// <remarks>
+    /// Pins stay until <see cref="ClearPins()"/> removes them or a newer pin of the same object
+    /// replaces them: the same Space Setup anchor, the same track, or (with deduplication) the same
+    /// label within <c>dedupDistance</c>. Dropping pins by age (<c>enablePinLifecycle</c>) is
+    /// optional and off by default: with it on, every capture removed the pins of earlier captures,
+    /// while labels are documented to persist across captures.
+    /// </remarks>
     public class SpatialPinManager : MonoBehaviour
     {
         [SerializeField] private Transform pinRoot;
@@ -17,18 +24,53 @@ namespace CompanionScan.Mapping
         [SerializeField] private Vector3 pinScale = Vector3.one;
         [SerializeField] private bool enableDeduplication = true;
         [SerializeField] private float dedupDistance = 0.15f;
-        [SerializeField] private bool enablePinLifecycle = true;
+        [Tooltip("Optional: when a pin arrives, drop the pins more than pinMaxAgeSeconds older. Off by default, " +
+                 "so pins stay until they are cleared or replaced by a newer pin of the same object.")]
+        [SerializeField] private bool enablePinLifecycle = false;
         [SerializeField] private float pinMaxAgeSeconds = 6f;
         [SerializeField] private bool preferTrackIds = true;
 
         private readonly List<SpatialPin> _pins = new List<SpatialPin>();
         private readonly List<GameObject> _instances = new List<GameObject>();
+        private bool _pinsVisible = true;
+        private bool _warnedNoPrefab;
+
+        /// <summary>Raised after pins were added, updated, replaced, removed or cleared.</summary>
+        public event Action PinsChanged;
 
         /// <summary>All pins from every source.</summary>
         public IReadOnlyList<SpatialPin> Pins => _pins;
 
+        /// <summary>The object shown for each pin, at the same index as <see cref="Pins"/> (null without a prefab).</summary>
+        public IReadOnlyList<GameObject> PinObjects => _instances;
+
         /// <summary>The root transform under which pin instances are spawned.</summary>
         public Transform PinRoot => pinRoot != null ? pinRoot : transform;
+
+        /// <summary>
+        /// Shows or hides the pin objects. Only those objects are switched, never this component's
+        /// GameObject: in the shipped scene that object also runs capture.
+        /// </summary>
+        public bool PinsVisible
+        {
+            get => _pinsVisible;
+            set
+            {
+                if (_pinsVisible == value)
+                {
+                    return;
+                }
+
+                _pinsVisible = value;
+                for (int i = 0; i < _instances.Count; i++)
+                {
+                    if (_instances[i] != null && _instances[i].activeSelf != value)
+                    {
+                        _instances[i].SetActive(value);
+                    }
+                }
+            }
+        }
 
         /// <summary>Only pins produced by the CV server pipeline.</summary>
         public IReadOnlyList<SpatialPin> CvPins =>
@@ -43,10 +85,11 @@ namespace CompanionScan.Mapping
         {
             for (int i = 0; i < _instances.Count; i++)
             {
-                if (_instances[i] != null) Destroy(_instances[i]);
+                DestroyPinObject(_instances[i]);
             }
             _instances.Clear();
             _pins.Clear();
+            PinsChanged?.Invoke();
         }
 
         /// <summary>Remove only pins from a specific source.</summary>
@@ -56,35 +99,62 @@ namespace CompanionScan.Mapping
             {
                 if (_pins[i].source == source)
                 {
-                    if (i < _instances.Count && _instances[i] != null)
-                    {
-                        Destroy(_instances[i]);
-                        _instances.RemoveAt(i);
-                    }
-                    _pins.RemoveAt(i);
+                    RemovePinAt(i);
                 }
             }
+            PinsChanged?.Invoke();
         }
 
         public void AddPin(SpatialPin pin)
         {
+            if (pin == null)
+            {
+                return;
+            }
+
             if (enablePinLifecycle)
             {
                 PruneStalePins(pin.timestamp);
             }
 
-            if (preferTrackIds && pin.trackId != 0 && TryMergeTrack(pin))
+            bool replaced = TryReplaceAnchor(pin)
+                            || (preferTrackIds && pin.trackId != 0 && TryMergeTrack(pin))
+                            || (enableDeduplication && TryMergePin(pin));
+            if (!replaced)
             {
-                return;
+                _pins.Add(pin);
+                SpawnPin(pin);
             }
 
-            if (enableDeduplication && TryMergePin(pin))
+            PinsChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// A newer reading of the same Space Setup anchor replaces its pin: the room may have been
+        /// set up again since, with the object moved or resized.
+        /// </summary>
+        private bool TryReplaceAnchor(SpatialPin pin)
+        {
+            if (string.IsNullOrEmpty(pin.anchorUuid))
             {
-                return;
+                return false;
             }
 
-            _pins.Add(pin);
-            SpawnPin(pin);
+            for (int i = 0; i < _pins.Count; i++)
+            {
+                var existing = _pins[i];
+                if (existing.source != pin.source ||
+                    !string.Equals(existing.anchorUuid, pin.anchorUuid, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                _pins[i] = pin;
+                UpdateInstance(i, pin);
+                return true;
+            }
+
+            return false;
         }
 
         private bool TryMergePin(SpatialPin pin)
@@ -102,6 +172,19 @@ namespace CompanionScan.Mapping
                     continue;
                 }
                 if (!string.Equals(existing.semanticLabel, pin.semanticLabel, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                // Two different Space Setup anchors are two objects, however close.
+                if (!string.IsNullOrEmpty(existing.anchorUuid) && !string.IsNullOrEmpty(pin.anchorUuid))
+                {
+                    continue;
+                }
+
+                // "OTHER" covers every unmapped class: a cup next to a book is two objects.
+                if (string.Equals(pin.semanticLabel, "OTHER", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(existing.label, pin.label, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -172,17 +255,20 @@ namespace CompanionScan.Mapping
                     continue;
                 }
 
-                if (i < _instances.Count && _instances[i] != null)
-                {
-                    Destroy(_instances[i]);
-                }
-
-                _pins.RemoveAt(i);
-                if (i < _instances.Count)
-                {
-                    _instances.RemoveAt(i);
-                }
+                RemovePinAt(i);
             }
+        }
+
+        /// <summary>Removes a pin and its object; the two lists stay index-aligned.</summary>
+        private void RemovePinAt(int index)
+        {
+            if (index < _instances.Count)
+            {
+                DestroyPinObject(_instances[index]);
+                _instances.RemoveAt(index);
+            }
+
+            _pins.RemoveAt(index);
         }
 
         private void UpdateInstance(int index, SpatialPin pin)
@@ -199,43 +285,61 @@ namespace CompanionScan.Mapping
             }
 
             instance.transform.position = pin.position;
-            if (pin.rotation != Quaternion.identity)
-            {
-                instance.transform.rotation = pin.rotation;
-            }
-
-            var text = instance.GetComponentInChildren<TMP_Text>();
-            if (text != null)
-            {
-                text.text = pin.label;
-            }
+            SetPinText(instance, pin.label);
         }
 
+        // The pin object stands upright at the pin's position. The pin's rotation (a Space Setup
+        // anchor's orientation, which for floors and furniture points +Y sideways) stays in the data.
         private void SpawnPin(SpatialPin pin)
         {
             if (pinPrefab == null)
             {
+                if (!_warnedNoPrefab)
+                {
+                    _warnedNoPrefab = true;
+                    Debug.LogWarning("[Pins] No pin prefab is set, so pins are kept and exported but not shown.", this);
+                }
+
                 _instances.Add(null); // keep indices aligned
                 return;
             }
 
-            Transform parent = pinRoot != null ? pinRoot : transform;
-            var instance = Instantiate(pinPrefab, parent);
+            var instance = Instantiate(pinPrefab, PinRoot);
             instance.transform.position = pin.position;
             instance.transform.localScale = pinScale;
-
-            if (pin.rotation != Quaternion.identity)
+            SetPinText(instance, pin.label);
+            if (!_pinsVisible)
             {
-                instance.transform.rotation = pin.rotation;
-            }
-
-            var text = instance.GetComponentInChildren<TMP_Text>();
-            if (text != null)
-            {
-                text.text = pin.label;
+                instance.SetActive(false);
             }
 
             _instances.Add(instance);
+        }
+
+        private static void SetPinText(GameObject instance, string label)
+        {
+            var text = instance.GetComponentInChildren<TMP_Text>(true);
+            if (text != null)
+            {
+                text.text = label;
+            }
+        }
+
+        private static void DestroyPinObject(GameObject instance)
+        {
+            if (instance == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(instance);
+            }
+            else
+            {
+                DestroyImmediate(instance);
+            }
         }
     }
 }
