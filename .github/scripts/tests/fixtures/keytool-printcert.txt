@@ -1,0 +1,24 @@
+Signer #1:
+
+Certificate #1:
+Owner: CN=Android Debug, O=Android, C=US
+Issuer: CN=Android Debug, O=Android, C=US
+Serial number: 1
+Valid from: Sat Nov 14 10:00:00 UTC 2026 until: Mon Nov 06 10:00:00 UTC 2056
+Certificate fingerprints:
+	 SHA1: 01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67
+	 SHA256: 01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF
+Signature algorithm name: SHA256withRSA
+Subject Public Key Algorithm: 2048-bit RSA key
+Version: 3
+
+Extensions: 
+
+#1: ObjectId: 2.5.29.14 Criticality=false
+SubjectKeyIdentifier [
+KeyIdentifier [
+0000: 01 23 45 67 89 AB CD EF   01 23 45 67 89 AB CD EF  .#Eg.....#Eg....
+0010: 01 23 45 67                                        .#Eg
+]
+]
+

@@ -1,0 +1,4 @@
+Package 'com.CompanionIntelligence.CompanionCapture':
+0x7f0f0000 - string/app_name
+	(default) - [STR] "Companion Scan"
+

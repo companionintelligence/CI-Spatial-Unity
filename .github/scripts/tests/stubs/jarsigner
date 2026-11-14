@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Stub jarsigner: "jarsigner -verify <aab>" prints $STUB_CASE/jarsigner-verify.txt.
+set -euo pipefail
+
+if [ "$#" -ne 2 ] || [ "$1" != -verify ] || [ ! -f "$2" ]; then
+  echo "stub jarsigner: unexpected arguments: $*" >&2
+  exit 2
+fi
+tr -d '\r' < "$STUB_CASE/jarsigner-verify.txt"

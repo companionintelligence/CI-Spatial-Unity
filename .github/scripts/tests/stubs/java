@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Stub java for apksigner and bundletool, answering from the files in $STUB_CASE:
+#   java -jar .../apksigner.jar verify --verbose --print-certs <apk>
+#   java -jar .../bundletool-all-<version>.jar dump manifest --bundle <aab> --xpath <xpath>
+#   java -jar .../bundletool-all-<version>.jar dump resources --bundle <aab> --resource <resource> --values
+set -euo pipefail
+
+fail() {
+  echo "stub java: unexpected arguments: $*" >&2
+  exit 2
+}
+if [ "$#" -lt 4 ] || [ "$1" != -jar ]; then fail "$@"; fi
+jar="$2"
+shift 2
+case "$jar $1 $2" in
+  */apksigner.jar" verify --verbose")
+    if [ "$#" -ne 4 ] || [ "$3" != --print-certs ] || [ ! -f "$4" ]; then fail "$@"; fi
+    tr -d '\r' < "$STUB_CASE/apksigner-verify.txt"
+    ;;
+  */bundletool-all-*.jar" dump manifest")
+    if [ "$#" -ne 6 ] || [ "$3" != --bundle ] || [ ! -f "$4" ] || [ "$5" != --xpath ]; then fail "$@"; fi
+    # One line for each value the XPath selects, and an empty line when it selects none.
+    tr -d '\r' < "$STUB_CASE/bundletool-manifest.tsv" |
+      awk -F '\t' -v xpath="$6" '!/^#/ && $1 == xpath { print $2; found = 1 } END { if (!found) print "" }'
+    ;;
+  */bundletool-all-*.jar" dump resources")
+    if [ "$#" -ne 7 ] || [ "$3" != --bundle ] || [ ! -f "$4" ] || [ "$5" != --resource ] || [ "$7" != --values ]; then
+      fail "$@"
+    fi
+    # bundletool finds a resource by type/name or by ID, and prints nothing for any other name.
+    entry="$(tr -d '\r' < "$STUB_CASE/bundletool-resources.txt" | sed -n 's/^\(0x[0-9a-f]*\) - \(.*\)$/\1 \2/p' | head -n 1)"
+    if [ -n "$entry" ] && { [ "$6" = "${entry%% *}" ] || [ "$6" = "${entry#* }" ]; }; then
+      tr -d '\r' < "$STUB_CASE/bundletool-resources.txt"
+    fi
+    ;;
+  *)
+    fail -jar "$jar" "$@"
+    ;;
+esac
