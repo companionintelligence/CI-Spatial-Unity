@@ -209,6 +209,29 @@ def test_delete_stays_inside_the_upload_dir(
     assert victim.exists()
 
 
+def test_delete_leaves_files_that_are_not_uploads(auth_headers: dict, upload_dir: Path) -> None:
+    # These files exist and have upload suffixes, but their names are not upload IDs, so
+    # only the ID check keeps DELETE away from them. Unlike the case and backslash checks,
+    # this fails on every file system when that check is missing.
+    upload_dir.mkdir()
+    files = {
+        "scan": "scan.gltf",
+        "notes": "notes.bin",
+        "x": "x.extras.json",
+        "spatial-map": "spatial-map.gltf",
+        "0123456789ABCDEF0123456789ABCDEF": "0123456789ABCDEF0123456789ABCDEF.gltf",
+    }
+    for name in files.values():
+        (upload_dir / name).write_bytes(GLTF)
+
+    for name in files:
+        response = client.delete(f"/v1/gltf/{name}", headers=auth_headers)
+        assert response.status_code == 404, name
+        assert response.json() == {"detail": "Upload not found."}, name
+    assert sorted(path.name for path in upload_dir.iterdir()) == sorted(files.values())
+    assert all((upload_dir / name).read_bytes() == GLTF for name in files.values())
+
+
 def test_uploads_from_before_opaque_ids_stay_readable_and_can_be_deleted(
     auth_headers: dict, upload_dir: Path
 ) -> None:
