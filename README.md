@@ -494,6 +494,30 @@ More details:
   the Android debug certificate. The run summary shows the signing
   certificate's SHA-256 fingerprint; it must match the one `keytool -list -v`
   prints for your keystore.
+- **Manifest.** The checks read the built package, so they also see what the
+  Meta XR SDK, Unity and AndroidX add to the manifest at build time. The
+  package name must be `com.CompanionIntelligence.CompanionCapture` and the
+  label `Companion Scan` in every locale (for an AAB, every value of the
+  label's string resource). The package must request exactly these
+  permissions, and the job names any other permission and any missing one:
+  `com.oculus.permission.USE_ANCHOR_API` and `com.oculus.permission.USE_SCENE`
+  for Space Setup; `horizonos.permission.HEADSET_CAMERA`,
+  `android.permission.CAMERA` and `com.oculus.permission.USE_PASSTHROUGH_CAMERA`
+  for the passthrough cameras; `android.permission.INTERNET` for the CV
+  server; and `com.CompanionIntelligence.CompanionCapture.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`,
+  which AndroidX Core adds. It must not declare the
+  `oculus.software.handtracking` or `oculus.software.eye_tracking` feature. To
+  change a permission, change `expected_permissions` in
+  `.github/scripts/check-quest-package.sh` together with
+  `Assets/Plugins/Android/AndroidManifest.xml`.
+- **Testing the checks.** `bash .github/scripts/tests/test-check-quest-package.sh`
+  runs `check-quest-package.sh` without a build or the Unity image, against
+  stub `docker`, `aapt2`, `bundletool` and signing tools that answer with a
+  debug build's output. Debug and release builds must pass, and builds with
+  `HAND_TRACKING`, the hand tracking feature, a wrong label, a missing or extra
+  permission, another package name or a release package signed with the debug
+  key must fail. Run it after changing the script; it needs bash 4.4 or later
+  (Git Bash on Windows works).
 - **Caches.** During a signed build Unity writes both signing passwords in
   plain text into `Library/Bee` and into Gradle's home, and anyone who can open
   a pull request can read the Actions caches of this public repository. So

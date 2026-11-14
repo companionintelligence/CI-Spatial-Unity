@@ -79,8 +79,14 @@ Triggers, runners and repository secrets are summarised in the README under
   - Builds the Android APK (or AAB) with GameCI through
     `CommandLineBuild.BuildAndroidQuest`, using the editor version from
     `ProjectSettings/ProjectVersion.txt` and the app version from Player
-    Settings > Version, then checks the signature, versionCode and target API
-    level
+    Settings > Version, then checks the built package's signature,
+    versionCode, target API level, package name, label in every locale,
+    permissions (exactly the expected set, so no `HAND_TRACKING`) and
+    features (no hand or eye tracking) with
+    `.github/scripts/check-quest-package.sh`
+  - `bash .github/scripts/tests/test-check-quest-package.sh` tests those
+    checks against stub `aapt2`, `bundletool` and signing tools, without a
+    build
   - Manual runs on a branch build debug-signed in a job that never sees the
     `ANDROID_*` secrets and is the only one that saves the Library cache
   - Tags, and manual runs on `main` with **release**, build with `-release` in
