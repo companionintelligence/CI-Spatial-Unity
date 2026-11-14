@@ -1,5 +1,8 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Threading.Tasks;
 using CompanionScan.Core;
@@ -18,6 +21,7 @@ namespace CompanionScan.Tests.Editor
     public class CaptureConsentTests
     {
         private const string ServerUrl = "https://cv.example.com";
+        private static readonly byte[] Jpeg = { 0xFF, 0xD8, 0xFF, 0xD9 };
 
         private readonly Dictionary<string, (bool had, string value)> _savedStrings = new Dictionary<string, (bool, string)>();
         private bool _hadVersion;
@@ -168,6 +172,64 @@ namespace CompanionScan.Tests.Editor
             Assert.AreEqual(0, camera.FramesTaken);
         }
 
+        [UnityTest]
+        public IEnumerator ImageRequest_WithoutAgreement_SendsNothing()
+        {
+            using var server = new LoopbackServer();
+            var client = new CVServerClient(NewConfig(server.Url));
+
+            var requests = new Task[]
+            {
+                client.DetectAsync(Jpeg, "chair ."),
+                client.SegmentAsync(Jpeg, "chair ."),
+                client.FlorenceAsync(Jpeg, "<MORE_DETAILED_CAPTION>")
+            };
+
+            foreach (var request in requests)
+            {
+                Assert.IsTrue(request.IsFaulted, "an image request went ahead without the agreement");
+                Assert.IsInstanceOf<CaptureConsentRequiredException>(request.Exception.GetBaseException());
+            }
+
+            // Leave time for a request that got through to connect.
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            while (!server.WasContacted && clock.Elapsed.TotalSeconds < 1)
+            {
+                yield return null;
+            }
+
+            Assert.IsFalse(server.WasContacted, "an image request reached the server without the agreement");
+        }
+
+        [UnityTest]
+        public IEnumerator ImageRequest_WithTheAgreement_ReachesTheServer()
+        {
+            // The test above means something only if the same request, once agreed to, reaches the server.
+            using var server = new LoopbackServer();
+            var client = new CVServerClient(NewConfig(server.Url));
+            CaptureConsent.Grant();
+
+            var request = client.DetectAsync(Jpeg, "chair .");
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            while (!server.WasContacted && clock.Elapsed.TotalSeconds < 10)
+            {
+                yield return null;
+            }
+
+            Assert.IsTrue(server.WasContacted, "the agreed request did not reach the test server");
+
+            // Hang up without answering, so the client gives up before the test ends.
+            server.Dispose();
+            clock.Restart();
+            while (!request.IsCompleted && clock.Elapsed.TotalSeconds < 10)
+            {
+                yield return null;
+            }
+
+            Assert.IsTrue(request.IsFaulted, "the client did not give up after the server hung up");
+            Assert.IsNotInstanceOf<CaptureConsentRequiredException>(request.Exception.GetBaseException());
+        }
+
         [Test]
         public void Notice_Accept_RecordsTheAgreementAndContinuesTheCapture()
         {
@@ -241,14 +303,20 @@ namespace CompanionScan.Tests.Editor
             return go.AddComponent<T>();
         }
 
-        private SpatialCapturePipeline NewPipeline(ICameraProvider camera)
+        private ServerConfig NewConfig(string serverUrl)
         {
             var config = ScriptableObject.CreateInstance<ServerConfig>();
-            config.baseUrl = ServerUrl;
+            config.baseUrl = serverUrl;
+            config.requestTimeoutSeconds = 2;
+            config.retryCount = 0;
             _created.Add(config);
+            return config;
+        }
 
+        private SpatialCapturePipeline NewPipeline(ICameraProvider camera)
+        {
             var pipeline = NewComponent<SpatialCapturePipeline>();
-            SetField(pipeline, "serverConfig", config);
+            SetField(pipeline, "serverConfig", NewConfig(ServerUrl));
             SetField(pipeline, "_cameraProvider", camera);
             return pipeline;
         }
@@ -267,6 +335,49 @@ namespace CompanionScan.Tests.Editor
             var field = target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.IsNotNull(field, $"{target.GetType().Name}.{name} not found");
             field.SetValue(target, value);
+        }
+
+        /// <summary>
+        /// A port on this machine that notes any connection. Its URL is https, which every build
+        /// allows; a client connects before the TLS handshake, which never gets an answer.
+        /// </summary>
+        private sealed class LoopbackServer : IDisposable
+        {
+            private readonly TcpListener _listener = new TcpListener(IPAddress.Loopback, 0);
+            private bool _contacted;
+            private bool _stopped;
+
+            public LoopbackServer()
+            {
+                _listener.Start();
+                Url = "https://127.0.0.1:" + ((IPEndPoint)_listener.LocalEndpoint).Port;
+            }
+
+            public string Url { get; }
+
+            /// <summary>True once a client has connected. Connections are never accepted or answered.</summary>
+            public bool WasContacted
+            {
+                get
+                {
+                    if (!_contacted && !_stopped && _listener.Pending())
+                    {
+                        _contacted = true;
+                    }
+
+                    return _contacted;
+                }
+            }
+
+            /// <summary>Stops listening, which resets any connection still waiting.</summary>
+            public void Dispose()
+            {
+                if (!_stopped)
+                {
+                    _stopped = true;
+                    _listener.Stop();
+                }
+            }
         }
 
         private sealed class CountingCameraProvider : ICameraProvider

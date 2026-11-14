@@ -10,9 +10,11 @@ namespace CompanionScan.Core
     /// Passthrough camera images are Device User Data under Meta's Developer Data Use Policy, so
     /// no snapshot leaves the headset before the user has agreed: the CV pipeline
     /// (<c>SpatialCapturePipeline</c>) calls <see cref="EnsureGranted"/> before it takes a frame,
-    /// and the camera notice (<c>CompanionScan.UI.CaptureConsentPanel</c>) asks the user. The
-    /// answer is kept on the headset only, in PlayerPrefs: the notice version and the UTC time of
-    /// the agreement. Settings can withdraw it, and uninstalling the app deletes it.
+    /// and the camera notice (<c>CompanionScan.UI.CaptureConsentPanel</c>) asks the user. Every
+    /// image request then passes <see cref="CVServerClient"/>, which refuses to send without the
+    /// agreement (<see cref="CaptureConsentRequiredException"/>). The answer is kept on the headset
+    /// only, in PlayerPrefs: the notice version and the UTC time of the agreement. Settings can
+    /// withdraw it, and uninstalling the app deletes it.
     /// </summary>
     public static class CaptureConsent
     {
@@ -91,5 +93,22 @@ namespace CompanionScan.Core
         {
             return time.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
         }
+    }
+
+    /// <summary>
+    /// Thrown by <see cref="CVServerClient"/> instead of sending an image the user has not agreed to
+    /// send (<see cref="CaptureConsent"/>). Nothing was sent.
+    /// </summary>
+    public sealed class CaptureConsentRequiredException : Exception
+    {
+        public CaptureConsentRequiredException(string serverUrl)
+            : base("Nothing was sent: the user has not agreed to send camera snapshots to " +
+                   (string.IsNullOrWhiteSpace(serverUrl) ? "the vision server" : serverUrl.Trim()) + ".")
+        {
+            ServerUrl = serverUrl ?? string.Empty;
+        }
+
+        /// <summary>The server the image would have gone to.</summary>
+        public string ServerUrl { get; }
     }
 }
