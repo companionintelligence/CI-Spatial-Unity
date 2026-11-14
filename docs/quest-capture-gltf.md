@@ -337,6 +337,9 @@ The payload includes:
 - `extras` (field) - the extras JSON (optional)
 
 Set `GLTF_UPLOAD_DIR` in the server container to control where uploads land (default: `uploads/gltf`).
+The response carries the upload's opaque `id`; `DELETE /v1/gltf/{id}` removes it, and
+`GLTF_UPLOAD_RETENTION_DAYS` can expire old uploads (off by default; see
+[cv-server/README.md](../cv-server/README.md#gltf-upload)).
 
 It also injects a JSON blob into the root `extras` with unified pin data from both systems:
 

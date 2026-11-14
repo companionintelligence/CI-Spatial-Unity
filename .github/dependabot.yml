@@ -1,0 +1,18 @@
+# Dependabot opens no version-update pull requests here (open-pull-requests-limit: 0).
+# Security updates are switched on in the repository settings and keep their own
+# limit of 10 open pull requests, which this file does not change.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /cv-server
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 0
+    ignore:
+      # transformers 5.17.0 is the last release that needs nothing newer than torch 2.5.1,
+      # the last torch with CUDA 12.1 wheels (cv-server/requirements.txt), so a new major
+      # version needs a planned migration. GitHub applies update-types to version updates only: a security
+      # update can still move transformers to a new major version (an ignore rule with
+      # `versions` applies to both).
+      - dependency-name: transformers
+        update-types: ["version-update:semver-major"]

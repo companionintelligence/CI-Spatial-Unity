@@ -164,6 +164,9 @@ names and key material out of the repository; `certs/` and `.env` are gitignored
 - `BOX_THRESHOLD`
 - `TEXT_THRESHOLD`
 - `GLTF_UPLOAD_DIR` (default: `uploads/gltf`)
+- `GLTF_UPLOAD_RETENTION_DAYS` (default: `0`, no expiry): delete glTF uploads
+  older than this many days, at startup and then hourly (see
+  [glTF Upload](#gltf-upload))
 - `CV_SERVER_MAX_REQUEST_BYTES` (default: `33554432`, 32 MiB): largest HTTP request
   body (base64 images, glTF uploads); larger requests get `413`
 - `CV_SERVER_MAX_WS_MESSAGE_BYTES` (default: `16777216`, 16 MiB): largest
@@ -176,6 +179,7 @@ names and key material out of the repository; `certs/` and `.env` are gitignored
 - `POST /v1/segment`
 - `POST /v1/florence`
 - `POST /v1/gltf`
+- `DELETE /v1/gltf/{id}`
 - `GET /v1/health`
 - `WS /v1/stream`
 
@@ -213,6 +217,29 @@ expects. GroundingDINO itself outputs boxes as `(cx, cy, w, h)`, centre and size
 - `gltf` (file)
 - `bin` (file, optional)
 - `extras` (field, optional)
+
+Each upload gets a new ID: 32 random lowercase hexadecimal characters (128
+bits from Python's `secrets` module). The ID holds no file name, counter or
+timestamp, and the file names the client sent are not kept. The parts are
+stored in `GLTF_UPLOAD_DIR` as `<id>.gltf`, `<id>.bin` and `<id>.extras.json`,
+and the response names them:
+
+```json
+{"ok": true, "id": "<id>", "gltf_path": "uploads/gltf/<id>.gltf", "bin_path": null, "extras_path": null}
+```
+
+`DELETE /v1/gltf/{id}` deletes an upload's files and answers `204`; an ID that
+names no upload gets `404`. Like every route, it needs the bearer token.
+Uploads stored before these IDs keep their files and names
+(`spatial-map-<date>-<time>-<8 hex>.gltf` and so on); their ID is the file name
+without the extension.
+
+Uploads are kept until they are deleted, unless `GLTF_UPLOAD_RETENTION_DAYS` is
+a positive number of days: the server then deletes every upload whose newest
+file is older than that, at startup and then every hour, uploads from before the
+opaque IDs included. `0` or unset (the default) keeps them. How long to keep scans is the
+owner's decision, so there is no default period. Only files named like an
+upload are ever deleted; anything else in the directory is left alone.
 
 The whole request is capped at `CV_SERVER_MAX_REQUEST_BYTES` (32 MiB by
 default). A larger `Content-Length` is refused with `413` before anything is
