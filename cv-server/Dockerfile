@@ -19,8 +19,8 @@ ENV TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"
 # Requires-Python >=3.11, and jammy's default python3 is 3.10. Not jammy's own python3.11
 # package: that is 3.11.0~rc1, a 2022 pre-release that gets no fixes, and on it importing
 # timm 0.9.16 with torch 2.5.1 kills the interpreter (SIGSEGV in torch.jit.script). timm is
-# imported by GroundingDINO and by Florence-2's model code. The deadsnakes build (3.11.18
-# when this was written) runs the same packages; the CUDA base image stays as it was.
+# imported by GroundingDINO. The deadsnakes build (3.11.18 when this was written) runs the
+# same packages; the CUDA base image stays as it was.
 RUN apt-get update && apt-get install -y software-properties-common \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get install -y \

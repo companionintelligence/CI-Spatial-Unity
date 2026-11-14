@@ -4,14 +4,25 @@ from typing import Optional
 
 import torch
 
+from app import hub_pins
 from app.config import settings
+from app.gdino_text_encoder import bert_text_encoder_for_groundingdino
 
 _gdino_import_error = None
 try:
-    from groundingdino.util.inference import load_model
+    from groundingdino.models import build_model as build_gdino_model
+    from groundingdino.util.misc import clean_state_dict
+    from groundingdino.util.slconfig import SLConfig
 except Exception as exc:  # pragma: no cover - optional import until deps are installed
-    load_model = None
+    build_gdino_model = None
+    clean_state_dict = None
+    SLConfig = None
     _gdino_import_error = exc
+
+try:
+    from huggingface_hub import snapshot_download
+except Exception:  # pragma: no cover
+    snapshot_download = None
 
 _sam2_import_error = None
 try:
@@ -23,10 +34,10 @@ except Exception as exc:  # pragma: no cover
     _sam2_import_error = exc
 
 try:
-    from transformers import AutoModelForCausalLM, AutoProcessor
+    from transformers import Florence2ForConditionalGeneration, Florence2Processor
 except Exception:  # pragma: no cover
-    AutoModelForCausalLM = None
-    AutoProcessor = None
+    Florence2ForConditionalGeneration = None
+    Florence2Processor = None
 
 
 class ModelManager:
@@ -48,14 +59,35 @@ class ModelManager:
     def load_grounding_dino(self) -> None:
         if self.gdino_model is not None:
             return
-        if load_model is None:
+        if build_gdino_model is None or snapshot_download is None:
             detail = f"{type(_gdino_import_error).__name__}: {_gdino_import_error}" if _gdino_import_error else "Unknown import error"
             raise RuntimeError(f"GroundingDINO dependencies are not available. {detail}")
-        self.gdino_model = load_model(
-            settings.gdino_config_path,
-            settings.gdino_weights_path,
-            device=str(self.device),
+        # groundingdino.util.inference.load_model, except for the text encoder: the config
+        # names "bert-base-uncased", which GroundingDINO would download from the hub's
+        # moving main branch. Point it at a local snapshot of the pinned commit instead.
+        args = SLConfig.fromfile(settings.gdino_config_path)
+        args.device = str(self.device)
+        args.text_encoder_type = snapshot_download(
+            hub_pins.BERT_BASE_UNCASED.repo_id,
+            revision=hub_pins.BERT_BASE_UNCASED.revision,
+            allow_patterns=list(hub_pins.BERT_FILES),
         )
+        # GroundingDINO's own BERT wrapper does not run on transformers 5 (app/gdino_text_encoder.py).
+        with bert_text_encoder_for_groundingdino():
+            model = build_gdino_model(args)
+        # The checkpoint holds only tensors, so the restricted unpickler can read it.
+        checkpoint = torch.load(settings.gdino_weights_path, map_location="cpu", weights_only=True)
+        # Not strict, as in GroundingDINO's loader: the checkpoint also holds weights the
+        # model does not use. Every weight the model has must come from it, though; a
+        # renamed parameter would otherwise keep its initial value without an error.
+        result = model.load_state_dict(clean_state_dict(checkpoint["model"]), strict=False)
+        if result.missing_keys:
+            raise RuntimeError(
+                f"The GroundingDINO checkpoint {settings.gdino_weights_path} lacks "
+                f"{len(result.missing_keys)} of the model's weights, e.g. {sorted(result.missing_keys)[:3]}"
+            )
+        model.eval()
+        self.gdino_model = model
 
     def load_sam2(self) -> None:
         if self.sam2_predictor is not None:
@@ -73,17 +105,30 @@ class ModelManager:
     def load_florence2(self) -> None:
         if self.florence_model is not None:
             return
-        if AutoModelForCausalLM is None or AutoProcessor is None:
+        if Florence2ForConditionalGeneration is None or Florence2Processor is None:
             raise RuntimeError("Transformers dependencies are not available.")
-        self.florence_model = AutoModelForCausalLM.from_pretrained(
-            settings.florence_model_id,
-            torch_dtype=torch.float16,
-            trust_remote_code=True,
-        ).to(self.device)
-        self.florence_processor = AutoProcessor.from_pretrained(
-            settings.florence_model_id,
-            trust_remote_code=True,
+        # transformers' own Florence-2 implementation: the repository supplies weights,
+        # configs and tokenizer files but no code, all from one fixed commit
+        # (app/hub_pins.py, or FLORENCE_MODEL_REVISION).
+        model_id, revision = hub_pins.florence_model(
+            settings.florence_model_id, settings.florence_model_revision
         )
+        model, loading_info = Florence2ForConditionalGeneration.from_pretrained(
+            model_id,
+            revision=revision,
+            dtype=torch.float16,
+            output_loading_info=True,
+        )
+        # A repository made for Florence-2's own repository code (such as Microsoft's) has
+        # other weight names; transformers would leave those weights at random values.
+        missing = sorted(loading_info["missing_keys"])
+        if missing:
+            raise RuntimeError(
+                f"{model_id} is not a checkpoint for transformers' Florence-2 implementation: "
+                f"{len(missing)} weights are missing, e.g. {missing[:3]}"
+            )
+        self.florence_model = model.to(self.device)
+        self.florence_processor = Florence2Processor.from_pretrained(model_id, revision=revision)
 
     def shutdown(self) -> None:
         self.gdino_model = None
