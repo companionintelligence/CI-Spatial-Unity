@@ -108,7 +108,7 @@ world-space panels that the same buttons drive while they are open.
 
 | Button | Colour | Action | Details |
 |--------|--------|--------|---------|
-| **A** | Red | **Capture** | Takes a snapshot. Runs both Meta Scene + CV Server pipelines (respects current model preset). 3D labels persist after each capture. Before the first snapshot leaves the headset, a notice says what is sent and where; **A** agrees and captures, **B** sends nothing. The agreement is recorded on the headset. |
+| **A** | Red | **Capture** | Takes a snapshot. Runs both Meta Scene + CV Server pipelines (respects current model preset). 3D labels persist after each capture. Before the first snapshot leaves the headset, a notice says what is sent and where; **A** agrees and captures, **B** sends nothing. The agreement is recorded on the headset, for that server only: after the server URL changes, the next capture asks again. |
 | **B** | Blue | **Cycle Model** | Cycles the active AI model preset: Florence → GDino → SAM2 → Florence … |
 
 ### Left Controller
@@ -117,7 +117,7 @@ world-space panels that the same buttons drive while they are open.
 |--------|--------|--------|---------|
 | **X** | Yellow | **Preview Distance** | Cycles the raycaster fallback distance: Near (1 m) → Far (3 m) → Off → Near … |
 | **Y** | Green | **Save & Export** | Saves a glTF of the room (pins, floor plan, scene data, and the session's snapshots with their camera poses) in the app's storage on the headset (`files/exports`). Nothing is uploaded: the shipped scene has `uploadAfterExport` off and no `GltfSyncClient`. |
-| **Menu** | — | **Settings** | Opens or closes the settings panel (it also opens on first run). While it is open, **A** edits the server URL, **X** the server's API token (secure keyboard; stored on the headset only, never shown) and **B** saves; **Y** opens the privacy policy in the browser, a **trigger** shows the open-source licences, and a **grip** withdraws the agreement to send snapshots. The other controls pause. |
+| **Menu** | — | **Settings** | Opens or closes the settings panel (it also opens on first run). Opening it closes the camera notice without agreeing. While it is open, **A** edits the server URL, **X** the server's API token (secure keyboard; stored on the headset only, never shown) and **B** saves; **Y** opens the privacy policy in the browser, a **trigger** shows the open-source licences, and a **grip** withdraws the agreement to send snapshots. The other controls pause. |
 
 ### Either Controller
 

@@ -10,8 +10,9 @@ namespace CompanionScan.Core
 {
     /// <summary>
     /// Client for the CV server's image endpoints. Every request carries a camera image, so
-    /// <see cref="PostAsync{T}"/> sends one only with the user's agreement (<see cref="CaptureConsent"/>)
-    /// and otherwise throws <see cref="CaptureConsentRequiredException"/> without sending anything.
+    /// <see cref="PostAsync{T}"/> sends one only with the user's agreement to send snapshots to that
+    /// server (<see cref="CaptureConsent"/>) and otherwise throws
+    /// <see cref="CaptureConsentRequiredException"/> without sending anything.
     /// </summary>
     public class CVServerClient
     {
@@ -83,8 +84,9 @@ namespace CompanionScan.Core
             for (int attempt = 0; attempt <= retries; attempt++)
             {
                 // Checked before every attempt, retries included: Settings can withdraw the
-                // agreement at any time. Whoever calls this client, no image leaves without it.
-                if (!CaptureConsent.IsGranted)
+                // agreement or change the server at any time. Whoever calls this client, no image
+                // leaves without the agreement for this server.
+                if (!CaptureConsent.IsGrantedFor(baseUrl))
                 {
                     throw new CaptureConsentRequiredException(baseUrl);
                 }

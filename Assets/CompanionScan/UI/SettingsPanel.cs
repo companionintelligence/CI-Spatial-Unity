@@ -17,7 +17,9 @@ namespace CompanionScan.UI
     /// <see cref="WithdrawCaptureConsent"/>; capture controls are suspended.
     ///
     /// The camera notice (<see cref="CaptureConsentPanel"/>) and the licences view
-    /// (<see cref="LicensesPanel"/>) are added next to this component at run time.
+    /// (<see cref="LicensesPanel"/>) are added next to this component at run time. The notice
+    /// opens where this panel does and names the server a capture would send to, so opening the
+    /// settings closes it without agreeing: the server cannot change behind it.
     ///
     /// The CV server requires a bearer token on every route. The token is typed with the
     /// system keyboard in secure mode, stored only as a PlayerPrefs override (see
@@ -177,6 +179,14 @@ namespace CompanionScan.UI
             if (config == null)
             {
                 return;
+            }
+
+            // The camera notice opens here too and names the current server: close it without
+            // agreeing, so the server cannot change behind it. Nothing is sent; the next capture asks.
+            var notice = GetComponent<CaptureConsentPanel>();
+            if (notice != null && notice.IsOpen)
+            {
+                notice.Decline();
             }
 
             _draftUrl = config.ResolveBaseUrl();
@@ -470,16 +480,21 @@ namespace CompanionScan.UI
 
             if (_consentText != null)
             {
-                _consentText.text = DescribeCaptureConsent();
+                _consentText.text = DescribeCaptureConsent(config != null ? config.ResolveBaseUrl() : string.Empty);
             }
         }
 
-        /// <summary>The settings line about the agreement to send camera snapshots.</summary>
-        public static string DescribeCaptureConsent()
+        /// <summary>The settings line about the agreement to send camera snapshots to <paramref name="serverUrl"/>.</summary>
+        public static string DescribeCaptureConsent(string serverUrl)
         {
             if (!CaptureConsent.IsGranted)
             {
                 return "Camera snapshots: the first capture asks you first";
+            }
+
+            if (!CaptureConsent.IsGrantedFor(serverUrl))
+            {
+                return "Camera snapshots: the next capture asks for this server";
             }
 
             var agreedAt = CaptureConsent.AgreedAtUtc;

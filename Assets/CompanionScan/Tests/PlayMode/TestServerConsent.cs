@@ -13,7 +13,8 @@ namespace CompanionScan.Tests.PlayMode
     {
         private static readonly string[] StringKeys =
         {
-            CaptureConsent.PlayerPrefsAgreedAtKey
+            CaptureConsent.PlayerPrefsAgreedAtKey,
+            CaptureConsent.PlayerPrefsServerUrlKey
         };
 
         private readonly bool _hadVersion;
@@ -35,7 +36,7 @@ namespace CompanionScan.Tests.PlayMode
         public static TestServerConsent Grant(ServerConfig config)
         {
             var consent = new TestServerConsent();
-            CaptureConsent.Grant();
+            CaptureConsent.Grant(config.ResolveBaseUrl());
             return consent;
         }
 

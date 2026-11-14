@@ -24,8 +24,9 @@ namespace CompanionScan.UI
     ///   snapshots; the capture controls above are suspended.
     /// While the open-source licences are shown, A / X turn the page, B / Y change the
     ///   document and Menu goes back to the settings.
-    /// While the camera notice is shown (before the first snapshot leaves the headset),
-    ///   A agrees and captures, B sends nothing and Y opens the privacy policy.
+    /// While the camera notice is shown (before snapshots first go to a server), A agrees and
+    ///   captures, B sends nothing and Y opens the privacy policy. Menu opens the settings, which
+    ///   close the notice without agreeing (both panels open at the same spot).
     /// </summary>
     public class XRControllerInput : MonoBehaviour
     {
@@ -107,9 +108,10 @@ namespace CompanionScan.UI
         }
 
         /// <summary>
-        /// Menu toggles the settings panel; while it is open, A edits the URL, X the API token,
-        /// B saves, Y opens the privacy policy, a trigger shows the licences and a grip withdraws
-        /// the agreement to send snapshots. Returns true when the panel consumed this frame's input.
+        /// Menu toggles the settings panel (opening it closes the camera notice); while it is open,
+        /// A edits the URL, X the API token, B saves, Y opens the privacy policy, a trigger shows the
+        /// licences and a grip withdraws the agreement to send snapshots. Returns true when the panel
+        /// consumed this frame's input.
         /// </summary>
         private bool HandleSettingsInput()
         {

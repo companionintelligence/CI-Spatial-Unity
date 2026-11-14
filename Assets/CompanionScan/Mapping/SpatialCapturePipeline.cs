@@ -379,8 +379,9 @@ namespace CompanionScan.Mapping
                 return;
             }
 
-            // No snapshot leaves the headset before the user has agreed to the camera notice.
-            // Until then nothing is captured; when they agree, the notice runs the CV pipeline.
+            // No snapshot leaves the headset before the user has agreed, in the camera notice, to
+            // send snapshots to this server. Until then nothing is captured; when they agree, the
+            // notice runs the CV pipeline.
             if (!CaptureConsent.EnsureGranted(serverConfig.ResolveBaseUrl(), CaptureAndPin))
             {
                 Debug.Log("[Pipeline-CV] Waiting for agreement to send camera snapshots; nothing was captured or sent.");
