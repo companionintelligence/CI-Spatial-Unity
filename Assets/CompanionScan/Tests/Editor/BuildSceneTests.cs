@@ -205,6 +205,41 @@ namespace CompanionScan.Tests.Editor
                 "the tracking space is not the camera rig's");
         }
 
+        // Export
+
+        [Test]
+        public void Exporter_IsConnectedToPinsBoundarySpaceSetupAndSnapshots()
+        {
+            var exporter = Single<SpatialMapExporter>();
+            var pipeline = Single<SpatialCapturePipeline>();
+
+            Assert.AreSame(Single<SpatialPinManager>(), Reference<SpatialPinManager>(exporter, "pinManager"),
+                "an export without the pin manager has no pins and no floor plan");
+            Assert.AreSame(Single<BoundaryProvider>(), Reference<BoundaryProvider>(exporter, "boundaryProvider"));
+            Assert.AreSame(Single<MetaSceneCollector>(), Reference<MetaSceneCollector>(exporter, "metaSceneCollector"),
+                "an export without the Space Setup reader has no scene data");
+
+            var snapshots = Reference<SnapshotFrameStore>(exporter, "snapshotStore");
+            Assert.IsNotNull(snapshots, "an export without the snapshot store has no snapshots");
+            Assert.AreSame(snapshots, Reference<SnapshotFrameStore>(pipeline, "snapshotStore"),
+                "captures and exports use different snapshot stores");
+
+            Assert.IsNotNull(Reference<Material>(exporter, "floorMaterial"),
+                "UnityGLTF leaves out meshes without a material, so the floor plan mesh would be missing");
+            Assert.IsNotNull(Reference<Material>(exporter, "sceneMeshMaterial"),
+                "UnityGLTF leaves out meshes without a material, so the Space Setup meshes would be missing");
+        }
+
+        [Test]
+        public void Exporter_KeepsExportsOnTheHeadset()
+        {
+            // The camera notice promises "your exports stay on this headset".
+            var exporter = new SerializedObject(Single<SpatialMapExporter>());
+            Assert.IsFalse(exporter.FindProperty("uploadAfterExport").boolValue);
+            Assert.IsNull(exporter.FindProperty("syncClient").objectReferenceValue);
+            CollectionAssert.IsEmpty(Components<GltfSyncClient>());
+        }
+
         // Helpers
 
         private static IEnumerable<string> BuildScenePaths()

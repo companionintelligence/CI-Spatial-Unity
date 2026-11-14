@@ -1606,6 +1606,8 @@ GameObject:
   - component: {fileID: 319536156}
   - component: {fileID: 319536155}
   - component: {fileID: 319536154}
+  - component: {fileID: 700100007}
+  - component: {fileID: 700100008}
   m_Layer: 0
   m_Name: CompanionScan
   m_TagString: Untagged
@@ -1643,15 +1645,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CompanionScan::CompanionScan.Export.SpatialMapExporter
   exportRoot: {fileID: 0}
-  pinManager: {fileID: 0}
-  boundaryProvider: {fileID: 0}
-  metaSceneCollector: {fileID: 0}
-  snapshotStore: {fileID: 0}
+  pinManager: {fileID: 319536160}
+  boundaryProvider: {fileID: 700100007}
+  metaSceneCollector: {fileID: 319536154}
+  snapshotStore: {fileID: 700100008}
   includeFloorMesh: 1
-  floorMaterial: {fileID: 0}
+  floorMaterial: {fileID: 2100000, guid: 0d9d4052d000f204fb331924dfca70b2, type: 2}
   floorY: 0
   includeSceneMeshes: 1
-  sceneMeshMaterial: {fileID: 0}
+  sceneMeshMaterial: {fileID: 2100000, guid: 4ea889ca4e764f342941e0189cc8c3fd, type: 2}
   fileName: spatial-map
   writeExtras: 1
   captureMetaScene: 1
@@ -1799,7 +1801,7 @@ MonoBehaviour:
   trackMaxAgeSeconds: 2.5
   raycaster: {fileID: 319536161}
   pinManager: {fileID: 319536160}
-  snapshotStore: {fileID: 0}
+  snapshotStore: {fileID: 700100008}
   snapshotCamera: {fileID: 0}
   snapshotDistance: 1
   minScore: 0.3
@@ -4840,6 +4842,33 @@ Transform:
   m_Children: []
   m_Father: {fileID: 700100002}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &700100007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 319536153}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c087d0df33f06d14e842597368bf7bb6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CompanionScan::CompanionScan.Mapping.BoundaryProvider
+  trackingOrigin: {fileID: 636858765}
+--- !u!114 &700100008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 319536153}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4fae8063e6a368645b642fb59fff1731, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CompanionScan::CompanionScan.Mapping.SnapshotFrameStore
+  maxFrames: 50
+  idPrefix: snap
 --- !u!1 &701334932
 GameObject:
   m_ObjectHideFlags: 0
