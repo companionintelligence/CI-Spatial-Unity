@@ -190,6 +190,21 @@ namespace CompanionScan.Tests.Editor
                 "age-based pruning removes every earlier capture's pins; labels persist across captures");
         }
 
+        [Test]
+        public void SpaceSetupReader_UsesTheCameraRigsTrackingSpace()
+        {
+            var trackingSpace = Reference<Transform>(Single<MetaSceneCollector>(), "trackingSpace");
+            Assert.IsNotNull(trackingSpace,
+                "without a tracking space, reading Space Setup throws and the capture never reaches the vision server");
+
+            // OVRCameraRig names its tracking space "TrackingSpace", a direct child of the rig.
+            Assert.AreEqual("TrackingSpace", trackingSpace.name);
+            Assert.IsNotNull(trackingSpace.parent, "the tracking space has no camera rig");
+            Assert.IsTrue(trackingSpace.parent.GetComponents<Component>()
+                    .Any(component => component != null && component.GetType().Name == "OVRCameraRig"),
+                "the tracking space is not the camera rig's");
+        }
+
         // Helpers
 
         private static IEnumerable<string> BuildScenePaths()

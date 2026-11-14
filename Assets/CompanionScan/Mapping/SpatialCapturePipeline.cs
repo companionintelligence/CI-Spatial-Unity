@@ -270,10 +270,18 @@ namespace CompanionScan.Mapping
             {
                 Debug.Log("[Pipeline] â•â•â• CaptureAll: running both pipelines â•â•â•");
 
-                // Meta Scene (fast, local, no network)
+                // Meta Scene (fast, local, no network). A failed Space Setup read must not stop
+                // the capture the user asked for.
                 if (runMetaSceneCapture)
                 {
-                    await RunMetaSceneCaptureAsync();
+                    try
+                    {
+                        await RunMetaSceneCaptureAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[Pipeline-Meta] Reading Space Setup failed: {ex.Message}");
+                    }
                 }
 
                 // CV Server (network)

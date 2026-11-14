@@ -1625,7 +1625,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8d2e8180d5f4674469b348f25ba8f6df, type: 3}
   m_Name: 
   m_EditorClassIdentifier: CompanionScan::CompanionScan.Mapping.MetaSceneCollector
-  trackingSpace: {fileID: 0}
+  trackingSpace: {fileID: 636858765}
   includePlanes: 1
   includeVolumes: 1
   includeMeshes: 1
