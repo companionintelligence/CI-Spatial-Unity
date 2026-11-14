@@ -78,14 +78,17 @@ jobs:
           if ($stale -eq 0) { Write-Host "README.md and docs/ match Unity $env:UNITY_VERSION" }
 
       - name: Unity Test Runner
-        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
+        uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213 # v4.4.0
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          # game-ci/cli activates Unity from these: email and password alone for a Personal
+          # licence, plus the serial for a paid seat. UNITY_LICENSE is deliberately not passed.
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           CompanionScan_TEST_ARTIFACTS: ${{ github.workspace }}/artifacts
         with:
+          # The game-ci/cli release this action downloads and runs; pinned for reproducible runs.
+          cliVersion: v0.1.72
           unityVersion: ${{ steps.unity.outputs.version }}
           projectPath: .
           testMode: all
@@ -131,17 +134,17 @@ jobs:
           throw "cv-server did not become healthy at $healthUrl"
 
       - name: Unity Test Runner (integration)
-        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
+        uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213 # v4.4.0
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           CompanionScan_TEST_SERVER_URL: http://localhost:8000
           # Bearer token the app sends; the cv-server requires it on every route.
           CompanionScan_API_TOKEN: ${{ secrets.CV_SERVER_API_TOKEN }}
           CompanionScan_TEST_ARTIFACTS: ${{ github.workspace }}/artifacts
         with:
+          cliVersion: v0.1.72
           unityVersion: ${{ needs.unit-tests.outputs.unity-version }}
           projectPath: .
           testMode: playmode

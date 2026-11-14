@@ -1,16 +1,47 @@
 name: Quest APK Build
 
-# Builds the Quest 3 APK (Android, ARM64, IL2CPP) with GameCI on a
-# GitHub-hosted Ubuntu runner and uploads it as a workflow artifact. Pushing a
-# v* tag also attaches the APK to a draft GitHub Release for review.
+# Builds the Quest 3 app (Android, ARM64, IL2CPP) with GameCI on GitHub-hosted
+# Ubuntu runners, through the same build method as local builds
+# (CommandLineBuild.BuildAndroidQuest), checks the APK or AAB and uploads it as
+# a workflow artifact. Two build jobs keep the signing secrets in one place:
 #
-# The Unity editor version is read from ProjectSettings/ProjectVersion.txt.
-# Repository secrets (Settings > Secrets and variables > Actions) are listed in
-# README.md under "Continuous integration and releases".
-# Installing the APK on a headset: docs/SIDELOAD.md.
+# - debug: manual runs on a branch without "release" ticked. Signed with a
+#   debug key made for the run. It never sees the ANDROID_* secrets, and it is
+#   the only job that saves the Unity Library cache.
+# - release: v* tags on main, and manual runs on main with "release" ticked or
+#   on a v* tag. Runs in the "release" environment (add required reviewers
+#   there) and builds with -release, signed with the ANDROID_* secrets. During
+#   a signed build Unity writes both passwords in plain text into Library/Bee
+#   and into Gradle's home, which is ~/.gradle on the runner because GameCI
+#   mounts the runner's home folder as the container's /root. Anyone who can
+#   open a pull request can read this public repository's Actions caches. So
+#   this job restores the Library cache read-only, never saves a cache or
+#   uploads Library, and as soon as the build step ends deletes the decoded
+#   keystore, Library/Bee and ~/.gradle, then fails if either password is still
+#   in a file in the workspace or the runner's home folder.
+#
+# A build of a v* tag also attaches its package (the APK when the tag is
+# pushed) to a draft GitHub Release.
+#
+# The Unity editor version is read from ProjectSettings/ProjectVersion.txt and
+# the app version from bundleVersion in ProjectSettings/ProjectSettings.asset.
+# Secrets and the release environment: README.md, "Continuous integration and
+# releases". Installing the APK on a headset: docs/SIDELOAD.md.
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: Sign with the release key (main only; runs on a v* tag always are). The release environment approves the run.
+        type: boolean
+        default: false
+      package:
+        description: Package to build
+        type: choice
+        options:
+          - apk
+          - aab
+        default: apk
   push:
     tags:
       - 'v*'
@@ -24,18 +55,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build Quest APK
+  plan:
+    name: Plan the build
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 10
     outputs:
-      artifact-name: ${{ steps.stage.outputs.artifact-name }}
+      signing: ${{ steps.plan.outputs.signing }}
+      package: ${{ steps.plan.outputs.package }}
+      unity-version: ${{ steps.unity.outputs.version }}
+      version: ${{ steps.version.outputs.version }}
+      version-code: ${{ steps.version.outputs.version-code }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # GameCI semantic versioning counts commits since the latest v* tag.
+          # Every commit (without file contents), to check that a release tag is on main.
           fetch-depth: 0
+          filter: blob:none
           persist-credentials: false
 
       - name: Read Unity version from ProjectVersion.txt
@@ -50,40 +86,231 @@ jobs:
           echo "Unity editor version: $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Check repository secrets
-        id: preflight
+      - name: Read app version from ProjectSettings.asset
+        id: version
+        shell: bash
+        run: |
+          # Player Settings > Version (bundleVersion) is the only place the version is kept.
+          # CommandLineBuild derives versionCode from it the same way.
+          file=ProjectSettings/ProjectSettings.asset
+          version="$(sed -n 's/^  bundleVersion:[[:space:]]*//p' "$file" | tr -d '[:space:]')"
+          if [[ ! "$version" =~ ^([0-9]{1,4})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then
+            echo "::error file=$file::bundleVersion '$version' is not MAJOR.MINOR.PATCH with MINOR and PATCH at most 999"
+            exit 1
+          fi
+          code=$(( 10#${BASH_REMATCH[1]} * 1000000 + 10#${BASH_REMATCH[2]} * 1000 + 10#${BASH_REMATCH[3]} ))
+          if (( code < 1 || code > 2100000000 )); then
+            echo "::error file=$file::versionCode $code for $version is outside 1 to 2100000000"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error file=$file::Tag $GITHUB_REF_NAME does not match bundleVersion $version. Set Player Settings > Version, commit, and tag that commit v$version."
+            exit 1
+          fi
+          echo "App version $version, versionCode $code"
+          {
+            echo "version=$version"
+            echo "version-code=$code"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Choose debug or release signing
+        id: plan
         shell: bash
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          RELEASE: ${{ inputs.release }}
+          PACKAGE: ${{ inputs.package }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            # Only v* tags start this workflow on push, and every build of a tag is a release,
+            # also a manual run on one (for example to add the AAB to the draft release).
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+              echo "::error::Tag $GITHUB_REF_NAME is not on main. Release tags must point to a commit on main."
+              exit 1
+            fi
+            signing=release
+          elif [ "$RELEASE" = true ]; then
+            if [ "$GITHUB_REF" != refs/heads/main ]; then
+              echo "::error::Release builds run on main only, not on $GITHUB_REF_NAME. Run without \"release\" for a debug-signed build of this branch."
+              exit 1
+            fi
+            signing=release
+          else
+            signing=debug
+          fi
+          # Tag pushes have no inputs and build the APK.
+          package="${PACKAGE:-apk}"
+          echo "Signing with the $signing key; package: $package"
+          {
+            echo "signing=$signing"
+            echo "package=$package"
+          } >> "$GITHUB_OUTPUT"
+
+  debug:
+    name: Build ${{ needs.plan.outputs.package }} (debug key)
+    needs: plan
+    if: needs.plan.outputs.signing == 'debug'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the Unity secrets
+        shell: bash
+        env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        run: |
+          missing=()
+          [ -n "$UNITY_EMAIL" ] || missing+=(UNITY_EMAIL)
+          [ -n "$UNITY_PASSWORD" ] || missing+=(UNITY_PASSWORD)
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing repository secrets: ${missing[*]}. See README.md, 'Continuous integration and releases'."
+            exit 1
+          fi
+          if [[ "$UNITY_PASSWORD" == *'"'* || "$UNITY_PASSWORD" == *"\\"* ]]; then
+            echo "::error::UNITY_PASSWORD contains \" or \\, which GameCI cannot pass to docker. Give the CI Unity account another password."
+            exit 1
+          fi
+          if [ -n "$UNITY_LICENSE" ]; then
+            echo "::warning::UNITY_LICENSE is set but not used: Unity is activated with UNITY_EMAIL and UNITY_PASSWORD (Personal), plus UNITY_SERIAL for a paid seat. A .ulf breaks activation on Unity 6000.6, so delete that secret."
+          fi
+          echo "::notice::This build is signed with a debug key made for this run. Uninstall an earlier build before installing it (docs/SIDELOAD.md)."
+
+      - name: Free disk space for the Unity Android image
+        shell: bash
+        run: |
+          df -h /
+          # GameCI brings its own Android SDK/NDK in the editor image.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+
+      - name: Restore the Unity Library cache
+        id: library
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Library
+          key: Library-Android-${{ needs.plan.outputs.unity-version }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-Android-${{ needs.plan.outputs.unity-version }}-
+
+      - name: Remove stale editor process IDs from the Library
+        # Unity kills the processes named in these files when it starts, without checking what they
+        # are. In a new container that PID can be the editor itself, which then exits with 137.
+        shell: bash
+        run: rm -f Library/ilpp.pid Library/MSBuild/buildhost.pid
+
+      - name: Build with CommandLineBuild.BuildAndroidQuest
+        id: build
+        uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45 # v6.0.0
+        env:
+          # game-ci/cli activates Unity from these: email and password alone for a Personal
+          # licence, plus the serial for a paid seat. UNITY_LICENSE is deliberately not passed.
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          # The game-ci/cli release this action downloads and runs; pinned for reproducible builds.
+          cliVersion: v0.1.72
+          unityVersion: ${{ needs.plan.outputs.unity-version }}
+          projectPath: .
+          targetPlatform: Android
+          # The local build method: target API level 34 (QuestTargetSdkRequirement), the version
+          # from bundleVersion, Burst and build-callback checks. With no android* inputs and no
+          # -release it signs with Unity's debug key.
+          buildMethod: CommandLineBuild.BuildAndroidQuest
+          customParameters: ${{ needs.plan.outputs.package == 'aab' && '-aab' || '' }}
+          versioning: Custom
+          version: ${{ needs.plan.outputs.version }}
+          androidVersionCode: ${{ needs.plan.outputs.version-code }}
+
+      - name: Save the Unity Library cache
+        # Only this job saves the cache: it never sees the signing secrets.
+        if: steps.library.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Library
+          key: ${{ steps.library.outputs.cache-primary-key }}
+
+      - name: Check and stage the package
+        id: package
+        shell: bash
+        env:
+          PACKAGE: ${{ needs.plan.outputs.package }}
+          UNITY_VERSION: ${{ needs.plan.outputs.unity-version }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          VERSION_CODE: ${{ needs.plan.outputs.version-code }}
+        run: bash .github/scripts/check-quest-package.sh debug "$PACKAGE"
+
+      - name: Upload the package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.package.outputs.artifact-name }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Build ${{ needs.plan.outputs.package }} (release key)
+    needs: plan
+    if: needs.plan.outputs.signing == 'release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    # The only job that can read the signing secrets. Give this environment required
+    # reviewers and restrict it to main and v* tags (README.md, "The release environment").
+    environment: release
+    env:
+      # GameCI decodes ANDROID_KEYSTORE_BASE64 to this file in the project folder (*.p12 is
+      # gitignored) and passes the name into its build container as ANDROID_KEYSTORE_NAME.
+      KEYSTORE_NAME: companion-scan-release.p12
+    outputs:
+      artifact-name: ${{ steps.package.outputs.artifact-name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the Unity and signing secrets
+        shell: bash
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
           ANDROID_KEYALIAS_NAME: ${{ secrets.ANDROID_KEYALIAS_NAME }}
           ANDROID_KEYALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS }}
         run: |
           missing=()
-          [ -n "$UNITY_EMAIL" ] || missing+=(UNITY_EMAIL)
-          [ -n "$UNITY_PASSWORD" ] || missing+=(UNITY_PASSWORD)
-          [ -n "$UNITY_LICENSE$UNITY_SERIAL" ] || missing+=("UNITY_LICENSE or UNITY_SERIAL")
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            [ -n "$ANDROID_KEYSTORE_PASS" ] || missing+=(ANDROID_KEYSTORE_PASS)
-            [ -n "$ANDROID_KEYALIAS_NAME" ] || missing+=(ANDROID_KEYALIAS_NAME)
-            [ -n "$ANDROID_KEYALIAS_PASS" ] || missing+=(ANDROID_KEYALIAS_PASS)
-          fi
+          for name in UNITY_EMAIL UNITY_PASSWORD ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASS ANDROID_KEYALIAS_NAME ANDROID_KEYALIAS_PASS; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Missing repository secrets: ${missing[*]}. See README.md, 'Continuous integration and releases'."
+            echo "::error::Missing secrets: ${missing[*]}. Release builds must be signed with the release key; see README.md, 'Continuous integration and releases'."
             exit 1
           fi
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "Signing with the release keystore from ANDROID_KEYSTORE_BASE64."
-            echo "signing=release keystore" >> "$GITHUB_OUTPUT"
-            echo "keystore-name=release.keystore" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::ANDROID_KEYSTORE_BASE64 is not set, so this APK is signed with a one-off debug key. Uninstall the previous build before installing it (docs/SIDELOAD.md)."
-            echo "signing=one-off debug key" >> "$GITHUB_OUTPUT"
-            echo "keystore-name=" >> "$GITHUB_OUTPUT"
+          # GameCI passes the passwords on docker's and Unity's command lines, and Unity writes
+          # them inside single quotes into a Gradle script, so only letters and digits are safe.
+          invalid=()
+          for name in ANDROID_KEYSTORE_PASS ANDROID_KEYALIAS_PASS; do
+            [[ "${!name}" =~ ^[A-Za-z0-9]{20,}$ ]] || invalid+=("$name must be at least 20 letters and digits")
+          done
+          [[ "$ANDROID_KEYALIAS_NAME" =~ ^[A-Za-z0-9._-]+$ ]] ||
+            invalid+=("ANDROID_KEYALIAS_NAME must be letters, digits, '.', '_' or '-'")
+          if [[ "$UNITY_PASSWORD" == *'"'* || "$UNITY_PASSWORD" == *"\\"* ]]; then
+            invalid+=("UNITY_PASSWORD must not contain \" or \\, which GameCI cannot pass to docker")
+          fi
+          if [ "${#invalid[@]}" -gt 0 ]; then
+            for message in "${invalid[@]}"; do echo "::error::$message"; done
+            exit 1
+          fi
+          if [ -n "$UNITY_LICENSE" ]; then
+            echo "::warning::UNITY_LICENSE is set but not used: Unity is activated with UNITY_EMAIL and UNITY_PASSWORD (Personal), plus UNITY_SERIAL for a paid seat. A .ulf breaks activation on Unity 6000.6, so delete that secret."
           fi
 
       - name: Free disk space for the Unity Android image
@@ -95,97 +322,138 @@ jobs:
           sudo docker image prune --all --force > /dev/null
           df -h /
 
-      - name: Cache Unity Library
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Restore the Unity Library cache (read-only)
+        # Restore only: this job never saves a cache, because the signed build writes the
+        # passwords into Library/Bee.
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Library
-          key: Library-Android-${{ steps.unity.outputs.version }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          key: Library-Android-${{ needs.plan.outputs.unity-version }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
-            Library-Android-${{ steps.unity.outputs.version }}-
+            Library-Android-${{ needs.plan.outputs.unity-version }}-
 
-      - name: Build APK with GameCI
+      - name: Remove stale editor process IDs from the Library
+        # Unity kills the processes named in these files when it starts, without checking what they
+        # are. In a new container that PID can be the editor itself, which then exits with 137.
+        shell: bash
+        run: rm -f Library/ilpp.pid Library/MSBuild/buildhost.pid
+
+      - name: Build with CommandLineBuild.BuildAndroidQuest -release
         id: build
-        uses: game-ci/unity-builder@adaf7cd8f42fd48fbbf2d4f5f67ca30d87f819f1 # v5.0.1
+        uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45 # v6.0.0
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
-          unityVersion: ${{ steps.unity.outputs.version }}
+          cliVersion: v0.1.72
+          unityVersion: ${{ needs.plan.outputs.unity-version }}
           projectPath: .
           targetPlatform: Android
-          androidExportType: androidPackage
-          # Meta requires API level 34 exactly; QuestTargetSdkRequirement fails any other value.
-          androidTargetSdkVersion: AndroidApiLevel34
-          buildName: CompanionScan
-          buildsPath: build
-          versioning: Semantic
-          androidKeystoreName: ${{ steps.preflight.outputs.keystore-name }}
+          # The local build method reads ANDROID_KEYSTORE_NAME, ANDROID_KEYSTORE_PASS,
+          # ANDROID_KEYALIAS_NAME and ANDROID_KEYALIAS_PASS, which GameCI sets in its container
+          # from the android* inputs below; -release fails the build unless all four are set.
+          buildMethod: CommandLineBuild.BuildAndroidQuest
+          customParameters: ${{ needs.plan.outputs.package == 'aab' && '-release -aab' || '-release' }}
+          versioning: Custom
+          version: ${{ needs.plan.outputs.version }}
+          androidVersionCode: ${{ needs.plan.outputs.version-code }}
+          androidKeystoreName: ${{ env.KEYSTORE_NAME }}
           androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
           androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
           androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
 
-      - name: Stage APK and checksum
-        id: stage
+      - name: Delete the keystore and the files holding its passwords
+        # Also after a failed or cancelled build. Nothing after this step needs the key, and a
+        # password left on the runner fails the job before the package is uploaded.
+        if: always()
+        timeout-minutes: 30
         shell: bash
         env:
-          BUILD_VERSION: ${{ steps.build.outputs.buildVersion }}
-          VERSION_CODE: ${{ steps.build.outputs.androidVersionCode }}
-          UNITY_VERSION: ${{ steps.unity.outputs.version }}
-          SIGNING: ${{ steps.preflight.outputs.signing }}
+          # Only to search for copies left behind; grep reads them on standard input.
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEYALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
         run: |
-          apk=build/Android/CompanionScan.apk
-          if [ ! -f "$apk" ]; then
-            echo "::error::$apk was not produced"
-            ls -la build/Android || true
+          # The decoded keystore; Library/Bee, where Unity wrote both passwords into the Gradle
+          # project and build graph (CommandLineBuild deletes the files it finds); and Gradle's
+          # home, whose build-script cache holds them compiled. game-ci/cli runs the editor
+          # container as root with this runner's home folder mounted as /root, so Gradle's home
+          # /root/.gradle is $HOME/.gradle here.
+          sudo rm -rf -- "$KEYSTORE_NAME" Library/Bee "$HOME/.gradle"
+          echo "Deleted $KEYSTORE_NAME, Library/Bee and $HOME/.gradle."
+          if [ "$BUILD_OUTCOME" = skipped ]; then
+            echo "The build did not run, so no file holds a signing password."
+            exit 0
+          fi
+
+          # Check instead of trusting the list above. Every folder the build container mounts is
+          # in the workspace or in this home folder, so search both, as root because the
+          # container wrote as root, for either password in plain text. grep reads the passwords
+          # on standard input, not on its command line, and prints only the names of files.
+          passwords=()
+          for name in ANDROID_KEYSTORE_PASS ANDROID_KEYALIAS_PASS; do
+            if [ -n "${!name}" ]; then passwords+=("${!name}"); fi
+          done
+          if [ "${#passwords[@]}" -eq 0 ]; then
+            echo "No signing password is set, so no file holds one."
+            exit 0
+          fi
+          roots=("$HOME")
+          case "$GITHUB_WORKSPACE/" in
+            "$HOME"/*) ;;
+            *) roots+=("$GITHUB_WORKSPACE") ;;
+          esac
+          status=0
+          leftovers="$(printf '%s\n' "${passwords[@]}" |
+            sudo grep --recursive --files-with-matches --fixed-strings --devices=skip --file=- -- "${roots[@]}")" ||
+            status=$?
+          if [ -n "$leftovers" ]; then
+            echo "::error::A signing password is still in the files below. Add them to the rm command of this step."
+            printf '%s\n' "$leftovers"
             exit 1
           fi
-          name="CompanionScan-${BUILD_VERSION}"
-          # build/ is owned by the container's root user, so stage in dist/.
-          mkdir -p dist
-          cp "$apk" "dist/${name}.apk"
-          (cd dist && sha256sum "${name}.apk" > "${name}.apk.sha256")
-          echo "artifact-name=${name}" >> "$GITHUB_OUTPUT"
-          {
-            echo "### Quest APK"
-            echo ""
-            echo "| | |"
-            echo "|---|---|"
-            echo "| File | \`${name}.apk\` |"
-            echo "| Version / versionCode | ${BUILD_VERSION} / ${VERSION_CODE} |"
-            echo "| Unity | ${UNITY_VERSION} |"
-            echo "| Signed with | ${SIGNING} |"
-            echo "| SHA-256 | \`$(cut -d ' ' -f 1 "dist/${name}.apk.sha256")\` |"
-            echo ""
-            echo "Install it on a Quest 3 with docs/SIDELOAD.md."
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -gt 1 ]; then
+            echo "::warning::grep could not read every file (exit $status, messages above). None of the files it read holds a signing password."
+          else
+            echo "Neither signing password is in a file under ${roots[*]}."
+          fi
 
-      - name: Upload APK artifact
+      - name: Check and stage the package
+        id: package
+        shell: bash
+        env:
+          PACKAGE: ${{ needs.plan.outputs.package }}
+          UNITY_VERSION: ${{ needs.plan.outputs.unity-version }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          VERSION_CODE: ${{ needs.plan.outputs.version-code }}
+        run: bash .github/scripts/check-quest-package.sh release "$PACKAGE"
+
+      - name: Upload the package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ${{ steps.stage.outputs.artifact-name }}
+          name: ${{ steps.package.outputs.artifact-name }}
           path: dist/
           if-no-files-found: error
           retention-days: 7
 
-  release:
-    name: Attach APK to draft release
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+  publish:
+    name: Attach the package to a draft release
+    needs: release
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
     steps:
-      - name: Download APK artifact
+      - name: Download the package artifact
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: ${{ needs.build.outputs.artifact-name }}
+          name: ${{ needs.release.outputs.artifact-name }}
           path: dist
 
-      - name: Create or update draft release
+      - name: Create or update the draft release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -193,11 +461,12 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           shopt -s nullglob
-          files=(dist/*.apk dist/*.sha256)
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "::error::The build artifact contains no APK"
+          packages=(dist/*.apk dist/*.aab)
+          if [ "${#packages[@]}" -eq 0 ]; then
+            echo "::error::The build artifact contains no APK or AAB"
             exit 1
           fi
+          files=("${packages[@]}" dist/*.sha256)
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" "${files[@]}" --clobber
           else

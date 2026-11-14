@@ -74,9 +74,22 @@ Triggers, runners and repository secrets are summarised in the README under
   - Runs Playwright coverage for the browser client workflows
 
 - Job D: Quest APK build (`quest-build.yml`, GitHub-hosted runner)
-  - Manual runs and `v*` tags; a tag also creates a draft GitHub Release
-  - Builds the Android APK with GameCI, using the editor version from
-    `ProjectSettings/ProjectVersion.txt`
+  - Manual runs and `v*` tags on `main`; a tag build also creates a draft
+    GitHub Release
+  - Builds the Android APK (or AAB) with GameCI through
+    `CommandLineBuild.BuildAndroidQuest`, using the editor version from
+    `ProjectSettings/ProjectVersion.txt` and the app version from Player
+    Settings > Version, then checks the signature, versionCode and target API
+    level
+  - Manual runs on a branch build debug-signed in a job that never sees the
+    `ANDROID_*` secrets and is the only one that saves the Library cache
+  - Tags, and manual runs on `main` with **release**, build with `-release` in
+    a separate job that runs in the `release` environment (required reviewers),
+    restores the Library cache read-only and never saves a cache. After the
+    build it deletes the decoded keystore, `Library/Bee` and Gradle's home
+    (`~/.gradle` on the runner), where Unity wrote the passwords, then fails if
+    either password is still in a file in the workspace or the runner's home
+    folder
   - Installing the APK on a headset: [SIDELOAD.md](SIDELOAD.md)
 
 ## Environment Variables
