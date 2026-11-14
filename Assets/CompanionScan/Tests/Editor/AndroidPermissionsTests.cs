@@ -149,7 +149,11 @@ namespace CompanionScan.Tests.Editor
                 }
 
                 var source = File.ReadAllText(file);
-                foreach (var api in new[] { "OVRHand", "OVRSkeleton", "XRHandSubsystem", "OVRInput.Controller.Hands" })
+                foreach (var api in new[]
+                         {
+                             "OVRHand", "OVRSkeleton", "XRHandSubsystem", "UnityEngine.XR.Hands",
+                             "OVRInput.Controller.Hands", "OVRInput.Controller.LHand", "OVRInput.Controller.RHand"
+                         })
                 {
                     StringAssert.DoesNotContain(api, source, $"{file} uses {api}; hand tracking needs HAND_TRACKING back");
                 }

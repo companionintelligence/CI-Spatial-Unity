@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEditor;
@@ -48,6 +49,15 @@ namespace CompanionScan.Tests.Editor
             Assert.IsTrue(Regex.IsMatch(text, packagePattern), path + " does not set the Android package name");
         }
 
+        /// <summary>
+        /// The old label, spelled CompanionCapture or Companion Capture. The package name
+        /// (com.CompanionIntelligence.CompanionCapture) and the main scene's file name
+        /// (CompanionCapture.unity) are not labels and stay.
+        /// </summary>
+        private static readonly Regex OldLabel = new Regex(@"(?<![\w./\\])Companion ?Capture(?!\.unity)", RegexOptions.IgnoreCase);
+
+        private static readonly Regex StringLiteral = new Regex(@"""(?:[^""\\\r\n]|\\.)*""");
+
         [Test]
         public void NoUserFacingTextUsesTheOldLabel()
         {
@@ -58,8 +68,33 @@ namespace CompanionScan.Tests.Editor
                     continue;
                 }
 
-                StringAssert.DoesNotContain("\"CompanionCapture", File.ReadAllText(file), file);
+                foreach (Match literal in StringLiteral.Matches(File.ReadAllText(file)))
+                {
+                    Assert.IsFalse(OldLabel.IsMatch(literal.Value), $"{file} shows the old label: {literal.Value}");
+                }
             }
+
+            // Scenes and prefabs: text components, object names and any other serialized text.
+            var assets = Directory.GetFiles("Assets", "*.unity", SearchOption.AllDirectories)
+                .Concat(Directory.GetFiles("Assets", "*.prefab", SearchOption.AllDirectories))
+                .ToList();
+            Assert.That(assets, Has.Some.EndsWith("CompanionCapture.unity"), "the main scene was not checked");
+            foreach (var file in assets)
+            {
+                var match = OldLabel.Match(File.ReadAllText(file));
+                Assert.IsFalse(match.Success, $"{file} contains the old label \"{match.Value}\"");
+            }
+        }
+
+        [TestCase("productName: Companion Capture", true)]
+        [TestCase("m_text: \"Welcome to CompanionCapture\"", true)]
+        [TestCase("\"companioncapture\"", true)]
+        [TestCase("Android: com.CompanionIntelligence.CompanionCapture", false)]
+        [TestCase("path: Assets/CompanionScan/Scenes/CompanionCapture.unity", false)]
+        [TestCase("\"Companion Scan\"", false)]
+        public void OldLabelPattern_FindsBothSpellingsButNotThePackageOrSceneName(string text, bool found)
+        {
+            Assert.AreEqual(found, OldLabel.IsMatch(text));
         }
     }
 }

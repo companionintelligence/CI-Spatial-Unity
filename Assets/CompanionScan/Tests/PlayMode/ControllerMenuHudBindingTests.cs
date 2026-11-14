@@ -1,6 +1,10 @@
+using System.Collections;
+using System.Reflection;
+using CompanionScan.Mapping;
 using CompanionScan.UI;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace CompanionScan.Tests.PlayMode
 {
@@ -30,6 +34,53 @@ namespace CompanionScan.Tests.PlayMode
 
             Object.DestroyImmediate(menuGo);
             Object.DestroyImmediate(hudRoot);
+        }
+
+        [UnityTest]
+        public IEnumerator BusyLabel_ReadsBusyWithThreeDots_WhileACaptureRuns()
+        {
+            // The commit "fix(hud): show BUSY... instead of mis-encoded text" fixed this label: it held
+            // an ellipsis encoded twice (UTF-8 read as Windows-1252), so the wrist showed BUSY and three
+            // stray characters.
+            var hudRoot = new GameObject("ControllerHUD");
+            hudRoot.AddComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+            var busyLabel = CreateLabel(hudRoot.transform, "BusyLabel");
+
+            // Inactive, so it sets up no camera: the wrist display reads only whether it is busy.
+            var pipelineGo = new GameObject("Pipeline");
+            pipelineGo.SetActive(false);
+            var pipeline = pipelineGo.AddComponent<SpatialCapturePipeline>();
+
+            var menuGo = new GameObject("MenuUI");
+            menuGo.SetActive(false);
+            var menu = menuGo.AddComponent<ControllerMenuUI>();
+            SetPrivateField(menu, "pipeline", pipeline);
+            SetPrivateField(menu, "busyLabel", busyLabel);
+            menuGo.SetActive(true);
+
+            try
+            {
+                SetPrivateField(pipeline, "_isBusy", true);
+                yield return null;
+                Assert.AreEqual("BUSY...", ReadTmpText(busyLabel.gameObject));
+
+                SetPrivateField(pipeline, "_isBusy", false);
+                yield return null;
+                Assert.AreEqual(string.Empty, ReadTmpText(busyLabel.gameObject));
+            }
+            finally
+            {
+                Object.DestroyImmediate(menuGo);
+                Object.DestroyImmediate(pipelineGo);
+                Object.DestroyImmediate(hudRoot);
+            }
+        }
+
+        private static void SetPrivateField(object target, string name, object value)
+        {
+            var field = target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, $"{target.GetType().Name}.{name} not found");
+            field.SetValue(target, value);
         }
 
         private static Component CreateLabel(Transform parent, string name)
