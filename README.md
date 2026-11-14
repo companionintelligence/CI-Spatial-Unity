@@ -109,7 +109,7 @@ world-space panels that the same buttons drive while they are open.
 | Button | Colour | Action | Details |
 |--------|--------|--------|---------|
 | **A** | Red | **Capture** | Takes a snapshot. Runs both Meta Scene + CV Server pipelines (respects current model preset). 3D labels persist after each capture. Before the first snapshot leaves the headset, a notice says what is sent and where; **A** agrees and captures, **B** sends nothing. The agreement is recorded on the headset, for that server only: after the server URL changes, the next capture asks again. |
-| **B** | Blue | **Cycle Model** | Cycles the active AI model preset: Florence → GDino → SAM2 → Florence … |
+| **B** | Blue | **Cycle Model** | Cycles the active AI model preset. The app starts on GDino: GDino → SAM2 → Florence → GDino … |
 
 ### Left Controller
 
@@ -131,7 +131,7 @@ A small world-space panel is attached to the left controller wrist showing
 the current state:
 
 ```
-Model: Florence
+Model: DINO
 Display: Both
 Preview: Near (1m)
 BUSY...          ← shown during capture
@@ -165,8 +165,9 @@ The modes only show or hide: boxes are still drawn and pins still placed while
 they are hidden, and capture and every button keep working in all three modes.
 
 Pins, and so labels, come from GDino and SAM2 detections and from Space Setup.
-The Florence preset captions the snapshot and lists its objects but places no
-pins.
+The app starts on GDino, which looks for common room objects such as chairs,
+tables and lamps. The Florence preset captions the snapshot and lists its
+objects but places no pins.
 
 ### Preview Distance
 
@@ -226,11 +227,12 @@ Use Unity `6000.6.9f1`, the editor version pinned in
    - Run Space Setup on the headset and grant `com.oculus.permission.USE_SCENE`.
 
 6. **Use the controller**
-    - **A** — capture (both pipelines run, 3D labels appear in world space).
-    - **B** — switch model if you only want one AI model active.
-    - **X** — change preview distance.
-    - **Y** — save a glTF export on the headset.
-    - **Trigger** — toggle between 2D boxes, 3D labels, or both.
+    - **A**: capture (both pipelines run, 3D labels appear in world space).
+    - **B**: switch the AI model. The app starts on GDino; B goes to SAM2,
+      then Florence, then back to GDino.
+    - **X**: change preview distance.
+    - **Y**: save a glTF export on the headset.
+    - **Trigger**: toggle between 2D boxes, 3D labels, or both.
 
 ### Web Client
 
