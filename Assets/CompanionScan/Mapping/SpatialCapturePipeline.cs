@@ -109,6 +109,7 @@ namespace CompanionScan.Mapping
         private ICameraProvider _cameraProvider;
         private CVServerClient _client;
         private bool _isBusy;
+        private bool _loggedStaticCameraPose;
         private Texture2D _frameTexture;
         private CaptureFrame _lastCaptureFrame;
         private readonly Dictionary<int, Vector3> _smoothedPositions = new Dictionary<int, Vector3>();
@@ -259,6 +260,10 @@ namespace CompanionScan.Mapping
                 Debug.Log("[Pipeline] Created ARSession + PCA camera for passthrough capture.");
             }
 
+            // The camera object sits under this root, which never moves: the provider reports the
+            // pose of the camera that follows the headset instead of its own.
+            var tracked = snapshotCamera != null ? snapshotCamera : Camera.main;
+            existingProvider.EnsurePoseSource(tracked != null ? tracked.transform : null);
             cameraProviderSource = existingProvider;
         }
 #endif
@@ -651,13 +656,21 @@ namespace CompanionScan.Mapping
         private CaptureFrame BuildCaptureFrame(byte[] jpegBytes)
         {
             var cam = snapshotCamera != null ? snapshotCamera : Camera.main;
-            Pose pose = cam != null
+            Pose cameraPose = cam != null
                 ? new Pose(cam.transform.position, cam.transform.rotation)
                 : new Pose(Vector3.zero, Quaternion.identity);
+            Pose pose = cameraPose;
 
             if (_cameraProvider != null)
             {
-                pose = _cameraProvider.GetCameraPose();
+                // A provider that reports the world origin while the headset is elsewhere is a
+                // transform that does not follow the headset: stamp the headset's pose instead.
+                pose = CapturePose.Resolve(_cameraProvider.GetCameraPose(), cam != null, cameraPose, out bool providerRejected);
+                if (providerRejected && !_loggedStaticCameraPose)
+                {
+                    _loggedStaticCameraPose = true;
+                    Debug.LogWarning("[Pipeline] The camera provider reported the world origin while the headset is elsewhere; capture frames carry the headset's pose instead.");
+                }
             }
 
             var intrinsics = _cameraProvider != null
