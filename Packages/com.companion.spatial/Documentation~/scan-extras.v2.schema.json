@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:companion:scan-extras:2",
+  "title": "Companion scan extras, schema 2",
+  "description": "The extras object at the root of a glTF that the Companion scanner exports (schema 2, with a reader for v1 in the Companion.Spatial package). Hand written; the field names follow the web Scan contract where the concept is the same, and CONTRACT.md lists where they do not. Unknown keys are allowed everywhere on purpose: other tools and newer scanners may add them, and a reader keeps them.",
+  "type": "object",
+  "required": ["schema", "schema_version", "units", "space", "frames", "objects", "planes"],
+  "properties": {
+    "schema": {
+      "description": "The schema id.",
+      "const": "companion.scan-extras"
+    },
+    "schema_version": {
+      "description": "The schema version, a number (v1 had the text \"1.0\").",
+      "const": 2
+    },
+    "units": {
+      "description": "Every length in the file is in metres.",
+      "const": "meters"
+    },
+    "space": { "$ref": "#/$defs/space" },
+    "consent": { "$ref": "#/$defs/consent" },
+    "device": { "$ref": "#/$defs/device" },
+    "frames": {
+      "description": "The camera frames the scan kept. Always a list, empty when there are none.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/frame" }
+    },
+    "objects": {
+      "description": "The things found in the room (v1: pins). Always a list, empty when there are none. Merged by id when a space is exported again.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/object" }
+    },
+    "planes": {
+      "description": "The surfaces of the headset's scene model (v1: meta_scene.anchors). Always a list, empty when there are none.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/plane" }
+    },
+    "bounds": { "$ref": "#/$defs/bounds" }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "vec2": {
+      "description": "Two numbers on a plane's own axes, in metres.",
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "vec3": {
+      "description": "A point or a size in the space's coordinate frame, in metres.",
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "quat": {
+      "description": "An orientation as a quaternion.",
+      "type": "object",
+      "required": ["x", "y", "z", "w"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" },
+        "w": { "type": "number" }
+      }
+    },
+    "timestamp": {
+      "description": "An ISO 8601 time in UTC, such as 2026-11-25T10:00:00.0000000Z.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "metaLabel": {
+      "description": "One of the 16 semantic labels of Meta's Space Setup export.",
+      "type": "string",
+      "enum": [
+        "CEILING", "DOOR_FRAME", "FLOOR", "INVISIBLE_WALL_FACE", "WALL_ART", "WALL_FACE", "WINDOW_FRAME", "COUCH",
+        "TABLE", "BED", "LAMP", "PLANT", "SCREEN", "STORAGE", "GLOBAL_MESH", "OTHER"
+      ]
+    },
+    "pose": {
+      "description": "A position and an orientation in the space's coordinate frame (the web contract's Pose, without its frame member: the frame is space.frame).",
+      "type": "object",
+      "required": ["position", "quaternion"],
+      "properties": {
+        "position": { "$ref": "#/$defs/vec3" },
+        "quaternion": { "$ref": "#/$defs/quat" }
+      }
+    },
+    "bounds": {
+      "description": "An axis-aligned box as a centre and a size, in metres.",
+      "type": "object",
+      "required": ["center", "size"],
+      "properties": {
+        "center": { "$ref": "#/$defs/vec3" },
+        "size": { "$ref": "#/$defs/vec3" }
+      }
+    },
+    "box": {
+      "description": "A 2D box as [cx, cy, w, h], fractions of the frame image with the origin at the top left (the web contract's bbox_cxcywh).",
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "number", "minimum": 0, "maximum": 1 }
+    },
+    "intrinsics": {
+      "description": "The pinhole model of the camera for a frame, in pixels of that frame's image.",
+      "type": "object",
+      "required": ["fx", "fy", "cx", "cy"],
+      "properties": {
+        "fx": { "type": "number", "exclusiveMinimum": 0 },
+        "fy": { "type": "number", "exclusiveMinimum": 0 },
+        "cx": { "type": "number" },
+        "cy": { "type": "number" },
+        "width": { "description": "The image width in pixels; left out when unknown.", "type": "integer", "minimum": 1 },
+        "height": { "description": "The image height in pixels; left out when unknown.", "type": "integer", "minimum": 1 }
+      }
+    },
+    "label": {
+      "description": "What an object is called: the text as shown, its canonical tag, and the Meta label of the tag.",
+      "type": "object",
+      "required": ["text", "tag", "semantic"],
+      "properties": {
+        "text": { "description": "The text a detector or the headset gave, as shown (\"TV screen\").", "type": "string" },
+        "tag": { "description": "The canonical lower-case singular tag (\"screen\").", "type": "string" },
+        "semantic": { "$ref": "#/$defs/metaLabel" }
+      }
+    },
+    "observation": {
+      "description": "One sighting of an object in a camera frame.",
+      "type": "object",
+      "required": ["frame_id", "score"],
+      "properties": {
+        "frame_id": { "description": "The id of a frame in frames.", "type": "string" },
+        "bbox_cxcywh": { "$ref": "#/$defs/box" },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "object": {
+      "description": "One thing in the room.",
+      "type": "object",
+      "required": ["id", "track_id", "label", "confidence", "source", "pose", "observations"],
+      "properties": {
+        "id": { "description": "Unique in the file and stable across exports: what a re-export merges on.", "type": "string", "minLength": 1 },
+        "track_id": { "description": "The number of the object's track in the app run that found it; 0 when it was not tracked.", "type": "integer", "minimum": 0 },
+        "label": { "$ref": "#/$defs/label" },
+        "confidence": { "description": "The fused confidence of the object (noisy-OR of its detections for a CV object, 1 for the headset's).", "type": "number", "minimum": 0, "maximum": 1 },
+        "source": { "description": "Who found it.", "type": "string", "enum": ["cv", "device", "manual"] },
+        "pose": { "$ref": "#/$defs/pose" },
+        "normal": { "description": "The surface normal where the object was placed (a unit vector).", "$ref": "#/$defs/vec3" },
+        "bounds": { "description": "The box around the object in world space, when its extent is known.", "$ref": "#/$defs/bounds" },
+        "anchor_uuid": { "description": "The headset's anchor id, for an object from the scene model.", "type": "string", "minLength": 1 },
+        "observations": {
+          "description": "The most recent sightings, oldest first. Always a list.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/observation" }
+        }
+      }
+    },
+    "frame": {
+      "description": "One camera frame the scan kept (the web contract's keyframe).",
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "description": "Unique in the file and stable across exports.", "type": "string", "minLength": 1 },
+        "timestamp_utc": { "$ref": "#/$defs/timestamp" },
+        "image": { "description": "The path of the JPEG beside the glTF, with forward slashes.", "type": "string", "minLength": 1 },
+        "pose": { "description": "Where the camera was when it took the frame.", "$ref": "#/$defs/pose" },
+        "intrinsics": { "$ref": "#/$defs/intrinsics" }
+      }
+    },
+    "plane": {
+      "description": "A surface of the headset's scene model.",
+      "type": "object",
+      "required": ["id", "label", "semantic", "pose", "boundary"],
+      "properties": {
+        "id": { "description": "The headset's anchor uuid.", "type": "string", "minLength": 1 },
+        "label": { "description": "The canonical tag of the plane's label (\"wall\").", "type": "string" },
+        "semantic": { "$ref": "#/$defs/metaLabel" },
+        "pose": { "$ref": "#/$defs/pose" },
+        "center": { "description": "The centre of the plane's rectangle on the plane's own x and y axes.", "$ref": "#/$defs/vec2" },
+        "size": { "description": "The size of the plane's rectangle along the plane's own x and y axes.", "$ref": "#/$defs/vec2" },
+        "boundary": {
+          "description": "The outline of the plane in world space. Always a list, empty when the headset gave none.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/vec3" }
+        }
+      }
+    },
+    "space": {
+      "description": "The room the file describes.",
+      "type": "object",
+      "required": ["id", "frame"],
+      "properties": {
+        "id": { "description": "The Space Setup room uuid, or \"default\".", "type": "string", "minLength": 1 },
+        "frame": { "description": "The coordinate frame of every position, rotation and size in the file: \"unity-world\" (metres, +Y up, left-handed) or \"local-floor\" (WebXR, metres, +Y up, right-handed).", "type": "string", "minLength": 1 },
+        "created_at_utc": { "$ref": "#/$defs/timestamp" },
+        "updated_at_utc": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "consent": {
+      "description": "The user's agreement to the scan, recorded with the data.",
+      "type": "object",
+      "required": ["notice_version", "agreed_at_utc"],
+      "properties": {
+        "notice_version": { "description": "The version of the privacy notice the user agreed to.", "type": "string", "minLength": 1 },
+        "agreed_at_utc": { "$ref": "#/$defs/timestamp" },
+        "server": { "description": "The server the data may go to.", "type": "string", "minLength": 1 }
+      }
+    },
+    "device": {
+      "description": "The device and the app that made the scan.",
+      "type": "object",
+      "properties": {
+        "model": { "type": "string" },
+        "os": { "type": "string" },
+        "app": { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
