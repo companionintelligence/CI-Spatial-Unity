@@ -95,6 +95,21 @@ device may offer it an `immersive-ar` session with camera access. `web/README.md
 how to serve it over HTTPS with the token added by the dev server's proxy. Not tried on a tablet. Safari on iOS
 has no WebXR AR, so there is no such route for the iPhone or iPad.
 
+## Other Companion apps for the same devices
+
+Before building a backend here, see what the org's web room scanner, `companionintelligence/Companion-Scan`,
+already does for these devices. Its `docs/targets/` has one page per device, with what has run on hardware and
+what has not; as of 2026-11-24 almost nothing has run on a device. As read on 2026-11-25:
+
+| Device | Its route | State there |
+|---|---|---|
+| Android tablet | Capacitor app with its own ARCore plugin (`ScanAR`) | Built by its Mobile Build workflow; not run on a device. |
+| iPhone | The same shell with ARKit | Compiled for the iOS Simulator; not run on a device. No iPad build. |
+| Quest 3 | A native Meta Spatial SDK app | Pre-release `quest-v0.1.0-preview.1`; not run on a headset. |
+| XREAL Aura, PICO | A WebXR-only Android app, or the browser at `/webxr.html` on a Scan server | Pre-release `v0.2.1-headsets.1`. On an Aura puck it opens but cannot capture, because its WebView has no WebXR; Chrome on the puck is the untried capture path. Nobody has run it on a PICO headset. |
+
+Those apps talk to a Scan server over https, not to `cv-server`.
+
 ## XREAL Aura
 
 Unity 6.5 or newer supports it through the Android XR build profile and the OpenXR: Android XR package (one
