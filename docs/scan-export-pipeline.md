@@ -69,7 +69,10 @@ see [`web/README.md`](../web/README.md).
 - Pin de-duplication merges nearby pins with the same semantic label (for `OTHER`,
   the same detector label).
 - Semantic plane hits (floor, wall, table) are preferred when available.
-- Pins carry capture session/frame IDs and per-label track IDs.
+- Pins carry capture session/frame IDs and track IDs. The tracker (`TrackTable` in the
+  `com.companion.spatial` package) matches detections of the same tag within 0.4 m across
+  captures; an object that is not seen for a while is lost, not forgotten, so seen again it
+  keeps its track.
 - A newer pin of the same object (track ID, Space Setup anchor, or the same label
   nearby) updates its pin. Nothing in the app clears pins, so they last until
   the app is closed. Pruning by age is optional and off.

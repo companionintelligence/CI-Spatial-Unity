@@ -64,9 +64,10 @@ local server.
 
 | Component | File | Role |
 |-----------|------|------|
-| `XRControllerInput` | `UI/XRControllerInput.cs` | Polls OVRInput, dispatches to ControllerMenuUI |
+| `ControllerInput` | `UI/ControllerInput.cs` | Routes buttons from an input backend to ControllerMenuUI and the panels |
+| `XRControllerInput` | `Quest/XRControllerInput.cs` | Quest backend: polls OVRInput, reports the buttons to ControllerInput |
 | `ControllerMenuUI` | `UI/ControllerMenuUI.cs` | State machine: model preset, display mode, preview distance |
-| `ControllerMenuBuilder` | `UI/ControllerMenuBuilder.cs` | Builds HUD + button indicators at runtime |
+| `ControllerMenuBuilder` | `Quest/ControllerMenuBuilder.cs` | Builds HUD + button indicators at runtime |
 | `SpatialCapturePipeline` | `Mapping/SpatialCapturePipeline.cs` | Orchestrates both capture pipelines |
 | `SpatialPinManager` | `Mapping/SpatialPinManager.cs` | Unified pin storage + prefab spawning |
 | `ViewportRaycaster` | `Mapping/ViewportRaycaster.cs` | 2D UV → 3D world hit (AR + Physics) |

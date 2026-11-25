@@ -182,6 +182,38 @@ with deduplication, the same semantic label (for `OTHER`, the same detector labe
 within `dedupDistance`. When lifecycle
 is enabled (off by default), pins older than `pinMaxAgeSeconds` are removed.
 
+## Assemblies and Backends
+
+The code in `Assets/CompanionScan/` is split so that only one assembly depends on the Meta SDK:
+
+| Assembly | Folder | Holds |
+| --- | --- | --- |
+| `CompanionScan.Core` | everything except the folders below | The capture pipeline, mapping, export, UI and server client. References no `Oculus.*` or `Meta.*` assembly (`CoreAssemblyTests` checks it). |
+| `CompanionScan.Quest` | `Quest/` | The Meta backend: `MetaSceneCollector` (OVRAnchor), `XRControllerInput` (OVRInput), `ControllerMenuBuilder` (finds the Touch controller anchors) and the Horizon Store entitlement check. |
+| `CompanionScan.Replay` | `Replay/` | A recorded session played back with no headset (see below). |
+
+A platform is a set of backends for four seams, all defined in Core. The scenes wire the Quest ones.
+
+| Seam | What it answers | Quest backend | Replay backend |
+| --- | --- | --- | --- |
+| `ICameraSource` (extends `ICameraProvider`) | One frame with the pose and intrinsics of the moment it was taken | `MobileCameraProvider` and `QuestCameraProvider`, through an adapter (`CameraSources.From`) | `ReplayCameraSource` |
+| `ISceneSource` | The room's planes, volumes and meshes (Space Setup) | `MetaSceneCollector` | `ReplaySceneSource` |
+| `IRaycastSource` | Where a ray meets the room; asked first by `ViewportRaycaster.AddSource` | the AR and environment raycasts stay inside `ViewportRaycaster` for now | `ReplayRaycastSource` |
+| `IInputSource` | Which button went down; `ControllerInput` routes it to the menu and panels | `XRControllerInput` | `ScriptedControllerInput` |
+
+A frame from a plain `ICameraProvider` has no promise about its pose, so the pipeline checks it against
+the headset's own (`CapturePose`). A frame from an `ICameraSource` is taken as it is, even at the world
+origin. `CaptureFrame.HasIntrinsics` is true only for pixel intrinsics: finite focal lengths above one pixel.
+The zero matrix (and the identity matrix, which used to stand in for it) means "unknown", and the pipeline
+then raycasts through the scene camera's view.
+
+### Replay
+
+`ReplayRig.Attach` points a pipeline at a `ScanRecording`: camera frames with their poses and intrinsics, the
+room's planes for raycasts, and a Space Setup snapshot. `SyntheticRoom.Build` makes a recording of a 4 x 6 m
+box room with no image files. The PlayMode `ReplayPipelineTests` run the whole pipeline against it and an
+in-process CV server on a loopback port, and check where the pins land against geometry worked out by hand.
+
 ## Key Components
 
 Components in `Assets/CompanionScan/`:
@@ -189,7 +221,7 @@ Components in `Assets/CompanionScan/`:
 | Component | Role |
 | --- | --- |
 | `SpatialCapturePipeline` | Orchestrator — runs CV pipeline (Florence2→GDino→SAM2) and/or Meta Scene capture |
-| `MetaSceneCollector` | Queries OVRAnchor/OVRRoomLayout, converts to `SpatialPin`s |
+| `MetaSceneCollector` | Quest: queries OVRAnchor/OVRRoomLayout, converts to `SpatialPin`s |
 | `ViewportRaycaster` | Converts image-space UV → world-space hit via Physics or ARRaycast. Exposes `FallbackDistance` for runtime control. |
 | `SpatialPinManager` | Stores + spawns pins from both systems |
 | `SpatialPin` | Unified data type with `PinSource` enum |
@@ -199,8 +231,9 @@ Components in `Assets/CompanionScan/`:
 | `SpatialMapExporter` | Exports glTF with unified extras from both systems |
 | `GltfSyncClient` | Uploads exported glTF to the CV server |
 | `CVServerClient` | HTTP client for `/v1/detect`, `/v1/segment`, `/v1/florence` |
-| `ICameraProvider` | Camera abstraction (Quest / Desktop / Mobile implementations) |
-| `XRControllerInput` | Polls OVRInput and dispatches button presses to `ControllerMenuUI` |
+| `ICameraProvider` / `ICameraSource` | Camera abstraction (Quest / Desktop / Mobile / Replay implementations); a source returns the frame with its pose and intrinsics |
+| `ControllerInput` | Routes button presses from an input backend to `ControllerMenuUI` and the panels |
+| `XRControllerInput` | Quest: polls OVRInput and reports the buttons to `ControllerInput` |
 | `ControllerMenuUI` | State machine: model preset, display mode, preview distance |
 | `ControllerMenuBuilder` | Builds coloured button indicators, wrist HUD, and wires everything at runtime |
 | `LabelRenderer` | Floats one 3D label beside every pin of the `SpatialPinManager`; a label moves with its pin and goes when the pin is cleared |
@@ -447,13 +480,23 @@ The `pins` array contains entries from **both** systems.  Use the `source` field
 ## Notes
 
 - Boundary points come from `XRInputSubsystem.TryGetBoundaryPoints` when available.
-- If no boundary is available, the floorplan uses a convex hull over pin positions.
-- The floor mesh is optional and is created just for export.
+- If no boundary is available, the floorplan uses a convex hull over pin positions. Pins on one line, or on
+  fewer than three places, enclose no area and give no floor plan.
+- The floor mesh is optional and is created just for export. It is triangulated by ear clipping, so a concave
+  boundary is covered exactly, and it faces up whichever way the polygon runs.
+- An export of a space that already has a glTF keeps the earlier extras (`ExtrasMergeV1`). A pin of the same
+  object (the same Space Setup anchor, or the same capture session and track id) and a snapshot with the same
+  id replace their earlier entries instead of being listed twice, and the new time, bounds, floor plan, scene
+  and space id replace the old ones. A glTF that cannot be read is ignored with a warning. The exporter still
+  writes extras schema 1.0; the `com.companion.spatial` package has the schema 2 reader, writer and merge.
 - Pins are spawned in world space and included in the exported scene.
 - Use `SpatialMapExporter.ExportAndSync()` to upload the glTF to the server via `GltfSyncClient`.
 - Both capture systems write `SpatialPin` objects with `PinSource.CvServer` or `PinSource.MetaScene`.
 - `SpatialPinManager.ClearPins(PinSource)` can selectively clear one system's pins.
 - Meta Scene pins have `score = 1.0` (ground-truth) and carry `planeSize`/`volumeSize`/`anchorUuid`.
 - CV Server pins have `bboxPixels`/`bboxNormalized` and are raycasted via `ViewportRaycaster`.
-- `SemanticLabelMapper` normalises both CV and Meta labels to the same Meta vocabulary.
+- `SemanticLabelMapper` maps both CV and Meta labels to the same Meta vocabulary, through the tag vocabulary of
+  the `com.companion.spatial` package (case, articles, plurals and synonyms: "a couch", "tables" and "TV screen"
+  all find their label). A class Meta has no label for (a chair, a cup) is OTHER but is still a tag, which is
+  what tracking uses.
 - The Meta Scene API reference: <https://developers.meta.com/horizon/documentation/unity/unity-scene-overview/>
