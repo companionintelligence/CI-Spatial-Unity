@@ -1,0 +1,16 @@
+{
+  "name": "CompanionScan.Replay",
+  "rootNamespace": "CompanionScan.Replay",
+  "references": [
+    "CompanionScan.Core"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

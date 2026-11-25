@@ -13,7 +13,7 @@ namespace CompanionScan.Mapping
     /// and produces a <see cref="MetaSceneSnapshot"/> plus optional
     /// <see cref="SpatialPin"/> list for the unified pin manager.
     /// </summary>
-    public class MetaSceneCollector : MonoBehaviour
+    public class MetaSceneCollector : MonoBehaviour, ISceneSource
     {
         [SerializeField] private Transform trackingSpace;
         [SerializeField] private bool includePlanes = true;
@@ -49,37 +49,7 @@ namespace CompanionScan.Mapping
         /// </summary>
         public List<SpatialPin> ConvertSnapshotToPins(MetaSceneSnapshot snapshot = null)
         {
-            snapshot ??= LastSnapshot;
-            var pins = new List<SpatialPin>();
-            if (snapshot?.anchors == null) return pins;
-
-            foreach (var anchor in snapshot.anchors)
-            {
-                // Use the first label, or fall back to OTHER
-                string label = anchor.labels != null && anchor.labels.Count > 0
-                    ? anchor.labels[0]
-                    : "OTHER";
-
-                var pin = new SpatialPin
-                {
-                    label = label,
-                    semanticLabel = label, // already a Meta label
-                    score = 1f,            // ground-truth confidence
-                    source = PinSource.MetaScene,
-                    position = anchor.position,
-                    normal = anchor.hasPlane ? (anchor.rotation * Vector3.up) : Vector3.up,
-                    rotation = anchor.rotation,
-                    planeSize = anchor.hasPlane ? anchor.planeSize : Vector3.zero,
-                    volumeSize = anchor.hasVolume ? anchor.volumeSize : Vector3.zero,
-                    anchorUuid = anchor.uuid,
-                    sourcePrompt = "meta_scene_understanding",
-                    timestamp = snapshot.timestamp
-                };
-
-                pins.Add(pin);
-            }
-
-            return pins;
+            return SceneSnapshotPins.Convert(snapshot ?? LastSnapshot);
         }
 
         public async Task<MetaSceneSnapshot> CaptureSnapshotAsync()

@@ -15,8 +15,21 @@ namespace CompanionScan.Export
         [SerializeField] private Transform exportRoot;
         [SerializeField] private SpatialPinManager pinManager;
         [SerializeField] private BoundaryProvider boundaryProvider;
-        [SerializeField] private MetaSceneCollector metaSceneCollector;
+        [Tooltip("The scene backend: any component that implements ISceneSource (MetaSceneCollector on Quest).")]
+        [SerializeField] private MonoBehaviour metaSceneCollector;
         [SerializeField] private SnapshotFrameStore snapshotStore;
+
+        private ISceneSource _sceneSourceOverride;
+
+        /// <summary>Uses <paramref name="source"/> as the scene backend, in place of the component the scene serializes.</summary>
+        public void UseSceneSource(ISceneSource source)
+        {
+            _sceneSourceOverride = source;
+        }
+
+        /// <summary>The scene backend in use: the one given with <see cref="UseSceneSource"/>, else the serialized component, else null.</summary>
+        public ISceneSource SceneSource =>
+            _sceneSourceOverride ?? (metaSceneCollector != null ? metaSceneCollector as ISceneSource : null);
 
         [Header("Floorplan")]
         [SerializeField] private bool includeFloorMesh = true;
@@ -63,12 +76,13 @@ namespace CompanionScan.Export
             Directory.CreateDirectory(baseOutputDir);
 
             MetaSceneSnapshot metaSnapshot = null;
-            if (captureMeta && metaSceneCollector != null)
+            var sceneSource = SceneSource;
+            if (captureMeta && sceneSource != null)
             {
                 // A failed Space Setup read leaves that part out; it does not stop the export.
                 try
                 {
-                    metaSnapshot = await metaSceneCollector.CaptureSnapshotAsync();
+                    metaSnapshot = await sceneSource.CaptureSnapshotAsync();
                 }
                 catch (Exception ex)
                 {
@@ -76,7 +90,7 @@ namespace CompanionScan.Export
                 }
             }
 
-            var spaceId = ResolveSpaceId(metaSnapshot, metaSceneCollector?.LastSnapshot);
+            var spaceId = ResolveSpaceId(metaSnapshot, sceneSource?.LastSnapshot);
             var spaceToken = SanitizeFileToken(spaceId);
             var outputDir = Path.Combine(baseOutputDir, spaceToken);
             Directory.CreateDirectory(outputDir);
@@ -179,12 +193,13 @@ namespace CompanionScan.Export
 
         private List<GameObject> CreateSceneMeshes(Transform root)
         {
-            if (!includeSceneMeshes || metaSceneCollector == null)
+            var sceneSource = SceneSource;
+            if (!includeSceneMeshes || sceneSource == null)
             {
                 return null;
             }
 
-            if (metaSceneCollector.TryBuildSceneMeshes(root, sceneMeshMaterial, out var meshes))
+            if (sceneSource.TryBuildSceneMeshes(root, sceneMeshMaterial, out var meshes))
             {
                 return meshes;
             }
@@ -442,80 +457,23 @@ namespace CompanionScan.Export
                 return null;
             }
 
-            var root = JObject.Parse(File.ReadAllText(gltfPath));
-            return root["extras"] as JObject;
+            try
+            {
+                var root = JObject.Parse(File.ReadAllText(gltfPath));
+                return root["extras"] as JObject;
+            }
+            catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is IOException || ex is UnauthorizedAccessException)
+            {
+                // A glTF that cannot be read (an export cut short) has no extras to keep; the export
+                // writes a new one over it. Throwing here made every later export of the space fail.
+                Debug.LogWarning($"[Export] Ignoring the extras of {gltfPath}, which cannot be read: {ex.Message}");
+                return null;
+            }
         }
 
         private static JObject MergeExtras(JObject existing, JObject current)
         {
-            if (existing == null)
-            {
-                return current;
-            }
-
-            if (current == null)
-            {
-                return existing;
-            }
-
-            var merged = new JObject(existing);
-
-            var existingSnapshots = existing["snapshots"] as JArray;
-            var currentSnapshots = current["snapshots"] as JArray;
-            merged["snapshots"] = MergeArrays(existingSnapshots, currentSnapshots);
-
-            var existingPins = existing["pins"] as JArray;
-            var currentPins = current["pins"] as JArray;
-            merged["pins"] = MergeArrays(existingPins, currentPins);
-
-            var existingCv = existing["cv_mapping"] as JObject;
-            var currentCv = current["cv_mapping"] as JObject;
-            var mergedCv = currentCv != null ? new JObject(currentCv) : new JObject();
-            if (existingCv != null)
-            {
-                var cvSnapshots = MergeArrays(existingCv["snapshots"] as JArray, currentCv?["snapshots"] as JArray);
-                var cvPins = MergeArrays(existingCv["pins"] as JArray, currentCv?["pins"] as JArray);
-                if (cvSnapshots != null) mergedCv["snapshots"] = cvSnapshots;
-                if (cvPins != null) mergedCv["pins"] = cvPins;
-            }
-            merged["cv_mapping"] = mergedCv;
-
-            if (current["meta_scene"] != null)
-            {
-                merged["meta_scene"] = current["meta_scene"];
-            }
-
-            if (current["space_id"] != null)
-            {
-                merged["space_id"] = current["space_id"];
-            }
-
-            return merged;
-        }
-
-        private static JArray MergeArrays(JArray existing, JArray current)
-        {
-            if ((existing == null || existing.Count == 0) && (current == null || current.Count == 0))
-            {
-                return null;
-            }
-
-            var merged = new JArray();
-            if (existing != null)
-            {
-                foreach (var item in existing)
-                {
-                    merged.Add(item);
-                }
-            }
-            if (current != null)
-            {
-                foreach (var item in current)
-                {
-                    merged.Add(item);
-                }
-            }
-            return merged;
+            return ExtrasMergeV1.Merge(existing, current);
         }
 
         private static JArray ToArray(Vector3 value)

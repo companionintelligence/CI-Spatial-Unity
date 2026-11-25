@@ -88,13 +88,25 @@ namespace CompanionScan.Tests.Editor
             AssertRect(new Rect(0f, 0f, 1f, 1f), rect);
         }
 
-        // A normalized box whose far corner is a hair past 1 (float error) is read as pixels and shrinks to a speck at the top left.
-        [Test]
-        public void TryNormalize_Currently_ReadsANormalizedBoxJustPastOneAsPixels()
+        // A normalized box whose far corner is a hair past 1 (float error: a box that reaches the edge of the image) used to be read
+        // as pixels and shrink to a speck at the top left. It is a normalized box, clamped to the image.
+        [TestCase(1.0001f, 0.9f)]
+        [TestCase(0.9f, 1.0001f)]
+        [TestCase(1.009f, 1.009f)]
+        public void TryNormalize_ReadsANormalizedBoxJustPastOneAsNormalized_AndClampsIt(float x2, float y2)
         {
-            Assert.IsTrue(BoundingBoxUtils.TryNormalize(new[] { 0.5f, 0.5f, 1.0001f, 0.9f }, 640, 480, out var rect));
+            Assert.IsTrue(BoundingBoxUtils.TryNormalize(new[] { 0.5f, 0.5f, x2, y2 }, 640, 480, out var rect));
 
-            AssertRect(new Rect(0.5f / 640f, 0.5f / 480f, 0.5001f / 640f, 0.4f / 480f), rect);
+            AssertRect(new Rect(0.5f, 0.5f, Mathf.Min(x2, 1f) - 0.5f, Mathf.Min(y2, 1f) - 0.5f), rect);
+        }
+
+        // Past the tolerance it is pixels.
+        [Test]
+        public void TryNormalize_ReadsAFarCornerPastOnePointOhOneAsPixels()
+        {
+            Assert.IsTrue(BoundingBoxUtils.TryNormalize(new[] { 0f, 0f, 2f, 2f }, 640, 480, out var rect));
+
+            AssertRect(new Rect(0f, 0f, 2f / 640f, 2f / 480f), rect);
         }
 
         // ---- NormalizedToPixels (no test of its own exists) ----

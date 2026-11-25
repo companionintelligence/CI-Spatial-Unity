@@ -1,23 +1,21 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace CompanionScan.UI
 {
     /// <summary>
-    /// Polls OVRInput every frame and dispatches actions based on physical
-    /// Quest controller buttons.  Replaces the old world-space UI button
-    /// approach with direct hardware input.
+    /// Reads an input backend every frame and dispatches actions to the menu and the panels. The
+    /// backend (<see cref="HasActiveController"/> and <see cref="GetDown"/>) is the subclass's: Quest's
+    /// is <c>XRControllerInput</c>, which polls OVRInput.
     ///
     /// Button mapping (right controller):
-    ///   A  (Button.One)   -> Capture snapshot
-    ///   B  (Button.Two)   -> Cycle active model (GDino -> SAM2 -> Florence; starts on GDino)
+    ///   A -> Capture snapshot
+    ///   B -> Cycle active model (GDino -> SAM2 -> Florence; starts on GDino)
     /// Left controller:
-    ///   X  (Button.Three) -> Cycle preview distance (Near -> Far -> Off)
-    ///   Y  (Button.Four)  -> Save & Export GLTF
-    /// Either index trigger:
-    ///   Primary / Secondary Index Trigger -> Cycle display mode
-    /// Either hand trigger:
-    ///   Primary / Secondary Hand Trigger -> Preview glTF
-    /// Left Menu button (Button.Start) -> open / close the settings.
+    ///   X -> Cycle preview distance (Near -> Far -> Off)
+    ///   Y -> Save and export glTF
+    /// Either index trigger -> Cycle display mode
+    /// Either grip -> Preview glTF
+    /// Left Menu button -> open / close the settings.
     ///   While the settings panel is open, A edits the server URL, X the server's
     ///   API token, B saves, Y opens the privacy policy, either trigger shows the
     ///   open-source licences and either grip withdraws the agreement to send camera
@@ -28,33 +26,50 @@ namespace CompanionScan.UI
     ///   captures, B sends nothing and Y opens the privacy policy. Menu opens the settings, which
     ///   close the notice without agreeing (both panels open at the same spot).
     /// </summary>
-    public class XRControllerInput : MonoBehaviour
+    public abstract class ControllerInput : MonoBehaviour, IInputSource
     {
-        [SerializeField] private ControllerMenuUI menuUI;
+        // Protected, not private: ControllerMenuBuilder sets "menuUI" by reflection on the subclass,
+        // and reflection finds a base class's private fields only through the base class.
+        [SerializeField] protected ControllerMenuUI menuUI;
         [Tooltip("Server settings panel. If null, the active SettingsPanel in the scene is used.")]
-        [SerializeField] private SettingsPanel settingsPanel;
+        [SerializeField] protected SettingsPanel settingsPanel;
         private bool _loggedNoController;
 
+        /// <inheritdoc />
+        public abstract bool HasActiveController { get; }
+
+        /// <inheritdoc />
+        public abstract bool GetDown(ControllerButton button);
+
         /// <summary>
-        /// If null, <see cref="menuUI"/> is found at Awake via
+        /// If <c>menuUI</c> is null, it is found at Awake via
         /// <see cref="Object.FindAnyObjectByType{T}"/>.
         /// </summary>
-        private void Awake()
+        protected virtual void Awake()
         {
-            if (FindAnyObjectByType<OVRManager>() == null)
-            {
-                var managerGo = new GameObject("OVRManager");
-                managerGo.AddComponent<OVRManager>();
-            }
-
             if (menuUI == null)
                 menuUI = FindAnyObjectByType<ControllerMenuUI>();
 
             if (menuUI == null)
-                Debug.LogWarning("[XRControllerInput] ControllerMenuUI not found in scene â€” will retry in Update.");
+                Debug.LogWarning("[ControllerInput] ControllerMenuUI not found in scene — will retry in Update.");
         }
 
+        /// <summary>
+        /// True (the default) to read the input every frame. A backend that is driven by hand, such as a
+        /// scripted one in a test, returns false and calls <see cref="Tick"/> itself.
+        /// </summary>
+        protected virtual bool TicksEveryFrame => true;
+
         private void Update()
+        {
+            if (TicksEveryFrame)
+            {
+                Tick();
+            }
+        }
+
+        /// <summary>One frame of input: what <c>Update</c> does, callable from a test.</summary>
+        public void Tick()
         {
             if (HandleLicensesInput())
                 return;
@@ -71,39 +86,37 @@ namespace CompanionScan.UI
             {
                 menuUI = FindAnyObjectByType<ControllerMenuUI>();
                 if (menuUI == null) return;
-                Debug.Log("[XRControllerInput] Late-bound ControllerMenuUI.");
+                Debug.Log("[ControllerInput] Late-bound ControllerMenuUI.");
             }
 
-            if (!_loggedNoController && OVRInput.GetActiveController() == OVRInput.Controller.None)
+            if (!_loggedNoController && !HasActiveController)
             {
                 _loggedNoController = true;
-                Debug.LogWarning("[XRControllerInput] No active OVR controller detected.");
+                Debug.LogWarning("[ControllerInput] No active controller detected.");
             }
 
-            // A â€“ Capture
-            if (OVRInput.GetDown(OVRInput.Button.One))
+            // A – Capture
+            if (GetDown(ControllerButton.A))
                 menuUI.DoCapture();
 
-            // B â€“ Cycle model
-            if (OVRInput.GetDown(OVRInput.Button.Two))
+            // B – Cycle model
+            if (GetDown(ControllerButton.B))
                 menuUI.CycleModel();
 
-            // X â€“ Cycle preview distance
-            if (OVRInput.GetDown(OVRInput.Button.Three))
+            // X – Cycle preview distance
+            if (GetDown(ControllerButton.X))
                 menuUI.CyclePreviewDistance();
 
-            // Y â€“ Save & Export
-            if (OVRInput.GetDown(OVRInput.Button.Four))
+            // Y – Save & Export
+            if (GetDown(ControllerButton.Y))
                 menuUI.DoSaveExport();
 
-            // Either trigger â€“ Cycle display mode
-            if (OVRInput.GetDown(OVRInput.Button.PrimaryIndexTrigger) ||
-                OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger))
+            // Either trigger – Cycle display mode
+            if (GetDown(ControllerButton.Trigger))
                 menuUI.CycleDisplayMode();
 
-            // Either hand trigger â€“ Preview glTF
-            if (OVRInput.GetDown(OVRInput.Button.PrimaryHandTrigger) ||
-                OVRInput.GetDown(OVRInput.Button.SecondaryHandTrigger))
+            // Either grip – Preview glTF
+            if (GetDown(ControllerButton.Grip))
                 menuUI.PreviewGltf();
         }
 
@@ -120,30 +133,28 @@ namespace CompanionScan.UI
             if (settingsPanel == null)
                 return false;
 
-            if (OVRInput.GetDown(OVRInput.Button.Start))
+            if (GetDown(ControllerButton.Menu))
                 settingsPanel.Toggle();
 
             if (!settingsPanel.IsOpen)
                 return false;
 
-            if (OVRInput.GetDown(OVRInput.Button.One))
+            if (GetDown(ControllerButton.A))
                 settingsPanel.EditUrl();
 
-            if (OVRInput.GetDown(OVRInput.Button.Three))
+            if (GetDown(ControllerButton.X))
                 settingsPanel.EditToken();
 
-            if (OVRInput.GetDown(OVRInput.Button.Two))
+            if (GetDown(ControllerButton.B))
                 settingsPanel.Apply();
 
-            if (OVRInput.GetDown(OVRInput.Button.Four))
+            if (GetDown(ControllerButton.Y))
                 settingsPanel.OpenPrivacyPolicy();
 
-            if (OVRInput.GetDown(OVRInput.Button.PrimaryHandTrigger) ||
-                OVRInput.GetDown(OVRInput.Button.SecondaryHandTrigger))
+            if (GetDown(ControllerButton.Grip))
                 settingsPanel.WithdrawCaptureConsent();
 
-            if (OVRInput.GetDown(OVRInput.Button.PrimaryIndexTrigger) ||
-                OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger))
+            if (GetDown(ControllerButton.Trigger))
                 settingsPanel.ShowLicenses();
 
             return true;
@@ -153,28 +164,28 @@ namespace CompanionScan.UI
         /// While the licences are shown: A / X turn the page, B / Y change the document, Menu goes back.
         /// Returns true when the view consumed this frame's input.
         /// </summary>
-        private static bool HandleLicensesInput()
+        private bool HandleLicensesInput()
         {
             var licenses = LicensesPanel.Active;
             if (licenses == null || !licenses.IsOpen)
                 return false;
 
-            if (OVRInput.GetDown(OVRInput.Button.Start))
+            if (GetDown(ControllerButton.Menu))
             {
                 licenses.Close();
                 return true;
             }
 
-            if (OVRInput.GetDown(OVRInput.Button.One))
+            if (GetDown(ControllerButton.A))
                 licenses.NextPage();
 
-            if (OVRInput.GetDown(OVRInput.Button.Three))
+            if (GetDown(ControllerButton.X))
                 licenses.PreviousPage();
 
-            if (OVRInput.GetDown(OVRInput.Button.Two))
+            if (GetDown(ControllerButton.B))
                 licenses.NextDocument();
 
-            if (OVRInput.GetDown(OVRInput.Button.Four))
+            if (GetDown(ControllerButton.Y))
                 licenses.PreviousDocument();
 
             return true;
@@ -184,22 +195,21 @@ namespace CompanionScan.UI
         /// While the camera notice is shown: A agrees (and the capture goes ahead), B sends nothing,
         /// Y opens the privacy policy. Returns true when the notice consumed this frame's input.
         /// </summary>
-        private static bool HandleConsentInput()
+        private bool HandleConsentInput()
         {
             var notice = CaptureConsentPanel.Active;
             if (notice == null || !notice.IsOpen)
                 return false;
 
-            if (OVRInput.GetDown(OVRInput.Button.One))
+            if (GetDown(ControllerButton.A))
                 notice.Accept();
-            else if (OVRInput.GetDown(OVRInput.Button.Two))
+            else if (GetDown(ControllerButton.B))
                 notice.Decline();
 
-            if (OVRInput.GetDown(OVRInput.Button.Four))
+            if (GetDown(ControllerButton.Y))
                 notice.OpenPrivacyPolicy();
 
             return true;
         }
     }
 }
-

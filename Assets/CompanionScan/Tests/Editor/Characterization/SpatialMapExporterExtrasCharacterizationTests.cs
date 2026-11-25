@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace CompanionScan.Tests.Editor
 {
@@ -260,52 +261,143 @@ namespace CompanionScan.Tests.Editor
             Assert.AreSame(earlier, MergeExtras(earlier, null));
         }
 
-        // A re-export lists each pin twice and keeps the old top-level time and bounds; only cv_mapping, meta_scene and space_id are new.
+        // A re-export takes the new time, bounds and scene; a pin of the same object (same session and track) replaces its
+        // earlier entry instead of being listed twice, and pins and snapshots only the earlier export had are kept.
         [Test]
-        public void MergeExtras_Currently_AppendsPinsAndSnapshotsWithoutDroppingRepeats_AndKeepsTheOldTimeAndBounds()
+        public void MergeExtras_ReplacesAPinOfTheSameObject_KeepsTheRest_AndTakesTheNewTimeAndBounds()
         {
             var earlier = JObject.Parse(@"{
                 'schema_version': '1.0', 'timestamp_utc': 'old', 'units': 'meters', 'custom': 'kept',
                 'bounds': { 'center': [0, 0, 0] }, 'boundary': [], 'floorplan': [],
-                'pins': [ { 'label': 'chair' } ], 'snapshots': [ { 'id': 'snap_0001' } ],
+                'pins': [ { 'label': 'chair', 'capture_session_id': 's1', 'track_id': 1, 'position': [0, 0, 1] },
+                          { 'label': 'bin', 'capture_session_id': 's1', 'track_id': 2, 'position': [4, 0, 4] } ],
+                'snapshots': [ { 'id': 'snap_0001' } ],
                 'space_id': 'room-old', 'meta_scene': { 'available': false },
-                'cv_mapping': { 'bounds': { 'center': [0, 0, 0] }, 'pins': [ { 'label': 'chair' } ],
+                'cv_mapping': { 'bounds': { 'center': [0, 0, 0] },
+                                'pins': [ { 'label': 'chair', 'capture_session_id': 's1', 'track_id': 1, 'position': [0, 0, 1] },
+                                          { 'label': 'bin', 'capture_session_id': 's1', 'track_id': 2, 'position': [4, 0, 4] } ],
                                 'snapshots': [ { 'id': 'snap_0001' } ], 'space_id': 'room-old' }
             }");
             var current = JObject.Parse(@"{
                 'schema_version': '1.0', 'timestamp_utc': 'new', 'units': 'meters',
                 'bounds': { 'center': [1, 1, 1] }, 'boundary': [], 'floorplan': [],
-                'pins': [ { 'label': 'chair' }, { 'label': 'lamp' } ], 'snapshots': [ { 'id': 'snap_0002' } ],
+                'pins': [ { 'label': 'chair', 'capture_session_id': 's1', 'track_id': 1, 'position': [0, 0, 2] },
+                          { 'label': 'lamp', 'capture_session_id': 's1', 'track_id': 3, 'position': [1, 1, 1] } ],
+                'snapshots': [ { 'id': 'snap_0002' } ],
                 'space_id': 'room-new', 'meta_scene': { 'available': true },
-                'cv_mapping': { 'bounds': { 'center': [1, 1, 1] }, 'pins': [ { 'label': 'chair' }, { 'label': 'lamp' } ],
+                'cv_mapping': { 'bounds': { 'center': [1, 1, 1] },
+                                'pins': [ { 'label': 'chair', 'capture_session_id': 's1', 'track_id': 1, 'position': [0, 0, 2] },
+                                          { 'label': 'lamp', 'capture_session_id': 's1', 'track_id': 3, 'position': [1, 1, 1] } ],
                                 'snapshots': [ { 'id': 'snap_0002' } ], 'space_id': 'room-new' }
             }");
+            var mergedPins = @"[ { 'label': 'chair', 'capture_session_id': 's1', 'track_id': 1, 'position': [0, 0, 2] },
+                                 { 'label': 'bin', 'capture_session_id': 's1', 'track_id': 2, 'position': [4, 0, 4] },
+                                 { 'label': 'lamp', 'capture_session_id': 's1', 'track_id': 3, 'position': [1, 1, 1] } ]";
 
             var merged = MergeExtras(earlier, current);
 
             AssertSameJson(JObject.Parse(@"{
-                'schema_version': '1.0', 'timestamp_utc': 'old', 'units': 'meters', 'custom': 'kept',
-                'bounds': { 'center': [0, 0, 0] }, 'boundary': [], 'floorplan': [],
-                'pins': [ { 'label': 'chair' }, { 'label': 'chair' }, { 'label': 'lamp' } ],
+                'schema_version': '1.0', 'timestamp_utc': 'new', 'units': 'meters', 'custom': 'kept',
+                'bounds': { 'center': [1, 1, 1] }, 'boundary': [], 'floorplan': [],
+                'pins': " + mergedPins + @",
                 'snapshots': [ { 'id': 'snap_0001' }, { 'id': 'snap_0002' } ],
                 'space_id': 'room-new', 'meta_scene': { 'available': true },
                 'cv_mapping': { 'bounds': { 'center': [1, 1, 1] },
-                                'pins': [ { 'label': 'chair' }, { 'label': 'chair' }, { 'label': 'lamp' } ],
+                                'pins': " + mergedPins + @",
                                 'snapshots': [ { 'id': 'snap_0001' }, { 'id': 'snap_0002' } ], 'space_id': 'room-new' }
             }"), merged, "merged extras");
         }
 
-        // With no pins or snapshots on either side the merged members are JSON null; a first export omits snapshots and writes pins: [].
+        // The same export merged twice changes nothing the second time: the file does not grow with every save.
         [Test]
-        public void MergeExtras_Currently_WritesNullForPinsAndSnapshotsWhenNeitherSideHasAny()
+        public void MergeExtras_OfTheSameExportAgain_ChangesNothing()
+        {
+            var export = JObject.Parse(@"{
+                'schema_version': '1.0', 'timestamp_utc': 't', 'units': 'meters', 'bounds': {}, 'boundary': [], 'floorplan': [],
+                'pins': [ { 'label': 'chair', 'capture_session_id': 's1', 'track_id': 1 },
+                          { 'label': 'TABLE', 'anchor_uuid': 'anchor-1' }, { 'label': 'cup', 'capture_id': 'snap_0001', 'position': [1, 2, 3] } ],
+                'snapshots': [ { 'id': 'snap_0001' } ], 'space_id': 'room', 'meta_scene': { 'available': false },
+                'cv_mapping': { 'pins': [ { 'label': 'chair', 'capture_session_id': 's1', 'track_id': 1 },
+                                          { 'label': 'TABLE', 'anchor_uuid': 'anchor-1' }, { 'label': 'cup', 'capture_id': 'snap_0001', 'position': [1, 2, 3] } ],
+                                'snapshots': [ { 'id': 'snap_0001' } ] }
+            }");
+
+            var once = MergeExtras(JObject.Parse(export.ToString()), JObject.Parse(export.ToString()));
+            var twice = MergeExtras(JObject.Parse(once.ToString()), JObject.Parse(export.ToString()));
+
+            AssertSameJson(export, once, "once");
+            AssertSameJson(once, twice, "twice");
+            Assert.AreEqual(3, ((JArray)twice["pins"]).Count);
+        }
+
+        // A file written by the old exporter lists every pin twice; the next export collapses them.
+        [Test]
+        public void MergeExtras_CollapsesPinsThatAnEarlierExportListedTwice()
+        {
+            var earlier = JObject.Parse(@"{ 'pins': [ { 'label': 'chair', 'capture_session_id': 's1', 'track_id': 1 },
+                                                    { 'label': 'chair', 'capture_session_id': 's1', 'track_id': 1 } ] }");
+            var current = JObject.Parse("{ 'pins': [], 'cv_mapping': { 'pins': [] } }");
+
+            var merged = MergeExtras(earlier, current);
+
+            Assert.AreEqual(1, ((JArray)merged["pins"]).Count);
+        }
+
+        // Track numbers start again at 1 in every session, so the session is part of what makes a pin the same object.
+        [Test]
+        public void MergeExtras_KeepsAnEarlierSessionsPin_EvenWithTheSameTrackNumber()
+        {
+            var earlier = JObject.Parse("{ 'pins': [ { 'label': 'chair', 'capture_session_id': 's0', 'track_id': 1 } ] }");
+            var current = JObject.Parse(@"{ 'pins': [ { 'label': 'lamp', 'capture_session_id': 's1', 'track_id': 1 } ],
+                                            'cv_mapping': { 'pins': [ { 'label': 'lamp', 'capture_session_id': 's1', 'track_id': 1 } ] } }");
+
+            var merged = MergeExtras(earlier, current);
+
+            CollectionAssert.AreEqual(new[] { "chair", "lamp" }, ((JArray)merged["pins"]).Select(pin => (string)pin["label"]).ToArray());
+        }
+
+        // A Space Setup anchor is the same object in every session: its newer entry replaces the older.
+        [Test]
+        public void MergeExtras_ReplacesASceneAnchorsPin_WhateverTheSession()
+        {
+            var earlier = JObject.Parse("{ 'pins': [ { 'label': 'TABLE', 'anchor_uuid': 'a-1', 'position': [0, 0, 0] } ] }");
+            var current = JObject.Parse(@"{ 'pins': [ { 'label': 'TABLE', 'anchor_uuid': 'a-1', 'position': [0, 0, 1] } ],
+                                            'cv_mapping': { 'pins': [ { 'label': 'TABLE', 'anchor_uuid': 'a-1', 'position': [0, 0, 1] } ] } }");
+
+            var merged = MergeExtras(earlier, current);
+
+            var pins = (JArray)merged["pins"];
+            Assert.AreEqual(1, pins.Count);
+            Assert.AreEqual(1f, (float)pins[0]["position"][2]);
+        }
+
+        // Snapshots are the same by id.
+        [Test]
+        public void MergeExtras_ReplacesASnapshotWithTheSameId()
+        {
+            var earlier = JObject.Parse("{ 'snapshots': [ { 'id': 'snap_0001', 'image': 'old.jpg' }, { 'id': 'snap_0002' } ] }");
+            var current = JObject.Parse(@"{ 'pins': [], 'snapshots': [ { 'id': 'snap_0001', 'image': 'new.jpg' } ],
+                                            'cv_mapping': { 'pins': [], 'snapshots': [ { 'id': 'snap_0001', 'image': 'new.jpg' } ] } }");
+
+            var merged = MergeExtras(earlier, current);
+
+            var snapshots = (JArray)merged["snapshots"];
+            CollectionAssert.AreEqual(new[] { "snap_0001", "snap_0002" }, snapshots.Select(s => (string)s["id"]).ToArray());
+            Assert.AreEqual("new.jpg", (string)snapshots[0]["image"]);
+        }
+
+        // With no pins on either side the pins are an empty list and there is no snapshots member, never JSON null.
+        [Test]
+        public void MergeExtras_WritesAnEmptyPinListAndNoSnapshotsMember_WhenNeitherSideHasAny()
         {
             var earlier = JObject.Parse("{ 'units': 'meters' }");
             var current = JObject.Parse("{ 'units': 'meters', 'pins': [], 'cv_mapping': { 'pins': [] } }");
 
             var merged = MergeExtras(earlier, current);
 
-            Assert.AreEqual(JTokenType.Null, merged["pins"].Type);
-            Assert.AreEqual(JTokenType.Null, merged["snapshots"].Type);
+            Assert.AreEqual(JTokenType.Array, merged["pins"].Type);
+            Assert.AreEqual(0, ((JArray)merged["pins"]).Count);
+            Assert.IsNull(merged["snapshots"], "no snapshots member");
             Assert.AreEqual(0, ((JArray)merged["cv_mapping"]["pins"]).Count);
             Assert.IsNull(merged["cv_mapping"]["snapshots"]);
         }
@@ -338,16 +430,16 @@ namespace CompanionScan.Tests.Editor
             Assert.AreEqual("meters", (string)extras["units"]);
         }
 
-        // A glTF that is not valid JSON (an export cut short) makes the next export of that space throw before it writes anything.
+        // A glTF that is not valid JSON (an export cut short) used to make every later export of that space throw before it
+        // wrote anything. Its extras cannot be kept, so the next export starts them afresh, with a warning.
         [Test]
-        public void ReadExistingExtras_Currently_ThrowsForAFileThatIsNotJson()
+        public void ReadExistingExtras_IgnoresAFileThatIsNotJson_WithAWarning()
         {
             var path = Path.Combine(_directory, "broken.gltf");
             File.WriteAllText(path, "{ \"asset\": ");
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("Ignoring the extras of .*broken\\.gltf"));
 
-            var exception = Assert.Catch(() => ReadExistingExtras(path));
-
-            Assert.AreEqual("JsonReaderException", (exception is TargetInvocationException wrapped ? wrapped.InnerException : exception).GetType().Name);
+            Assert.IsNull(ReadExistingExtras(path));
         }
 
         // ---- the name and folder of the export ----

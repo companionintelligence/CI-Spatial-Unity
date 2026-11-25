@@ -10,13 +10,12 @@ namespace CompanionScan.Tests.Editor
     /// </summary>
     public class CaptureFrameCharacterizationTests
     {
-        // ---- HasIntrinsics: both focal lengths (m00 and m11) must be greater than zero ----
+        // ---- HasIntrinsics: both focal lengths (m00 and m11) must be finite and above one pixel ----
 
         [TestCase(500f, 500f)]
         [TestCase(300f, 700f)]
-        [TestCase(1f, 1f)]
-        [TestCase(0.001f, 0.001f)]
-        public void HasIntrinsics_IsTrueWhenBothFocalLengthsAreGreaterThanZero(float fx, float fy)
+        [TestCase(2f, 2f)]
+        public void HasIntrinsics_IsTrueWhenBothFocalLengthsAreFiniteAndAboveOnePixel(float fx, float fy)
         {
             Assert.IsTrue(FrameWithFocalLengths(fx, fy).HasIntrinsics);
         }
@@ -29,17 +28,16 @@ namespace CompanionScan.Tests.Editor
         [TestCase(-1f, -1f)]
         [TestCase(float.NaN, 500f)]
         [TestCase(500f, float.NaN)]
-        public void HasIntrinsics_IsFalseWhenEitherFocalLengthIsZeroNegativeOrNotANumber(float fx, float fy)
-        {
-            Assert.IsFalse(FrameWithFocalLengths(fx, fy).HasIntrinsics);
-        }
-
-        // The rule is only "greater than zero": an infinite focal length passes.
+        // One pixel or less is a placeholder (the identity matrix) or a normalised matrix, not pixel intrinsics.
+        [TestCase(1f, 1f)]
+        [TestCase(0.001f, 0.001f)]
+        [TestCase(500f, 1f)]
+        // An infinite focal length would give every pixel the same ray.
         [TestCase(float.PositiveInfinity, 500f)]
         [TestCase(500f, float.PositiveInfinity)]
-        public void HasIntrinsics_Currently_IsTrueForAnInfiniteFocalLength(float fx, float fy)
+        public void HasIntrinsics_IsFalseWhenEitherFocalLengthIsNotFiniteOrNotAboveOnePixel(float fx, float fy)
         {
-            Assert.IsTrue(FrameWithFocalLengths(fx, fy).HasIntrinsics);
+            Assert.IsFalse(FrameWithFocalLengths(fx, fy).HasIntrinsics);
         }
 
         [Test]
@@ -54,13 +52,13 @@ namespace CompanionScan.Tests.Editor
             Assert.IsFalse(new CaptureFrame { cameraIntrinsics = Matrix4x4.zero }.HasIntrinsics);
         }
 
-        // The identity matrix (no camera provider; DesktopCameraProvider) counts as intrinsics: a focal length of one pixel.
+        // The identity matrix (what DesktopCameraProvider and a missing provider used to return) is a focal length of one pixel: not intrinsics.
         [Test]
-        public void HasIntrinsics_Currently_IsTrueForTheIdentityMatrix_ThatStandsInWhenThereAreNoIntrinsics()
+        public void HasIntrinsics_IsFalseForTheIdentityMatrix_ThatStoodInWhenThereWereNoIntrinsics()
         {
             var frame = CaptureFrame.Create(new byte[] { 1 }, 640, 480, Pose.identity, Matrix4x4.identity);
 
-            Assert.IsTrue(frame.HasIntrinsics);
+            Assert.IsFalse(frame.HasIntrinsics);
         }
 
         [Test]

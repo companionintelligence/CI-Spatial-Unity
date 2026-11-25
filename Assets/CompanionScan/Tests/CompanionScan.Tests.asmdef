@@ -2,7 +2,8 @@
   "name": "CompanionScan.Tests",
   "rootNamespace": "CompanionScan.Tests",
   "references": [
-    "CompanionScan"
+    "CompanionScan.Core",
+    "CompanionScan.Quest"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

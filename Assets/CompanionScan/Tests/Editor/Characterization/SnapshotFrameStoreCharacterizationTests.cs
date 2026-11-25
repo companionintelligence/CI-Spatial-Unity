@@ -4,6 +4,7 @@ using System.Reflection;
 using CompanionScan.Mapping;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace CompanionScan.Tests.Editor
 {
@@ -133,7 +134,7 @@ namespace CompanionScan.Tests.Editor
             var camera = NewCamera(new Vector3(1f, 2f, 3f), Quaternion.identity, 90f, 2f);
             var store = NewStore();
 
-            store.AddSnapshot(Capture(), 2f, camera);
+            store.AddSnapshot(Capture(intrinsics: Matrix4x4.zero), 2f, camera);
 
             // 2 in front of the camera a 90 degree vertical field of view is 4 high, and aspect 2 makes it 8 wide.
             AssertCorners(new[] { new Vector3(-3f, 0f, 5f), new Vector3(-3f, 4f, 5f), new Vector3(5f, 4f, 5f), new Vector3(5f, 0f, 5f) },
@@ -146,7 +147,7 @@ namespace CompanionScan.Tests.Editor
             var camera = NewCamera(new Vector3(-2f, 1f, 4f), Quaternion.Euler(20f, 130f, 0f), 60f, 1.5f);
             var store = NewStore();
 
-            store.AddSnapshot(Capture(), 3f, camera);
+            store.AddSnapshot(Capture(intrinsics: Matrix4x4.zero), 3f, camera);
 
             var transform = camera.transform;
             var centre = transform.position + transform.forward * 3f;
@@ -156,43 +157,103 @@ namespace CompanionScan.Tests.Editor
                 store.Frames[0].frustumCorners);
         }
 
-        // The corners come from the scene camera passed in, not from the capture's pose or intrinsics, so they can disagree with the stored pose.
+        // With intrinsics the corners are the capture's own view: its pose, its focal lengths and principal point and its image size.
+        // They used to come from the scene camera passed in, so a capture taken elsewhere (a replayed one) got the wrong frustum.
         [Test]
-        public void AddSnapshot_Currently_TakesTheCornersFromTheSceneCameraNotFromTheCapturesPoseOrIntrinsics()
+        public void AddSnapshot_TakesTheCornersFromTheCapturesPoseAndIntrinsics_NotFromTheSceneCamera()
         {
             var camera = NewCamera(new Vector3(1f, 2f, 3f), Quaternion.identity, 90f, 2f);
             var store = NewStore();
             var elsewhere = new Pose(new Vector3(50f, 60f, 70f), Quaternion.Euler(0f, 180f, 0f));
 
-            store.AddSnapshot(Capture(pose: new Pose(camera.transform.position, camera.transform.rotation), intrinsics: Matrix4x4.zero), 2f, camera);
-            store.AddSnapshot(Capture(pose: elsewhere, intrinsics: Intrinsics(900f, 900f, 100f, 100f)), 2f, camera);
+            store.AddSnapshot(Capture(pose: elsewhere, intrinsics: Intrinsics(400f, 400f, 320f, 240f)), 2f, camera);
 
-            var frames = store.Frames;
-            AssertCorners(frames[0].frustumCorners, frames[1].frustumCorners);
-            Assert.AreEqual(elsewhere.position, frames[1].cameraPosition, "the stored pose is still the capture's");
+            // 2 in front of a 640 x 480 camera with a focal length of 400 pixels and a centred principal point the view is 3.2 wide and 2.4 high.
+            Vector3 Corner(float x, float y) => elsewhere.position + elsewhere.rotation * new Vector3(x, y, 2f);
+            AssertCorners(new[] { Corner(-1.6f, -1.2f), Corner(-1.6f, 1.2f), Corner(1.6f, 1.2f), Corner(1.6f, -1.2f) },
+                store.Frames[0].frustumCorners);
+            Assert.AreEqual(elsewhere.position, store.Frames[0].cameraPosition);
         }
 
         [Test]
-        public void AddSnapshot_WithoutACameraOrWithADistanceNotAboveZero_StoresTheFrameWithAnEmptyCornerList()
+        public void AddSnapshot_WithIntrinsics_NeedsNoSceneCamera()
+        {
+            var store = NewStore();
+
+            store.AddSnapshot(Capture(), 2f, null);
+
+            Assert.AreEqual(4, store.Frames[0].frustumCorners.Length);
+        }
+
+        [Test]
+        public void AddSnapshot_HonoursAPrincipalPointThatIsNotInTheMiddle()
+        {
+            var store = NewStore();
+            var pose = Pose.identity;
+
+            store.AddSnapshot(Capture(pose: pose, intrinsics: Intrinsics(400f, 400f, 100f, 40f)), 2f, null);
+
+            // Pixel (0, 0) is the top left: x = (0 - 100) / 400 * 2 = -0.5 and y = -(0 - 40) / 400 * 2 = 0.2. Pixel (640, 480) is the bottom right.
+            AssertCorners(new[]
+                {
+                    new Vector3(-0.5f, 0.2f - 2.4f, 2f), new Vector3(-0.5f, 0.2f, 2f),
+                    new Vector3(-0.5f + 3.2f, 0.2f, 2f), new Vector3(-0.5f + 3.2f, 0.2f - 2.4f, 2f)
+                },
+                store.Frames[0].frustumCorners);
+        }
+
+        // Without intrinsics (a desktop webcam) the scene camera is all there is to take the corners from.
+        [Test]
+        public void AddSnapshot_WithoutIntrinsics_TakesTheCornersFromTheSceneCamera()
+        {
+            var camera = NewCamera(new Vector3(1f, 2f, 3f), Quaternion.identity, 90f, 2f);
+            var store = NewStore();
+
+            store.AddSnapshot(Capture(pose: new Pose(camera.transform.position, camera.transform.rotation), intrinsics: Matrix4x4.zero), 2f, camera);
+
+            AssertCorners(new[] { new Vector3(-3f, 0f, 5f), new Vector3(-3f, 4f, 5f), new Vector3(5f, 4f, 5f), new Vector3(5f, 0f, 5f) },
+                store.Frames[0].frustumCorners);
+        }
+
+        [Test]
+        public void AddSnapshot_WithoutAnImageSize_TakesTheCornersFromTheSceneCameraEvenWithIntrinsics()
+        {
+            var camera = NewCamera(new Vector3(1f, 2f, 3f), Quaternion.identity, 90f, 2f);
+            var store = NewStore();
+            var capture = Capture(pose: new Pose(camera.transform.position, camera.transform.rotation));
+            capture.imageWidth = 0;
+            capture.imageHeight = 0;
+
+            store.AddSnapshot(capture, 2f, camera);
+
+            AssertCorners(new[] { new Vector3(-3f, 0f, 5f), new Vector3(-3f, 4f, 5f), new Vector3(5f, 4f, 5f), new Vector3(5f, 0f, 5f) },
+                store.Frames[0].frustumCorners);
+        }
+
+        [Test]
+        public void AddSnapshot_WithoutACameraAndWithoutIntrinsics_OrWithADistanceNotAboveZero_StoresTheFrameWithAnEmptyCornerList()
         {
             var camera = NewCamera(Vector3.zero, Quaternion.identity, 90f, 2f);
             var destroyed = NewCamera(Vector3.zero, Quaternion.identity, 90f, 2f);
             Object.DestroyImmediate(destroyed);
             var store = NewStore();
+            var noIntrinsics = Matrix4x4.zero;
 
-            store.AddSnapshot(Capture(), 1f, null);
-            store.AddSnapshot(Capture(), 0f, camera);
+            store.AddSnapshot(Capture(intrinsics: noIntrinsics), 1f, null);
+            store.AddSnapshot(Capture(intrinsics: noIntrinsics), 0f, camera);
+            store.AddSnapshot(Capture(intrinsics: noIntrinsics), -2f, camera);
+            store.AddSnapshot(Capture(intrinsics: noIntrinsics), 1f, destroyed);
+            store.AddSnapshot(Capture(), 0f, null);
             store.AddSnapshot(Capture(), -2f, camera);
-            store.AddSnapshot(Capture(), 1f, destroyed);
 
-            Assert.AreEqual(4, store.Frames.Count);
+            Assert.AreEqual(6, store.Frames.Count);
             foreach (var frame in store.Frames)
             {
                 Assert.IsNotNull(frame.frustumCorners);
                 Assert.IsEmpty(frame.frustumCorners);
             }
 
-            CollectionAssert.AreEqual(new[] { 1f, 0f, -2f, 1f }, store.Frames.Select(frame => frame.frustumDistance).ToArray(),
+            CollectionAssert.AreEqual(new[] { 1f, 0f, -2f, 1f, 0f, -2f }, store.Frames.Select(frame => frame.frustumDistance).ToArray(),
                 "the distance is stored as given, even when no corners are made from it");
         }
 
@@ -202,6 +263,7 @@ namespace CompanionScan.Tests.Editor
         public void AddSnapshot_KeepsTheNewestFiftyFramesByDefault()
         {
             var store = NewStore();
+            LogAssert.Expect(LogType.Warning, DroppedWarning("snap_0001", 50));
 
             for (int i = 0; i < 51; i++)
             {
@@ -213,11 +275,14 @@ namespace CompanionScan.Tests.Editor
             Assert.AreEqual("snap_0051", store.Frames[49].id);
         }
 
-        // The oldest snapshot is dropped silently, so a pin's capture id can name a snapshot that is never exported.
+        // The oldest snapshot is dropped, so a pin's capture id can name a snapshot that is never exported: the store says so.
+        // (The last test of the group below cannot see the id of a frame that is dropped later: it is still returned.)
         [Test]
-        public void AddSnapshot_Currently_DropsTheOldestFrameSilentlyOnceTheLimitIsPassed()
+        public void AddSnapshot_DropsTheOldestFrameOnceTheLimitIsPassed_AndSaysWhichOne()
         {
             var store = NewStore(maxFrames: 3);
+            LogAssert.Expect(LogType.Warning, DroppedWarning("snap_0001", 3));
+            LogAssert.Expect(LogType.Warning, DroppedWarning("snap_0002", 3));
 
             var ids = new List<string>();
             for (int i = 0; i < 5; i++)
@@ -235,6 +300,8 @@ namespace CompanionScan.Tests.Editor
         public void AddSnapshot_WithALimitBelowOne_KeepsOnlyTheNewestFrame(int limit)
         {
             var store = NewStore(maxFrames: limit);
+            LogAssert.Expect(LogType.Warning, DroppedWarning("snap_0001", 1));
+            LogAssert.Expect(LogType.Warning, DroppedWarning("snap_0002", 1));
 
             store.AddSnapshot(Capture(), 1f, null);
             store.AddSnapshot(Capture(), 1f, null);
@@ -292,6 +359,11 @@ namespace CompanionScan.Tests.Editor
             Assert.AreEqual(1, view.Count);
             store.Clear();
             Assert.AreEqual(0, view.Count);
+        }
+
+        private static System.Text.RegularExpressions.Regex DroppedWarning(string id, int limit)
+        {
+            return new System.Text.RegularExpressions.Regex($"\\[Snapshots\\] Dropping {id}: the store keeps the newest {limit} snapshots");
         }
 
         private SnapshotFrameStore NewStore(int maxFrames = 50, string idPrefix = "snap")

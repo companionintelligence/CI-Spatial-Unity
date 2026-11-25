@@ -1,8 +1,15 @@
-﻿using System.Collections.Generic;
-using System.Globalization;
+﻿using Companion.Spatial.Vocabulary;
 
 namespace CompanionScan.Mapping
 {
+    /// <summary>
+    /// Maps detector labels to Meta's semantic labels, through the scanner's one tag vocabulary
+    /// (<see cref="TagVocabulary"/> in the Companion.Spatial package). The vocabulary reads the words
+    /// the way people write them: case, articles, plurals, separators and the usual synonyms, so
+    /// "chair" and "a couch", "tables", "TV screen", "Sofa Bed" and "door  frame" all find their label.
+    /// This mapper used to look the text up whole, and gave OTHER to 16 of the 26 classes of the
+    /// default prompt.
+    /// </summary>
     public static class SemanticLabelMapper
     {
         public static readonly string[] SupportedMetaLabels =
@@ -25,49 +32,22 @@ namespace CompanionScan.Mapping
             "OTHER"
         };
 
-        private static readonly Dictionary<string, string> Map = new Dictionary<string, string>
-        {
-            { "couch", "COUCH" },
-            { "sofa", "COUCH" },
-            { "bed", "BED" },
-            { "table", "TABLE" },
-            { "desk", "TABLE" },
-            { "lamp", "LAMP" },
-            { "plant", "PLANT" },
-            { "screen", "SCREEN" },
-            { "tv", "SCREEN" },
-            { "monitor", "SCREEN" },
-            { "storage", "STORAGE" },
-            { "cabinet", "STORAGE" },
-            { "shelf", "STORAGE" },
-            { "door", "DOOR_FRAME" },
-            { "door_frame", "DOOR_FRAME" },
-            { "window", "WINDOW_FRAME" },
-            { "window_frame", "WINDOW_FRAME" },
-            { "wall", "WALL_FACE" },
-            { "wall_face", "WALL_FACE" },
-            { "ceiling", "CEILING" },
-            { "floor", "FLOOR" },
-            { "wall_art", "WALL_ART" },
-            { "other", "OTHER" }
-        };
-
+        /// <summary>
+        /// The Meta label for raw text: one of <see cref="SupportedMetaLabels"/>, OTHER for text the
+        /// vocabulary does not know, for a class Meta has no label for (a chair, a cup) and for no text.
+        /// </summary>
         public static string MapToMetaLabel(string rawLabel)
         {
-            if (string.IsNullOrWhiteSpace(rawLabel))
-            {
-                return "OTHER";
-            }
+            return TagVocabulary.Default.ToSemanticLabel(rawLabel);
+        }
 
-            var normalized = rawLabel.Trim().ToLower(CultureInfo.InvariantCulture);
-            normalized = normalized.Replace(' ', '_').Replace('-', '_');
-            if (Map.TryGetValue(normalized, out var mapped))
-            {
-                return mapped;
-            }
-
-            return "OTHER";
+        /// <summary>
+        /// The canonical tag for raw text ("sofa" and "a loveseat" are "couch"), empty when there is
+        /// no usable text. A class without a Meta label still has a tag, which is what tracking uses.
+        /// </summary>
+        public static string NormalizeTag(string rawLabel)
+        {
+            return TagVocabulary.Default.Normalize(rawLabel);
         }
     }
 }
-

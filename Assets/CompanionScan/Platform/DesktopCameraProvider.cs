@@ -49,9 +49,10 @@ namespace CompanionScan.Platform
             return _frame.EncodeToJPG(quality);
         }
 
+        /// <summary>A webcam's intrinsics are not known: the zero matrix, which <c>CaptureFrame.HasIntrinsics</c> reads as "none".</summary>
         public Matrix4x4 GetCameraIntrinsics()
         {
-            return Matrix4x4.identity;
+            return Matrix4x4.zero;
         }
 
         public Pose GetCameraPose()

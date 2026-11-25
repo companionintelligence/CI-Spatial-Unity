@@ -25,6 +25,47 @@ namespace CompanionScan.Mapping
         private bool _loggedEnvironmentUnsupported;
         private bool _loggedEnvironmentPermission;
         private bool _loggedEnvironmentMiss;
+        private readonly List<IRaycastSource> _sources = new List<IRaycastSource>();
+
+        /// <summary>
+        /// Registers a source that is asked before the AR, environment and physics raycasts (a recorded
+        /// room, a scene mesh). Sources are asked in the order they were added; adding one twice does nothing.
+        /// </summary>
+        public void AddSource(IRaycastSource source)
+        {
+            if (source != null && !_sources.Contains(source))
+            {
+                _sources.Add(source);
+            }
+        }
+
+        /// <summary>Removes a source added with <see cref="AddSource"/>. Returns false when it was not there.</summary>
+        public bool RemoveSource(IRaycastSource source)
+        {
+            return source != null && _sources.Remove(source);
+        }
+
+        /// <summary>How many sources were added with <see cref="AddSource"/>.</summary>
+        public int SourceCount => _sources.Count;
+
+        private bool TryRaycastSources(Ray ray, out Vector3 point, out Vector3 normal, out RaycastHitType hitType)
+        {
+            for (int i = 0; i < _sources.Count; i++)
+            {
+                if (_sources[i].TryRaycast(ray, maxDistance, out var hit))
+                {
+                    point = hit.Point;
+                    normal = hit.Normal;
+                    hitType = hit.Type;
+                    return true;
+                }
+            }
+
+            point = Vector3.zero;
+            normal = Vector3.up;
+            hitType = RaycastHitType.Fallback;
+            return false;
+        }
 
         /// <summary>Runtime-adjustable fallback distance (metres).
         /// Used when no AR/physics hit is found.</summary>
@@ -60,6 +101,12 @@ namespace CompanionScan.Mapping
                 return false;
             }
 
+            Ray ray = targetCamera.ViewportPointToRay(new Vector3(uv.x, uv.y, 0));
+            if (_sources.Count > 0 && TryRaycastSources(ray, out point, out normal, out hitType))
+            {
+                return true;
+            }
+
     #if UNITY_IOS || UNITY_ANDROID
             if (arRaycastManager != null)
             {
@@ -74,7 +121,6 @@ namespace CompanionScan.Mapping
             }
     #endif
 
-            Ray ray = targetCamera.ViewportPointToRay(new Vector3(uv.x, uv.y, 0));
             if (preferEnvironmentRaycast)
             {
                 bool envAvailable = IsEnvironmentRaycastAvailable();
@@ -118,9 +164,16 @@ namespace CompanionScan.Mapping
             point = Vector3.zero;
             hitType = RaycastHitType.Fallback;
 
+            // The pixel belongs to a frame: without one there is no ray to cast (and no fallback point).
             if (frame == null)
             {
-                return TryRaycastViewport(Vector2.zero, out point, out normal, out hitType);
+                return false;
+            }
+
+            var ray = BuildRayFromIntrinsics(frame, pixel);
+            if (_sources.Count > 0 && TryRaycastSources(ray, out point, out normal, out hitType))
+            {
+                return true;
             }
 
     #if UNITY_IOS || UNITY_ANDROID
@@ -138,7 +191,6 @@ namespace CompanionScan.Mapping
             }
     #endif
 
-            var ray = BuildRayFromIntrinsics(frame, pixel);
             if (preferEnvironmentRaycast)
             {
                 bool envAvailable = IsEnvironmentRaycastAvailable();
