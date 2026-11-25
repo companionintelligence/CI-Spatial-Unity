@@ -29,6 +29,8 @@ namespace CompanionScan.Platform
         private CameraPermissionGate _permissionGate;
         private bool _loggedWaiting;
 
+        [SerializeField] private Transform poseSource;
+
         public bool IsAvailable => _cameraManager != null;
 
         /// <summary>True while capture is requested but the camera waits for its permissions.</summary>
@@ -161,9 +163,26 @@ namespace CompanionScan.Platform
             return Matrix4x4.zero;
         }
 
+        /// <summary>
+        /// The pose of the camera that follows the headset: the pose source, otherwise the main
+        /// camera, otherwise this object. This object alone is not enough: the pipeline creates it
+        /// under a root that does not move.
+        /// </summary>
         public Pose GetCameraPose()
         {
-            return new Pose(transform.position, transform.rotation);
+            var source = poseSource != null
+                ? poseSource
+                : (Camera.main != null ? Camera.main.transform : transform);
+            return new Pose(source.position, source.rotation);
+        }
+
+        /// <summary>Sets the pose source unless one is already set. Null leaves the main camera as the source.</summary>
+        public void EnsurePoseSource(Transform fallback)
+        {
+            if (poseSource == null)
+            {
+                poseSource = fallback;
+            }
         }
     }
 #else
@@ -175,6 +194,7 @@ namespace CompanionScan.Platform
         public byte[] GetCurrentFrameJpeg(int quality = 75) => null;
         public Matrix4x4 GetCameraIntrinsics() => Matrix4x4.zero;
         public Pose GetCameraPose() => new Pose(Vector3.zero, Quaternion.identity);
+        public void EnsurePoseSource(Transform fallback) { }
     }
 #endif
 }
