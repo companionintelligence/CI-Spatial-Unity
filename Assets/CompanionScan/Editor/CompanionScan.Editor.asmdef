@@ -3,7 +3,7 @@
   "rootNamespace": "CompanionScan.Editor",
   "references": [
     "GUID:dbe5d272346c8ec41b52d87c99009bed",
-    "CompanionScan"
+    "CompanionScan.Core"
   ],
   "includePlatforms": [
     "Editor"

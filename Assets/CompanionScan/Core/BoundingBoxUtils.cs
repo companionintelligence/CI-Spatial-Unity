@@ -4,6 +4,12 @@ namespace CompanionScan.Core
 {
     public static class BoundingBoxUtils
     {
+        /// <summary>
+        /// A box whose far corner (x2 and y2) is at most this is read as fractions of the image, otherwise as
+        /// pixels. The CV server sends fractions; a bit over 1 is float error, not a one-pixel box.
+        /// </summary>
+        public const float NormalizedLimit = 1.01f;
+
         public static bool TryNormalize(float[] bbox, int imageWidth, int imageHeight, out Rect normalized)
         {
             normalized = Rect.zero;
@@ -17,7 +23,9 @@ namespace CompanionScan.Core
             float x2 = bbox[2];
             float y2 = bbox[3];
 
-            bool alreadyNormalized = x2 <= 1f && y2 <= 1f;
+            // A far corner a hair past 1 is a normalized box with float error (a box that reaches the edge of
+            // the image), not a pixel box one pixel wide; it is clamped to 1 below.
+            bool alreadyNormalized = x2 <= NormalizedLimit && y2 <= NormalizedLimit;
             if (!alreadyNormalized)
             {
                 if (imageWidth <= 0 || imageHeight <= 0)

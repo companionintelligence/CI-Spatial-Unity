@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Companion.Spatial;
+using Companion.Spatial.Tracking;
 using CompanionScan.Core;
 using CompanionScan.Platform;
 using CompanionScan.Rendering;
@@ -50,6 +52,8 @@ namespace CompanionScan.Mapping
         [SerializeField] private bool preferSemanticPlanes = true;
         [SerializeField] private float semanticPlaneMaxDistance = 6f;
         [SerializeField] private float trackDistanceThreshold = 0.4f;
+        [Tooltip("Seconds without a detection before a track is called lost. A lost track is not forgotten: " +
+                 "the same object seen again later is still that track, so one pin.")]
         [SerializeField] private float trackMaxAgeSeconds = 2.5f;
 
         [Header("Mapping")]
@@ -99,7 +103,8 @@ namespace CompanionScan.Mapping
         [SerializeField] private bool runGroundingDino = true;
 
         [Header("Pipeline Steps â€” Meta Scene Understanding")]
-        [SerializeField] private MetaSceneCollector metaSceneCollector;
+        [Tooltip("The scene backend: any component that implements ISceneSource (MetaSceneCollector on Quest).")]
+        [SerializeField] private MonoBehaviour metaSceneCollector;
         [SerializeField] private bool runMetaSceneCapture = true;
 
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -107,27 +112,50 @@ namespace CompanionScan.Mapping
         // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
         private ICameraProvider _cameraProvider;
+        private ICameraProvider _cameraSourceFor;
+        private ICameraSource _cameraSource;
+        private ISceneSource _sceneSourceOverride;
         private CVServerClient _client;
         private bool _isBusy;
         private bool _loggedStaticCameraPose;
         private Texture2D _frameTexture;
         private CaptureFrame _lastCaptureFrame;
-        private readonly Dictionary<int, Vector3> _smoothedPositions = new Dictionary<int, Vector3>();
-        private readonly Dictionary<string, List<TrackState>> _tracksByLabel = new Dictionary<string, List<TrackState>>();
-        private int _trackPass;
+        private TrackTable _tracks;
         private string _captureSessionId;
         private int _captureFrameIndex;
-        private int _nextTrackId = 1;
         private bool _lastCaptureHadIntrinsics;
         private int _lastFallbackHits;
         private bool _loggedMissingIntrinsics;
 
-        private class TrackState
+        /// <summary>A pin made from one detection, with the detection as the tracker sees it.</summary>
+        private struct PendingPin
         {
-            public int id;
-            public Vector3 position;
-            public double timestamp;
-            public int pass;
+            public SpatialPin pin;
+            public Detection3D detection;
+        }
+
+        /// <summary>
+        /// The objects found so far, matched across captures: the same object seen again is one track, so
+        /// one pin that is updated, not a second pin. The tracker is the <c>Companion.Spatial</c> package's:
+        /// same canonical tag, within <see cref="trackDistanceThreshold"/>, positions smoothed with
+        /// <see cref="smoothingAlpha"/>. A track that is not seen for <see cref="trackMaxAgeSeconds"/> is
+        /// lost, not forgotten: seen again later it is the same object (it used to be forgotten after that
+        /// time, so a second capture a few seconds later pinned every object twice).
+        /// </summary>
+        private TrackTable Tracks
+        {
+            get
+            {
+                if (_tracks == null)
+                {
+                    _tracks = new TrackTable(new TrackTableOptions(
+                        associationDistance: Mathf.Max(0.01f, trackDistanceThreshold),
+                        smoothingAlpha: enableTemporalSmoothing ? Mathf.Clamp01(smoothingAlpha) : 1.0,
+                        lostAfterSeconds: Mathf.Max(0.1f, trackMaxAgeSeconds)));
+                }
+
+                return _tracks;
+            }
         }
 
         /// <summary>Last caption produced by Florence2.</summary>
@@ -215,13 +243,65 @@ namespace CompanionScan.Mapping
             {
                 labelRenderer.Follow(pinManager);
             }
+            // A camera or scene backend given with UseCameraProvider / UseSceneSource before Awake wins
+            // over the serialized one.
 #if UNITY_ANDROID
-            if (preferArCameraOnQuest)
+            if (preferArCameraOnQuest && _cameraProvider == null)
             {
                 TryAutoSetupArCameraProvider();
             }
 #endif
-            _cameraProvider = cameraProviderSource as ICameraProvider;
+            _cameraProvider = _cameraProvider ?? (cameraProviderSource as ICameraProvider);
+        }
+
+        /// <summary>
+        /// Uses <paramref name="provider"/> as the camera, in place of the one the scene serializes (the
+        /// replay backend, a test's fake). Capture is stopped on the old camera and started on the new one
+        /// while this component is enabled. Plain <see cref="ICameraProvider"/>s are adapted; an
+        /// <see cref="ICameraSource"/> is used as it is.
+        /// </summary>
+        public void UseCameraProvider(ICameraProvider provider)
+        {
+            if (ReferenceEquals(_cameraProvider, provider))
+            {
+                return;
+            }
+
+            if (isActiveAndEnabled)
+            {
+                _cameraProvider?.StopCapture();
+            }
+
+            _cameraProvider = provider;
+            if (isActiveAndEnabled)
+            {
+                _cameraProvider?.StartCapture();
+            }
+        }
+
+        /// <summary>Uses <paramref name="source"/> as the scene backend, in place of the component the scene serializes.</summary>
+        public void UseSceneSource(ISceneSource source)
+        {
+            _sceneSourceOverride = source;
+        }
+
+        /// <summary>The scene backend in use: the one given with <see cref="UseSceneSource"/>, else the serialized component, else null.</summary>
+        public ISceneSource SceneSource =>
+            _sceneSourceOverride ?? (metaSceneCollector != null ? metaSceneCollector as ISceneSource : null);
+
+        /// <summary>The camera in use as an <see cref="ICameraSource"/> (an adapter for a plain provider); null without a camera.</summary>
+        private ICameraSource CameraSource
+        {
+            get
+            {
+                if (!ReferenceEquals(_cameraSourceFor, _cameraProvider))
+                {
+                    _cameraSource = CameraSources.From(_cameraProvider);
+                    _cameraSourceFor = _cameraProvider;
+                }
+
+                return _cameraSource;
+            }
         }
 
 #if UNITY_ANDROID
@@ -367,14 +447,15 @@ namespace CompanionScan.Mapping
 
         private async Task RunMetaSceneCaptureAsync()
         {
-            if (metaSceneCollector == null)
+            var sceneSource = SceneSource;
+            if (sceneSource == null)
             {
                 Debug.LogWarning("[Pipeline-Meta] MetaSceneCollector is not assigned.");
                 return;
             }
 
             Debug.Log("[Pipeline-Meta] Querying Meta Scene Understandingâ€¦");
-            var snapshot = await metaSceneCollector.CaptureSnapshotAsync();
+            var snapshot = await sceneSource.CaptureSnapshotAsync();
             LastMetaSnapshot = snapshot;
 
             if (!string.IsNullOrEmpty(snapshot.error))
@@ -386,7 +467,7 @@ namespace CompanionScan.Mapping
             Debug.Log($"[Pipeline-Meta] Captured {snapshot.anchors.Count} scene anchors.");
 
             // Convert to SpatialPins and add to the shared pin manager
-            var pins = metaSceneCollector.ConvertSnapshotToPins(snapshot);
+            var pins = sceneSource.ConvertSnapshotToPins(snapshot);
             if (pinManager != null)
             {
                 int added = 0;
@@ -438,16 +519,17 @@ namespace CompanionScan.Mapping
             // when denied the raycaster falls back to physics/fixed-distance hits).
             await SpatialDataPermission.RequestAsync();
 
-            var frame = _cameraProvider.GetCurrentFrameJpeg(jpegQuality);
-            if (frame == null || frame.Length == 0)
+            if (!CameraSource.TryCaptureFrame(jpegQuality, out var cameraFrame))
             {
                 Debug.LogWarning("[Pipeline-CV] Failed to capture frame from camera.");
                 return;
             }
 
+            var frame = cameraFrame.Jpeg;
+
             Debug.Log($"[Pipeline-CV] Captured frame ({frame.Length} bytes). Starting CV pipelineâ€¦");
             EnsureFrameTexture(frame);
-            var capture = BuildCaptureFrame(frame);
+            var capture = BuildCaptureFrame(cameraFrame);
             _lastCaptureHadIntrinsics = capture.HasIntrinsics;
             _lastFallbackHits = 0;
             if (!_lastCaptureHadIntrinsics && !_loggedMissingIntrinsics)
@@ -653,19 +735,20 @@ namespace CompanionScan.Mapping
             _frameTexture.LoadImage(jpegBytes);
         }
 
-        private CaptureFrame BuildCaptureFrame(byte[] jpegBytes)
+        private CaptureFrame BuildCaptureFrame(CameraFrame source)
         {
-            var cam = snapshotCamera != null ? snapshotCamera : Camera.main;
-            Pose cameraPose = cam != null
-                ? new Pose(cam.transform.position, cam.transform.rotation)
-                : new Pose(Vector3.zero, Quaternion.identity);
-            Pose pose = cameraPose;
+            Pose pose = source.Pose;
 
-            if (_cameraProvider != null)
+            if (!source.PoseIsGuaranteed)
             {
-                // A provider that reports the world origin while the headset is elsewhere is a
-                // transform that does not follow the headset: stamp the headset's pose instead.
-                pose = CapturePose.Resolve(_cameraProvider.GetCameraPose(), cam != null, cameraPose, out bool providerRejected);
+                // A plain camera provider that reports the world origin while the headset is elsewhere
+                // is a transform that does not follow the headset: stamp the headset's pose instead.
+                // (An ICameraSource promises the pose at capture, whatever it is.)
+                var cam = snapshotCamera != null ? snapshotCamera : Camera.main;
+                Pose cameraPose = cam != null
+                    ? new Pose(cam.transform.position, cam.transform.rotation)
+                    : new Pose(Vector3.zero, Quaternion.identity);
+                pose = CapturePose.Resolve(source.Pose, cam != null, cameraPose, out bool providerRejected);
                 if (providerRejected && !_loggedStaticCameraPose)
                 {
                     _loggedStaticCameraPose = true;
@@ -673,14 +756,16 @@ namespace CompanionScan.Mapping
                 }
             }
 
-            var intrinsics = _cameraProvider != null
-                ? _cameraProvider.GetCameraIntrinsics()
-                : Matrix4x4.identity;
+            // The source's own size when it gives one; otherwise the decoded image's.
+            int width = source.Width > 0 ? source.Width : (_frameTexture != null ? _frameTexture.width : 0);
+            int height = source.Height > 0 ? source.Height : (_frameTexture != null ? _frameTexture.height : 0);
 
-            int width = _frameTexture != null ? _frameTexture.width : 0;
-            int height = _frameTexture != null ? _frameTexture.height : 0;
+            var capture = CaptureFrame.Create(source.Jpeg, width, height, pose, source.Intrinsics);
+            if (source.Timestamp > 0.0)
+            {
+                capture.timestamp = source.Timestamp; // when the frame was taken; otherwise the time of this call
+            }
 
-            var capture = CaptureFrame.Create(jpegBytes, width, height, pose, intrinsics);
             capture.sessionId = _captureSessionId;
             capture.frameIndex = _captureFrameIndex;
             capture.id = $"{_captureSessionId}_{_captureFrameIndex:0000}";
@@ -707,60 +792,19 @@ namespace CompanionScan.Mapping
             if (segmentation?.annotations == null || raycaster == null || pinManager == null)
                 return;
 
-            int imgW = capture != null ? capture.imageWidth : (_frameTexture != null ? _frameTexture.width : 0);
-            int imgH = capture != null ? capture.imageHeight : (_frameTexture != null ? _frameTexture.height : 0);
-            int added = 0;
-            int pass = ++_trackPass;
-
+            var pending = new List<PendingPin>();
             foreach (var ann in segmentation.annotations)
             {
-                if (added >= maxPinsPerCapture) break;
+                if (pending.Count >= maxPinsPerCapture) break;
                 if (ann.score < minScore) continue;
-                if (ann.bbox == null || ann.bbox.Length < 4) continue;
-
-                if (!BoundingBoxUtils.TryNormalize(ann.bbox, imgW, imgH, out Rect normalized))
-                    continue;
-
-                float u = normalized.x + normalized.width * 0.5f;
-                float v = 1.0f - (normalized.y + normalized.height * 0.5f);
-                Rect pixelRect = BoundingBoxUtils.NormalizedToPixels(normalized, imgW, imgH);
-
-                var pixel = new Vector2(pixelRect.x + pixelRect.width * 0.5f,
-                                        pixelRect.y + pixelRect.height * 0.5f);
-
-                if (!TryResolveHit(capture, new Vector2(u, v), pixel, out Vector3 hitPoint, out Vector3 hitNormal, out RaycastHitType hitType))
-                    hitNormal = Vector3.up;
-
-                string semantic = SemanticLabelMapper.MapToMetaLabel(ann.label);
-                int trackId = AssignTrackId(TrackKey(ann.label, semantic), hitPoint,
-                    capture?.timestamp ?? Time.timeAsDouble, pass);
-                var position = ApplySmoothing(trackId, hitPoint);
-                float confidence = ComputePlacementConfidence(ann.score, hitType);
-                var pin = new SpatialPin
+                if (TryMakePin(ann.label, ann.score, ann.bbox, "segment", capture, out var made))
                 {
-                    label = ann.label,
-                    semanticLabel = semantic,
-                    score = ann.score,
-                    source = PinSource.CvServer,
-                    position = position,
-                    normal = hitNormal,
-                    bboxPixels = new SerializableRect(pixelRect.x, pixelRect.y, pixelRect.width, pixelRect.height),
-                    bboxNormalized = new SerializableRect(normalized.x, normalized.y, normalized.width, normalized.height),
-                    sourcePrompt = "segment",
-                    timestamp = capture != null ? capture.timestamp : Time.timeAsDouble,
-                    captureId = capture?.id,
-                    captureSessionId = capture?.sessionId,
-                    captureFrameIndex = capture?.frameIndex ?? 0,
-                    placementConfidence = confidence,
-                    hitType = hitType,
-                    trackId = trackId
-                };
-
-                pinManager.AddPin(pin);
-                added++;
+                    pending.Add(made);
+                }
             }
 
-            Debug.Log($"[Pipeline-CV] Created {added} spatial pins from SAM2 annotations.");
+            AddTrackedPins(pending, capture);
+            Debug.Log($"[Pipeline-CV] Created {pending.Count} spatial pins from SAM2 annotations.");
         }
 
         private void AddCvPinsFromDetections(DetectionResult detection, CaptureFrame capture)
@@ -771,65 +815,133 @@ namespace CompanionScan.Mapping
             }
 
             int count = Mathf.Min(detection.bboxes.Count, detection.labels.Count);
-            int added = 0;
-            int pass = ++_trackPass;
+            var pending = new List<PendingPin>();
 
             for (int i = 0; i < count; i++)
             {
-                if (added >= maxPinsPerCapture) break;
+                if (pending.Count >= maxPinsPerCapture) break;
 
                 float score = i < detection.scores.Count ? detection.scores[i] : 0f;
                 if (score < minScore) continue;
 
-                var bbox = detection.bboxes[i];
-                if (bbox == null || bbox.Length < 4) continue;
-
-                int imgW = capture != null ? capture.imageWidth : (_frameTexture != null ? _frameTexture.width : 0);
-                int imgH = capture != null ? capture.imageHeight : (_frameTexture != null ? _frameTexture.height : 0);
-                if (!BoundingBoxUtils.TryNormalize(bbox, imgW, imgH, out Rect normalized))
-                    continue;
-
-                float u = normalized.x + normalized.width * 0.5f;
-                float v = 1.0f - (normalized.y + normalized.height * 0.5f);
-                Rect pixelRect = BoundingBoxUtils.NormalizedToPixels(normalized, imgW, imgH);
-
-                var pixel = new Vector2(pixelRect.x + pixelRect.width * 0.5f,
-                                        pixelRect.y + pixelRect.height * 0.5f);
-
-                if (!TryResolveHit(capture, new Vector2(u, v), pixel, out Vector3 hitPoint, out Vector3 hitNormal, out RaycastHitType hitType))
+                if (TryMakePin(detection.labels[i], score, detection.bboxes[i], BuildDinoPrompt(null), capture, out var made))
                 {
-                    hitNormal = Vector3.up;
+                    pending.Add(made);
                 }
+            }
 
-                string semantic = SemanticLabelMapper.MapToMetaLabel(detection.labels[i]);
-                int trackId = AssignTrackId(TrackKey(detection.labels[i], semantic), hitPoint,
-                    capture?.timestamp ?? Time.timeAsDouble, pass);
-                var position = ApplySmoothing(trackId, hitPoint);
-                float confidence = ComputePlacementConfidence(score, hitType);
-                var pin = new SpatialPin
+            AddTrackedPins(pending, capture);
+        }
+
+        /// <summary>
+        /// Makes the pin for one detection: the box becomes a ray through the capture's camera, the ray a
+        /// place in the room, and the place the pin's position (before it is matched to an earlier object).
+        /// False when the box is no box.
+        /// </summary>
+        private bool TryMakePin(string label, float score, float[] bbox, string prompt, CaptureFrame capture, out PendingPin made)
+        {
+            made = default;
+            if (bbox == null || bbox.Length < 4)
+            {
+                return false;
+            }
+
+            int imgW = capture != null ? capture.imageWidth : (_frameTexture != null ? _frameTexture.width : 0);
+            int imgH = capture != null ? capture.imageHeight : (_frameTexture != null ? _frameTexture.height : 0);
+            if (!BoundingBoxUtils.TryNormalize(bbox, imgW, imgH, out Rect normalized))
+            {
+                return false;
+            }
+
+            float u = normalized.x + normalized.width * 0.5f;
+            float v = 1.0f - (normalized.y + normalized.height * 0.5f);
+            Rect pixelRect = BoundingBoxUtils.NormalizedToPixels(normalized, imgW, imgH);
+
+            var pixel = new Vector2(pixelRect.x + pixelRect.width * 0.5f,
+                                    pixelRect.y + pixelRect.height * 0.5f);
+
+            if (!TryResolveHit(capture, new Vector2(u, v), pixel, out Vector3 hitPoint, out Vector3 hitNormal, out RaycastHitType hitType))
+            {
+                hitNormal = Vector3.up;
+            }
+
+            double timestamp = capture != null ? capture.timestamp : Time.timeAsDouble;
+            made = new PendingPin
+            {
+                pin = new SpatialPin
                 {
-                    label = detection.labels[i],
-                    semanticLabel = semantic,
+                    label = label,
+                    semanticLabel = SemanticLabelMapper.MapToMetaLabel(label),
                     score = score,
                     source = PinSource.CvServer,
-                    position = position,
+                    position = hitPoint,
                     normal = hitNormal,
                     bboxPixels = new SerializableRect(pixelRect.x, pixelRect.y, pixelRect.width, pixelRect.height),
                     bboxNormalized = new SerializableRect(normalized.x, normalized.y, normalized.width, normalized.height),
-                    sourcePrompt = BuildDinoPrompt(null),
-                    timestamp = capture != null ? capture.timestamp : Time.timeAsDouble,
+                    sourcePrompt = prompt,
+                    timestamp = timestamp,
                     captureId = capture?.id,
                     captureSessionId = capture?.sessionId,
                     captureFrameIndex = capture?.frameIndex ?? 0,
-                    placementConfidence = confidence,
-                    hitType = hitType,
-                    trackId = trackId
-                };
+                    placementConfidence = ComputePlacementConfidence(score, hitType),
+                    hitType = hitType
+                },
+                detection = new Detection3D(label, score, ToVec3(hitPoint), ToVec3(hitNormal), capture?.id,
+                    NormalizedBox.TryCreate(normalized.xMin, normalized.yMin, normalized.xMax, normalized.yMax, out var box)
+                        ? box
+                        : (NormalizedBox?)null)
+            };
+            return true;
+        }
+
+        /// <summary>
+        /// Matches one capture's detections to the objects found so far, then adds a pin for each: the pin
+        /// of an object seen before takes that object's track id and its smoothed position, so it replaces
+        /// the earlier pin. Two detections of one capture are never one object. A detection the tracker
+        /// cannot use (no label) is pinned where it was found, with no track.
+        /// </summary>
+        private void AddTrackedPins(List<PendingPin> pending, CaptureFrame capture)
+        {
+            if (pending.Count == 0)
+            {
+                return;
+            }
+
+            var detections = new List<Detection3D>(pending.Count);
+            foreach (var item in pending)
+            {
+                detections.Add(item.detection);
+            }
+
+            var table = Tracks;
+            var trackOf = new int[pending.Count];
+            foreach (var trackEvent in table.Update(capture != null ? capture.timestamp : Time.timeAsDouble, detections))
+            {
+                bool forADetection = trackEvent.Kind == TrackEventKind.Found
+                                     || trackEvent.Kind == TrackEventKind.Updated
+                                     || trackEvent.Kind == TrackEventKind.Revived;
+                if (forADetection && trackEvent.DetectionIndex >= 0 && trackEvent.DetectionIndex < trackOf.Length)
+                {
+                    trackOf[trackEvent.DetectionIndex] = trackEvent.TrackId;
+                }
+            }
+
+            for (int i = 0; i < pending.Count; i++)
+            {
+                var pin = pending[i].pin;
+                if (trackOf[i] > 0 && table.TryGetTrack(trackOf[i], out var track))
+                {
+                    pin.trackId = track.Id;
+                    pin.position = ToVector3(track.Position);
+                }
 
                 pinManager.AddPin(pin);
-                added++;
             }
         }
+
+        private static Vec3 ToVec3(Vector3 v) => new Vec3(v.x, v.y, v.z);
+
+        private static Vector3 ToVector3(Vec3 v) => new Vector3((float)v.X, (float)v.Y, (float)v.Z);
 
         private bool TryResolveHit(CaptureFrame capture, Vector2 uv, Vector2 pixel,
                                    out Vector3 hitPoint, out Vector3 hitNormal, out RaycastHitType hitType)
@@ -884,35 +996,6 @@ namespace CompanionScan.Mapping
             return viewportFallback;
         }
 
-        // Smooths along one object's track. Smoothing by label alone pulled each detection toward the
-        // last one with that label, so a chair, a cup and a book (all "OTHER") landed between each other.
-        private Vector3 ApplySmoothing(int trackId, Vector3 position)
-        {
-            if (!enableTemporalSmoothing || trackId == 0)
-            {
-                return position;
-            }
-
-            if (_smoothedPositions.TryGetValue(trackId, out var previous))
-            {
-                var smoothed = Vector3.Lerp(previous, position, smoothingAlpha);
-                _smoothedPositions[trackId] = smoothed;
-                return smoothed;
-            }
-
-            _smoothedPositions[trackId] = position;
-            return position;
-        }
-
-        // Tracks group detections by Meta label; "OTHER" covers every unmapped class, so those
-        // are grouped by their own label instead.
-        private static string TrackKey(string rawLabel, string semanticLabel)
-        {
-            return string.Equals(semanticLabel, "OTHER", StringComparison.OrdinalIgnoreCase)
-                ? "OTHER:" + (rawLabel ?? string.Empty).Trim().ToLowerInvariant()
-                : semanticLabel;
-        }
-
         private static float ComputePlacementConfidence(float modelScore, RaycastHitType hitType)
         {
             float weight = hitType switch
@@ -927,72 +1010,12 @@ namespace CompanionScan.Mapping
             return Mathf.Clamp01(modelScore * weight);
         }
 
-        private int AssignTrackId(string trackKey, Vector3 position, double timestamp, int pass)
-        {
-            if (string.IsNullOrWhiteSpace(trackKey))
-            {
-                return 0;
-            }
-
-            if (!_tracksByLabel.TryGetValue(trackKey, out var tracks))
-            {
-                tracks = new List<TrackState>();
-                _tracksByLabel[trackKey] = tracks;
-            }
-
-            tracks.RemoveAll(t =>
-            {
-                bool expired = (timestamp - t.timestamp) > trackMaxAgeSeconds;
-                if (expired)
-                {
-                    _smoothedPositions.Remove(t.id);
-                }
-                return expired;
-            });
-
-            TrackState best = null;
-            float bestDist = float.MaxValue;
-            foreach (var track in tracks)
-            {
-                // Two detections in one capture are two objects: they never share a track.
-                if (track.pass == pass)
-                {
-                    continue;
-                }
-
-                float dist = Vector3.Distance(track.position, position);
-                if (dist < bestDist)
-                {
-                    bestDist = dist;
-                    best = track;
-                }
-            }
-
-            if (best != null && bestDist <= trackDistanceThreshold)
-            {
-                best.position = position;
-                best.timestamp = timestamp;
-                best.pass = pass;
-                return best.id;
-            }
-
-            var created = new TrackState
-            {
-                id = _nextTrackId++,
-                position = position,
-                timestamp = timestamp,
-                pass = pass
-            };
-            tracks.Add(created);
-            return created.id;
-        }
-
         private bool TryProjectToSemanticPlane(CaptureFrame capture, Vector2 pixel, out Vector3 point, out Vector3 normal)
         {
             point = Vector3.zero;
             normal = Vector3.up;
 
-            if (metaSceneCollector == null || metaSceneCollector.LastSnapshot == null)
+            if (SceneSource?.LastSnapshot == null)
             {
                 return false;
             }
@@ -1021,7 +1044,8 @@ namespace CompanionScan.Mapping
             point = Vector3.zero;
             normal = Vector3.up;
 
-            if (!preferSemanticPlanes || metaSceneCollector == null || metaSceneCollector.LastSnapshot == null)
+            var lastSnapshot = SceneSource?.LastSnapshot;
+            if (!preferSemanticPlanes || lastSnapshot == null)
             {
                 return false;
             }
@@ -1029,7 +1053,7 @@ namespace CompanionScan.Mapping
             float bestT = float.MaxValue;
             MetaSceneAnchorSnapshot bestAnchor = null;
 
-            foreach (var anchor in metaSceneCollector.LastSnapshot.anchors)
+            foreach (var anchor in lastSnapshot.anchors)
             {
                 if (!anchor.hasPlane)
                 {

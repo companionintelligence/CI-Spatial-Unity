@@ -156,28 +156,28 @@ namespace CompanionScan.Tests.Editor
             AssertEmptyNotNull(FloorplanBuilder.BuildFloorPolygon(new[] { V(0f, 0f, 0f), V(1f, 0f, 0f) }, new[] { PinAt(0f, 0f, 0f) }, 0f));
         }
 
-        // Collinear pins still pass the three-pin check, so the floor plan is a two-point "polygon" instead of empty.
+        // Pins on a line enclose no area: no polygon (a two-point "polygon" used to come back).
         [Test]
-        public void BuildFloorPolygon_Currently_ReturnsTwoPointsForCollinearPins()
+        public void BuildFloorPolygon_ReturnsAnEmptyListForCollinearPins()
         {
             var alongX = new[] { PinAt(0f, 0f, 0f), PinAt(1f, 0f, 0f), PinAt(2f, 0f, 0f) };
             var diagonal = new[] { PinAt(2f, 0f, 2f), PinAt(0f, 0f, 0f), PinAt(1f, 0f, 1f) };
             var alongZ = new[] { PinAt(1f, 0f, 0f), PinAt(1f, 0f, 1f), PinAt(1f, 0f, 2f) };
 
-            CollectionAssert.AreEqual(new[] { V(0f, 0.25f, 0f), V(2f, 0.25f, 0f) }, FloorplanBuilder.BuildFloorPolygon(null, alongX, 0.25f));
-            CollectionAssert.AreEqual(new[] { V(0f, 0.25f, 0f), V(2f, 0.25f, 2f) }, FloorplanBuilder.BuildFloorPolygon(null, diagonal, 0.25f));
-            CollectionAssert.AreEqual(new[] { V(1f, 0.25f, 0f), V(1f, 0.25f, 2f) }, FloorplanBuilder.BuildFloorPolygon(null, alongZ, 0.25f));
+            AssertEmptyNotNull(FloorplanBuilder.BuildFloorPolygon(null, alongX, 0.25f));
+            AssertEmptyNotNull(FloorplanBuilder.BuildFloorPolygon(null, diagonal, 0.25f));
+            AssertEmptyNotNull(FloorplanBuilder.BuildFloorPolygon(null, alongZ, 0.25f));
         }
 
-        // Duplicate pins count towards the three, so pins on one or two places give a two-point "polygon".
+        // Duplicate pins do not count towards the three: pins on one or two places enclose no area.
         [Test]
-        public void BuildFloorPolygon_Currently_CountsDuplicatePinsTowardsTheMinimumOfThree()
+        public void BuildFloorPolygon_ReturnsAnEmptyListForPinsOnOneOrTwoPlaces()
         {
             var samePlace = new[] { PinAt(1f, 0f, 1f), PinAt(1f, 0f, 1f), PinAt(1f, 0f, 1f) };
             var twoPlaces = new[] { PinAt(0f, 0f, 0f), PinAt(0f, 0f, 0f), PinAt(1f, 0f, 0f) };
 
-            CollectionAssert.AreEqual(new[] { V(1f, 0f, 1f), V(1f, 0f, 1f) }, FloorplanBuilder.BuildFloorPolygon(null, samePlace, 0f));
-            CollectionAssert.AreEqual(new[] { V(0f, 0f, 0f), V(1f, 0f, 0f) }, FloorplanBuilder.BuildFloorPolygon(null, twoPlaces, 0f));
+            AssertEmptyNotNull(FloorplanBuilder.BuildFloorPolygon(null, samePlace, 0f));
+            AssertEmptyNotNull(FloorplanBuilder.BuildFloorPolygon(null, twoPlaces, 0f));
         }
 
         [Test]
@@ -210,33 +210,34 @@ namespace CompanionScan.Tests.Editor
             Assert.IsEmpty(mesh.colors);
         }
 
+        // A convex polygon is covered by n - 2 triangles whose areas add up to its own.
         [Test]
-        public void BuildFloorMesh_FansTheTrianglesOutFromTheFirstPoint()
+        public void BuildFloorMesh_CoversAConvexPolygonWithNMinusTwoTriangles()
         {
             var rectangle = NewMesh(new[] { V(0f, 0f, 0f), V(4f, 0f, 0f), V(4f, 0f, 3f), V(0f, 0f, 3f) }, null, 0f);
             var pentagon = NewMesh(new[] { V(0f, 0f, 0f), V(4f, 0f, 0f), V(5f, 0f, 2f), V(2f, 0f, 4f), V(0f, 0f, 3f) }, null, 0f);
 
-            CollectionAssert.AreEqual(new[] { 0, 1, 2, 0, 2, 3 }, rectangle.triangles);
-            CollectionAssert.AreEqual(new[] { 0, 1, 2, 0, 2, 3, 0, 3, 4 }, pentagon.triangles);
+            AssertCoversExactly(rectangle, 12f, 2);
+            AssertCoversExactly(pentagon, SignedAreaXZ(new[] { V(0f, 0f, 0f), V(4f, 0f, 0f), V(5f, 0f, 2f), V(2f, 0f, 4f), V(0f, 0f, 3f) }), 3);
         }
 
-        // Counterclockwise from above (as the pin hull is) gives downward normals, so back-face culling hides the floor from above.
+        // A polygon that runs counterclockwise from above (as the pin hull does) used to give downward normals, so back-face
+        // culling hid the floor from above. The floor faces up whichever way the polygon runs.
         [Test]
-        public void BuildFloorMesh_Currently_FacesDownForACounterClockwisePolygonAndUpForAClockwiseOne()
+        public void BuildFloorMesh_FacesUp_WhicheverWayThePolygonRuns()
         {
             var counterClockwise = new[] { V(0f, 0f, 0f), V(4f, 0f, 0f), V(4f, 0f, 3f), V(0f, 0f, 3f) };
 
-            var down = NewMesh(counterClockwise, null, 0f);
-            var up = NewMesh(Enumerable.Reverse(counterClockwise).ToArray(), null, 0f);
+            var first = NewMesh(counterClockwise, null, 0f);
+            var second = NewMesh(Enumerable.Reverse(counterClockwise).ToArray(), null, 0f);
 
-            foreach (var normal in down.normals)
+            foreach (var mesh in new[] { first, second })
             {
-                Assert.That(Vector3.Distance(normal, Vector3.down), Is.LessThan(1e-4f), "counterclockwise: " + normal);
-            }
-
-            foreach (var normal in up.normals)
-            {
-                Assert.That(Vector3.Distance(normal, Vector3.up), Is.LessThan(1e-4f), "clockwise: " + normal);
+                Assert.IsNotEmpty(mesh.normals);
+                foreach (var normal in mesh.normals)
+                {
+                    Assert.That(Vector3.Distance(normal, Vector3.up), Is.LessThan(1e-4f), "normal " + normal);
+                }
             }
         }
 
@@ -254,28 +255,46 @@ namespace CompanionScan.Tests.Editor
             }
         }
 
-        // The fan from the first point turns one triangle of a U-shaped boundary the other way, over part of the notch.
+        // A fan from the first point turned one triangle of a U-shaped boundary the other way, over part of the notch. The
+        // triangles now cover the polygon exactly: all face up and their areas add up to its own (24 less the notch of 4).
         [Test]
-        public void BuildFloorMesh_Currently_GivesAConcavePolygonATriangleTurnedTheOtherWay()
+        public void BuildFloorMesh_CoversAUShapedPolygonExactly_WithNoTriangleTurnedTheOtherWay()
         {
             var u = new[]
             {
                 V(0f, 0f, 0f), V(6f, 0f, 0f), V(6f, 0f, 4f), V(4f, 0f, 4f), V(4f, 0f, 2f), V(2f, 0f, 2f), V(2f, 0f, 4f), V(0f, 0f, 4f)
             };
 
-            var mesh = NewMesh(u, null, 0f);
+            AssertCoversExactly(NewMesh(u, null, 0f), 20f, 6);
+            AssertCoversExactly(NewMesh(Enumerable.Reverse(u).ToArray(), null, 0f), 20f, 6);
+        }
 
-            var vertices = mesh.vertices;
-            var triangles = mesh.triangles;
-            var areas = new List<float>();
-            for (int i = 0; i < triangles.Length; i += 3)
-            {
-                areas.Add(SignedAreaXZ(new[] { vertices[triangles[i]], vertices[triangles[i + 1]], vertices[triangles[i + 2]] }));
-            }
+        [Test]
+        public void BuildFloorMesh_CoversAnLShapedPolygonExactly()
+        {
+            var l = new[] { V(0f, 0f, 0f), V(4f, 0f, 0f), V(4f, 0f, 2f), V(2f, 0f, 2f), V(2f, 0f, 4f), V(0f, 0f, 4f) };
 
-            Assert.AreEqual(6, areas.Count);
-            Assert.AreEqual(1, areas.Count(area => area < 0f), "triangles with a negative area: " + string.Join(", ", areas));
-            Assert.AreEqual(20f, areas.Sum(), 1e-4f, "the areas add up to the U (24 less the notch of 4)");
+            AssertCoversExactly(NewMesh(l, null, 0f), 12f, 4);
+        }
+
+        // A point in the middle of an edge (what a boundary traced with many points has) adds no triangle and no area.
+        [Test]
+        public void BuildFloorMesh_CoversAPolygonWithPointsOnItsEdgesExactly()
+        {
+            var rectangle = new[] { V(0f, 0f, 0f), V(2f, 0f, 0f), V(4f, 0f, 0f), V(4f, 0f, 3f), V(0f, 0f, 3f) };
+
+            var mesh = NewMesh(rectangle, null, 0f);
+
+            Assert.AreEqual(5, mesh.vertexCount, "every point is a vertex");
+            AssertCoversExactly(mesh, 12f, 2);
+        }
+
+        [Test]
+        public void BuildFloorMesh_OfTheSameWholePolygonTwice_GivesTheSameTriangles()
+        {
+            var l = new[] { V(0f, 0f, 0f), V(4f, 0f, 0f), V(4f, 0f, 2f), V(2f, 0f, 2f), V(2f, 0f, 4f), V(0f, 0f, 4f) };
+
+            CollectionAssert.AreEqual(NewMesh(l, null, 0f).triangles, NewMesh(l, null, 0f).triangles);
         }
 
         // ---- ComputeBounds ----
@@ -349,6 +368,26 @@ namespace CompanionScan.Tests.Editor
             }
 
             return twice * 0.5f;
+        }
+
+        /// <summary>
+        /// The mesh's triangles all face up (a positive area seen from above) and add up to <paramref name="polygonArea"/>
+        /// (which may be negative for a polygon that runs clockwise: only its size counts), in the stated number of triangles.
+        /// </summary>
+        private static void AssertCoversExactly(Mesh mesh, float polygonArea, int triangleCount)
+        {
+            var vertices = mesh.vertices;
+            var triangles = mesh.triangles;
+            var areas = new List<float>();
+            for (int i = 0; i < triangles.Length; i += 3)
+            {
+                // SignedAreaXZ is positive counterclockwise; a triangle that faces up runs clockwise, so its area here is negative.
+                areas.Add(-SignedAreaXZ(new[] { vertices[triangles[i]], vertices[triangles[i + 1]], vertices[triangles[i + 2]] }));
+            }
+
+            Assert.AreEqual(triangleCount, areas.Count, "triangles: " + string.Join(", ", areas));
+            Assert.IsTrue(areas.All(area => area > 0f), "a triangle faces down or has no area: " + string.Join(", ", areas));
+            Assert.AreEqual(Mathf.Abs(polygonArea), areas.Sum(), 1e-4f, "the triangles do not cover the polygon exactly");
         }
 
         private static void AssertEmptyNotNull(List<Vector3> polygon)

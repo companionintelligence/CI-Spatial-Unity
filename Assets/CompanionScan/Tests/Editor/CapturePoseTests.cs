@@ -134,9 +134,15 @@ namespace CompanionScan.Tests.Editor
 
         private static CaptureFrame BuildCaptureFrame(SpatialCapturePipeline pipeline)
         {
+            // The frame the way the pipeline gets it from a plain provider (the adapter), then built into a capture.
+            var provider = (ICameraProvider)typeof(SpatialCapturePipeline)
+                .GetField("_cameraProvider", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(pipeline);
+            Assert.IsTrue(CameraSources.From(provider).TryCaptureFrame(75, out var cameraFrame), "the provider gave no frame");
+
             var method = typeof(SpatialCapturePipeline).GetMethod("BuildCaptureFrame", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.IsNotNull(method, "SpatialCapturePipeline.BuildCaptureFrame not found");
-            return (CaptureFrame)method.Invoke(pipeline, new object[] { Jpeg });
+            return (CaptureFrame)method.Invoke(pipeline, new object[] { cameraFrame });
         }
 
         private static void SetField(object target, string name, object value)

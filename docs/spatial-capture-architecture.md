@@ -67,7 +67,8 @@ For the browser/WebXR implementation, see [`web/README.md`](../web/README.md).
   classes without a Meta label (`OTHER`) keep their own detector label for both,
   so a chair and a cup are never averaged into one pin.
 - Pins prefer semantic plane intersections (floor, wall, table) when available.
-- Pins carry capture session/frame IDs plus per-label track IDs.
+- Pins carry capture session/frame IDs plus track IDs from the `TrackTable` of the
+  `com.companion.spatial` package (matched by canonical tag across captures).
 - A newer pin of the same object (track ID, Space Setup anchor, or the same label
   nearby) updates its pin. Nothing in the app clears pins, so they last until
   the app is closed. Pruning by age is optional and off.

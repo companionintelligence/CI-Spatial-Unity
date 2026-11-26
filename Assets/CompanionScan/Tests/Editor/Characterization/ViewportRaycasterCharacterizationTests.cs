@@ -96,16 +96,20 @@ namespace CompanionScan.Tests.Editor
             AssertDirection(Vector3.down, ViewportRaycaster.BuildRayFromIntrinsics(frame, new Vector2(50f, 50f)));
         }
 
-        // The identity matrix counts as intrinsics (a focal length of one pixel), so even the middle of a 640 x 480 image gives a nearly sideways ray.
+        // The identity matrix is not intrinsics (a focal length of one pixel would give the middle of a 640 x 480 image a nearly sideways ray): the ray follows the pose.
         [Test]
-        public void BuildRayFromIntrinsics_Currently_TreatsTheIdentityMatrixAsRealIntrinsics()
+        public void BuildRayFromIntrinsics_TreatsTheIdentityMatrixAsNoIntrinsics_AndFollowsThePose()
         {
-            var frame = new CaptureFrame { cameraPose = Pose.identity, cameraIntrinsics = Matrix4x4.identity };
+            var frame = new CaptureFrame
+            {
+                cameraPose = new Pose(new Vector3(1f, 2f, 3f), Quaternion.Euler(0f, 90f, 0f)),
+                cameraIntrinsics = Matrix4x4.identity
+            };
 
             var ray = ViewportRaycaster.BuildRayFromIntrinsics(frame, new Vector2(320f, 240f));
 
-            AssertDirection(new Vector3(320f, -240f, 1f), ray);
-            Assert.That(ray.direction.z, Is.LessThan(0.01f));
+            Assert.AreEqual(new Vector3(1f, 2f, 3f), ray.origin);
+            AssertDirection(Vector3.right, ray);
         }
 
         // ---- TryRaycastCapture ----
@@ -142,22 +146,22 @@ namespace CompanionScan.Tests.Editor
             Assert.AreEqual(RaycastHitType.Fallback, hitType);
         }
 
-        // A missing frame raycasts through the bottom left corner of the camera's view whatever the pixel, and allowFallback is ignored.
+        // No frame means no ray (the pixel belongs to a frame): no hit and no fallback point, whatever the pixel and allowFallback. It used to raycast through the bottom left corner of the camera's view.
         [Test]
-        public void TryRaycastCapture_Currently_WithoutAFrameUsesTheBottomLeftCornerOfTheCamerasView_AndIgnoresAllowFallback()
+        public void TryRaycastCapture_WithoutAFrame_HasNoRayAndNoHit_WhateverThePixelAndAllowFallback()
         {
             var camera = NewCamera(Far, Quaternion.identity);
             var raycaster = NewRaycaster(camera);
-            var ray = camera.ViewportPointToRay(new Vector3(0f, 0f, 0f));
-            var expected = ray.origin + ray.direction * 2f;
 
-            var withFallback = raycaster.TryRaycastCapture(null, new Vector2(300f, 200f), true, out var first, out _, out var firstType);
-            var withoutFallback = raycaster.TryRaycastCapture(null, new Vector2(10f, 10f), false, out var second, out _, out var secondType);
+            var withFallback = raycaster.TryRaycastCapture(null, new Vector2(300f, 200f), true, out var first, out var firstNormal, out var firstType);
+            var withoutFallback = raycaster.TryRaycastCapture(null, new Vector2(10f, 10f), false, out var second, out var secondNormal, out var secondType);
 
             Assert.IsFalse(withFallback);
             Assert.IsFalse(withoutFallback);
-            Assert.That(Vector3.Distance(expected, first), Is.LessThan(1e-3f));
-            Assert.That(Vector3.Distance(expected, second), Is.LessThan(1e-3f));
+            Assert.AreEqual(Vector3.zero, first);
+            Assert.AreEqual(Vector3.zero, second);
+            Assert.AreEqual(Vector3.up, firstNormal);
+            Assert.AreEqual(Vector3.up, secondNormal);
             Assert.AreEqual(RaycastHitType.Fallback, firstType);
             Assert.AreEqual(RaycastHitType.Fallback, secondType);
         }

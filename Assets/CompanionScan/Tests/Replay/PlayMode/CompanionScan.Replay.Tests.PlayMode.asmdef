@@ -1,0 +1,23 @@
+{
+  "name": "CompanionScan.Replay.Tests.PlayMode",
+  "rootNamespace": "CompanionScan.Replay.Tests",
+  "references": [
+    "CompanionScan.Core",
+    "CompanionScan.Replay",
+    "UnityEngine.TestRunner"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll",
+    "Newtonsoft.Json.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
